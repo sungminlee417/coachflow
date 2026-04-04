@@ -1,0 +1,4 @@
+-- This is a note: You need to disable email confirmation in the Supabase Dashboard
+-- Go to: Authentication > Settings > Email Auth
+-- Turn OFF "Enable email confirmations"
+-- This allows users to sign up without needing to confirm their email during development
