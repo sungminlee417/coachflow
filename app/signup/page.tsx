@@ -134,18 +134,28 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
-        <div>
-          <h2 className="text-center text-3xl font-bold text-gray-900">
-            {inviteCode ? 'Join CoachFlow' : 'Create your account'}
-          </h2>
-          {inviteCode && (
-            <p className="mt-2 text-center text-sm text-gray-600">
-              You've been invited to join as a client
-            </p>
-          )}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="max-w-md w-full mx-4">
+        <div className="text-center mb-8">
+          <Link href="/" className="text-3xl font-bold text-gray-900">
+            CoachFlow
+          </Link>
         </div>
+        <div className="bg-white rounded-xl shadow-xl p-8">
+          <div>
+            <h2 className="text-center text-3xl font-bold text-gray-900">
+              {inviteCode ? 'Join CoachFlow' : 'Create your account'}
+            </h2>
+            {inviteCode ? (
+              <p className="mt-2 text-center text-sm text-gray-600">
+                You've been invited to join as a client
+              </p>
+            ) : (
+              <p className="mt-2 text-center text-sm text-gray-600">
+                Start your fitness coaching journey today
+              </p>
+            )}
+          </div>
         <form className="mt-8 space-y-6" onSubmit={handleSignup}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
@@ -247,6 +257,7 @@ export default function Signup() {
             </Link>
           </div>
         </form>
+        </div>
       </div>
     </div>
   )

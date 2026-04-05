@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import ClientDetailView from './ClientDetailView'
 
 interface Client {
   id: string
@@ -17,6 +18,7 @@ interface ClientListProps {
 export default function ClientList({ coachId }: ClientListProps) {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -60,6 +62,16 @@ export default function ClientList({ coachId }: ClientListProps) {
     return <div>Loading...</div>
   }
 
+  if (selectedClient) {
+    return (
+      <ClientDetailView
+        client={selectedClient}
+        coachId={coachId}
+        onBack={() => setSelectedClient(null)}
+      />
+    )
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -77,7 +89,11 @@ export default function ClientList({ coachId }: ClientListProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {clients.map((client) => (
-            <div key={client.id} className="bg-white rounded-lg shadow p-6">
+            <button
+              key={client.id}
+              onClick={() => setSelectedClient(client)}
+              className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left w-full"
+            >
               <div className="flex items-center space-x-4">
                 <div className="h-12 w-12 bg-blue-500 rounded-full flex items-center justify-center text-white text-lg font-bold">
                   {client.full_name?.charAt(0) || 'C'}
@@ -89,8 +105,9 @@ export default function ClientList({ coachId }: ClientListProps) {
                     Joined {new Date(client.started_at).toLocaleDateString()}
                   </p>
                 </div>
+                <div className="text-gray-400">→</div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
