@@ -38,7 +38,7 @@ export default function ClientDetailView({
   coachId,
   onBack,
 }: ClientDetailViewProps) {
-  const { openChat, closeChat, open } = useChatContext();
+  const [open, setOpen] = useState(false);
   const [assignments, setAssignments] = useState<WorkoutAssignment[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +76,9 @@ export default function ClientDetailView({
       console.error("Error fetching workouts:", error);
     }
   };
+
+  const openChat = () => setOpen(true);
+  const closeChat = () => setOpen(false);
 
   const fetchClientAssignments = async () => {
     try {

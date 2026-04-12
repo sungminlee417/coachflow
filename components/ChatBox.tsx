@@ -13,7 +13,7 @@ export default function ChatBox({ clientId, open }: ChatBoxProps) {
   const supabase = createClient();
   // state - some that persist (value that persis on component render)
   // component -> fragment of jsx/tsx logic for it
-  const [conversationId, setConversationId] = useState<String | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   console.log("conversationId:", conversationId);
   // built in react hook that runs callback on mount
   useEffect(() => {

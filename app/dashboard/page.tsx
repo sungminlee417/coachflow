@@ -32,10 +32,7 @@ export default async function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       <ChatProvider>
         {profile.role === "coach" ? (
-          <CoachDashboard user={user} profile={profile}>
-            {" "}
-            hi
-          </CoachDashboard> // becomes children
+          <CoachDashboard user={user} profile={profile} />
         ) : (
           <ClientDashboard user={user} profile={profile} /> // becomes children
         )}
