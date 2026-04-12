@@ -26,7 +26,7 @@ export default function ClientDashboard({ user, profile }: ClientDashboardProps)
       // Get coach relationship
       const { data: relationship } = await supabase
         .from('coach_client_relationships')
-        .select('coach_id, profiles(*)')
+        .select('coach_id, profiles!coach_client_relationships_coach_id_fkey(*)')
         .eq('client_id', user.id)
         .eq('status', 'active')
         .single()

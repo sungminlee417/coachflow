@@ -19,12 +19,14 @@ export default function Signup() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
-
+  
   const handleSignup = async (e: React.FormEvent) => {
+    console.log("FORM SUBMITTED") // testing 1.
     e.preventDefault()
     setError(null)
     setLoading(true)
-
+    console.log("ROLE (before check):", role) // testing 2
+    console.log("INVITE CODE (before check):", inviteCode) // testing 3
     try {
       // If invite code is present, validate it first
       if (inviteCode && role === 'client') {
@@ -110,16 +112,13 @@ export default function Signup() {
             if (relationshipError) throw relationshipError
 
             // Update invite code usage
-            const newTimesUsed = inviteData.times_used + 1
-            const newStatus = newTimesUsed >= inviteData.max_uses ? 'accepted' : 'pending'
-
-            await supabase
-              .from('invite_codes')
-              .update({
-                times_used: newTimesUsed,
-                status: newStatus,
-              })
-              .eq('id', inviteData.id)
+           const { error:rpcError } = await supabase.rpc('use_invite', {
+            code: inviteCode
+           })
+           if (rpcError) {
+            console.error("RPC invite update failed:", rpcError)
+            throw rpcError
+           }
           }
         }
 
