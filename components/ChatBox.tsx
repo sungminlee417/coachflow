@@ -5,15 +5,19 @@ import { createClient } from "@/lib/supabase/client"; // supabase client
 
 type ChatBoxProps = {
   clientId: string;
+  open: boolean;
 };
 // get Current user
 // I need supabase client
-export default function ChatBox({ clientId }: ChatBoxProps) {
+export default function ChatBox({ clientId, open }: ChatBoxProps) {
   const supabase = createClient();
-
+  // state - some that persist (value that persis on component render)
+  // component -> fragment of jsx/tsx logic for it
   const [conversationId, setConversationId] = useState<String | null>(null);
   console.log("conversationId:", conversationId);
+  // built in react hook that runs callback on mount
   useEffect(() => {
+    // run on component mount and/or dependency change
     const setupConversation = async () => {
       // get current user
       const {
@@ -29,7 +33,7 @@ export default function ChatBox({ clientId }: ChatBoxProps) {
         .eq("client_id", clientId)
         .maybeSingle(); // expects only 1 result and returns null if none
 
-      let conversationId;
+      let conversationId: string;
 
       // create if not exists
       if (existingConversation) {
@@ -47,9 +51,10 @@ export default function ChatBox({ clientId }: ChatBoxProps) {
         conversationId = newConversation.id;
       }
       // save to state
+      // renders (unmounted) state will go away if we unmount
       setConversationId(conversationId);
     };
     setupConversation();
-  }, [clientId]);
-  return <div>ChatBox</div>;
+  }, [clientId]); // dependency array (if this change, useEffect will run again)
+  return open ? <div>ChatBox</div> : null;
 }

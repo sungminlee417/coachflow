@@ -1,7 +1,8 @@
 "use client";
-
+import { useChatContext } from "@/app/directmessage/ChatContext";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import ChatBox from "./ChatBox";
 
 interface Client {
   id: string;
@@ -37,6 +38,7 @@ export default function ClientDetailView({
   coachId,
   onBack,
 }: ClientDetailViewProps) {
+  const { openChat, closeChat, open } = useChatContext();
   const [assignments, setAssignments] = useState<WorkoutAssignment[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +100,7 @@ export default function ClientDetailView({
       if (error) throw error;
 
       const workoutData = data || [];
+      setAssignments(workoutData);
 
       // Calculate stats
       const totalAssigned = workoutData.length;
@@ -188,6 +191,8 @@ export default function ClientDetailView({
                   ✕
                 </button>
               </div>
+              {/* context that holds state value
+                client will have t */}
 
               <div className="mb-4 p-3 bg-blue-50 rounded">
                 <p className="text-sm text-blue-900 font-medium">
@@ -295,12 +300,23 @@ export default function ClientDetailView({
           <p className="text-gray-600">{client.email}</p>
         </div>
         <button
+          onClick={() => openChat()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
+          Direct message
+        </button>
+        <button
           onClick={() => setShowAssignment(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
           Assign Workout
         </button>
       </div>
+
+      {/* chat box needs to be open based on state
+       * absolutely position on bottom left
+       * pass in close function so it closes chatbot on button x */}
+      <ChatBox clientId={client.id} open={open} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

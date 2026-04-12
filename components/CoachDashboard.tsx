@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import InviteCodeGenerator from "./InviteCodeGenerator";
@@ -10,9 +10,14 @@ import WorkoutLibrary from "./WorkoutLibrary";
 interface CoachDashboardProps {
   user: User;
   profile: any;
+  children: ReactNode;
 }
 
-export default function CoachDashboard({ user, profile }: CoachDashboardProps) {
+export default function CoachDashboard({
+  user,
+  profile,
+  children,
+}: CoachDashboardProps) {
   const [activeTab, setActiveTab] = useState<
     "clients" | "workouts" | "invites"
   >("clients");
@@ -33,6 +38,7 @@ export default function CoachDashboard({ user, profile }: CoachDashboardProps) {
               <h1 className="text-2xl font-bold text-gray-900">CoachFlow</h1>
               <p className="text-sm text-gray-600">
                 Welcome back, {profile.full_name}
+                {children}
               </p>
             </div>
             <button
