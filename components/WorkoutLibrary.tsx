@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { showToast } from './Toast'
+import { Plus, Send, Pencil, Trash2, Dumbbell } from 'lucide-react'
 import WorkoutBuilder from './WorkoutBuilder'
 import WorkoutAssignment from './WorkoutAssignment'
 
@@ -54,8 +56,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
       })) || []
 
       setWorkouts(workoutsWithCount)
-    } catch (error) {
-      console.error('Error fetching workouts:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -83,9 +84,9 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
       if (error) throw error
 
       await fetchWorkouts()
-    } catch (error) {
-      console.error('Error deleting workout:', error)
-      alert('Failed to delete workout')
+      showToast('Workout deleted')
+    } catch {
+      showToast('Failed to delete workout', 'error')
     }
   }
 
@@ -115,89 +116,92 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
     )
   }
 
-  if (showAssignment && assigningWorkout) {
-    return (
-      <WorkoutAssignment
-        coachId={coachId}
-        workoutId={assigningWorkout.id}
-        workoutName={assigningWorkout.name}
-        onClose={handleCloseAssignment}
-      />
-    )
-  }
-
   if (loading) {
-    return <div>Loading...</div>
+    return <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
   }
 
   return (
     <div>
+      {showAssignment && assigningWorkout && (
+        <WorkoutAssignment
+          coachId={coachId}
+          workoutId={assigningWorkout.id}
+          workoutName={assigningWorkout.name}
+          onClose={handleCloseAssignment}
+        />
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Workout Library</h2>
-          <p className="text-gray-600 mt-1">
+          <h2 className="text-2xl font-bold text-slate-900">Workout Library</h2>
+          <p className="text-sm text-slate-500 mt-1">
             {workouts.length} {workouts.length === 1 ? 'workout' : 'workouts'}
           </p>
         </div>
         <button
           onClick={handleCreateNew}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors cursor-pointer"
         >
+          <Plus size={16} />
           Create Workout
         </button>
       </div>
 
       {workouts.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <p className="text-gray-500 mb-4">No workouts yet. Create your first workout template!</p>
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Dumbbell size={20} className="text-slate-400" />
+          </div>
+          <p className="text-slate-500 mb-1">No workouts yet</p>
+          <p className="text-sm text-slate-400 mb-5">Create your first workout template</p>
           <button
             onClick={handleCreateNew}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors cursor-pointer"
           >
+            <Plus size={16} />
             Create Your First Workout
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {workouts.map((workout) => (
-            <div key={workout.id} className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">{workout.name}</h3>
-                  {workout.description && (
-                    <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
-                  )}
-                </div>
+            <div key={workout.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:border-indigo-200 transition-colors">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-semibold text-slate-900">{workout.name}</h3>
                 {workout.is_template && (
-                  <span className="ml-2 px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">
+                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-50 text-purple-600 border border-purple-200 rounded-full">
                     Template
                   </span>
                 )}
               </div>
-              <div className="text-sm text-gray-500 mb-4">
+              {workout.description && (
+                <p className="text-sm text-slate-500 mb-3 line-clamp-2">{workout.description}</p>
+              )}
+              <p className="text-xs text-slate-400 mb-4">
                 {workout.exercise_count} {workout.exercise_count === 1 ? 'exercise' : 'exercises'}
-              </div>
-              <div className="space-y-2">
+              </p>
+              <div className="flex gap-2">
                 <button
                   onClick={() => handleAssign(workout)}
-                  className="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors cursor-pointer"
                 >
-                  Assign to Client
+                  <Send size={14} />
+                  Assign
                 </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(workout)}
-                    className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(workout.id)}
-                    className="px-3 py-2 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-                  >
-                    Delete
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleEdit(workout)}
+                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  aria-label="Edit workout"
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  onClick={() => handleDelete(workout.id)}
+                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  aria-label="Delete workout"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             </div>
           ))}

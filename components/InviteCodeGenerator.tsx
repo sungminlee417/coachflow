@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { showToast } from './Toast'
+import { Plus, Copy, Link as LinkIcon } from 'lucide-react'
 
 interface InviteCode {
   id: string
@@ -37,8 +39,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
 
       if (error) throw error
       setInviteCodes(data || [])
-    } catch (error) {
-      console.error('Error fetching invite codes:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -47,7 +48,6 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
   const generateInviteCode = async () => {
     setGenerating(true)
     try {
-      // Generate a random 8-character code
       const code = Math.random().toString(36).substring(2, 10).toUpperCase()
 
       const { error } = await supabase
@@ -62,107 +62,85 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
       if (error) throw error
 
       await fetchInviteCodes()
-    } catch (error) {
-      console.error('Error generating invite code:', error)
-      alert('Failed to generate invite code')
+    } catch {
+      showToast('Failed to generate invite code', 'error')
     } finally {
       setGenerating(false)
     }
   }
 
   const copyInviteLink = (code: string) => {
-    const link = `${window.location.origin}/signup?invite=${code}`
+    const link = `${window.location.origin}/invite?code=${code}`
     navigator.clipboard.writeText(link)
-    alert('Invite link copied to clipboard!')
+    showToast('Invite link copied to clipboard!')
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
   }
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Invite Codes</h2>
-          <p className="text-gray-600 mt-1">Generate invite codes to connect with new clients</p>
+          <h2 className="text-2xl font-bold text-slate-900">Invite Codes</h2>
+          <p className="text-sm text-slate-500 mt-1">Generate invite codes to connect with new clients</p>
         </div>
         <button
           onClick={generateInviteCode}
           disabled={generating}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors cursor-pointer"
         >
-          {generating ? 'Generating...' : 'Generate New Code'}
+          <Plus size={16} />
+          {generating ? 'Generating...' : 'Generate Code'}
         </button>
       </div>
 
       {inviteCodes.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <p className="text-gray-500">No invite codes yet. Generate one to get started!</p>
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <LinkIcon size={20} className="text-slate-400" />
+          </div>
+          <p className="text-slate-500 mb-1">No invite codes yet</p>
+          <p className="text-sm text-slate-400">Generate one to invite your first client</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Code
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Usage
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {inviteCodes.map((invite) => (
-                <tr key={invite.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-                      {invite.code}
-                    </code>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        invite.status === 'pending'
-                          ? 'bg-green-100 text-green-800'
-                          : invite.status === 'accepted'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {invite.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {invite.times_used} / {invite.max_uses}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(invite.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {invite.status === 'pending' && invite.times_used < invite.max_uses && (
-                      <button
-                        onClick={() => copyInviteLink(invite.code)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Copy Link
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-3">
+          {inviteCodes.map((invite) => (
+            <div key={invite.id} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <code className="text-sm font-mono bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-slate-700">
+                  {invite.code}
+                </code>
+                <span
+                  className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                    invite.status === 'pending'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : invite.status === 'accepted'
+                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                      : 'bg-slate-50 text-slate-600 border border-slate-200'
+                  }`}
+                >
+                  {invite.status}
+                </span>
+                <span className="text-sm text-slate-400">
+                  {invite.times_used}/{invite.max_uses} used
+                </span>
+                <span className="text-sm text-slate-400">
+                  {new Date(invite.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              {invite.status === 'pending' && invite.times_used < invite.max_uses && (
+                <button
+                  onClick={() => copyInviteLink(invite.code)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer font-medium"
+                >
+                  <Copy size={14} />
+                  Copy Link
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
