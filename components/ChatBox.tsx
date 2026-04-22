@@ -2,14 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client"; // supabase client
+// passing whole client object (supabase)
+interface Client {
+  id: string;
+  full_name: string;
+  email: string;
+}
 
 type ChatBoxProps = {
   clientId: string;
+  client: Client;
   open: boolean;
+  onClose: () => void;
 };
+
 // get Current user
 // I need supabase client
-export default function ChatBox({ clientId, open }: ChatBoxProps) {
+export default function ChatBox({ clientId, open, onClose }: ChatBoxProps) {
   const supabase = createClient();
   // state - some that persist (value that persis on component render)
   // component -> fragment of jsx/tsx logic for it

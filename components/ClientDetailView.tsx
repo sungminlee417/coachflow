@@ -39,6 +39,7 @@ export default function ClientDetailView({
   onBack,
 }: ClientDetailViewProps) {
   const [open, setOpen] = useState(false);
+  const [close, setClose] = useState(false);
   const [assignments, setAssignments] = useState<WorkoutAssignment[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -319,7 +320,7 @@ export default function ClientDetailView({
       {/* chat box needs to be open based on state
        * absolutely position on bottom left
        * pass in close function so it closes chatbot on button x */}
-      <ChatBox clientId={client.id} open={open} />
+      <ChatBox clientId={client.id} open={open} onClose={closeChat} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

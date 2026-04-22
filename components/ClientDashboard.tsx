@@ -1,50 +1,57 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
-import ClientWorkoutView from './ClientWorkoutView'
-import WorkoutHistory from './WorkoutHistory'
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
+import ClientWorkoutView from "./ClientWorkoutView";
+import WorkoutHistory from "./WorkoutHistory";
 
 interface ClientDashboardProps {
-  user: User
-  profile: any
+  user: User;
+  profile: any;
 }
 
-export default function ClientDashboard({ user, profile }: ClientDashboardProps) {
-  const [coach, setCoach] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'workouts' | 'history'>('workouts')
-  const supabase = createClient()
+export default function ClientDashboard({
+  user,
+  profile,
+}: ClientDashboardProps) {
+  const [coach, setCoach] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"workouts" | "history">(
+    "workouts",
+  );
+  const supabase = createClient();
 
   useEffect(() => {
-    fetchCoach()
-  }, [])
+    fetchCoach();
+  }, []);
 
   const fetchCoach = async () => {
     try {
       // Get coach relationship
       const { data: relationship } = await supabase
-        .from('coach_client_relationships')
-        .select('coach_id, profiles(*)')
-        .eq('client_id', user.id)
-        .eq('status', 'active')
-        .single()
+        .from("coach_client_relationships")
+        .select(
+          "coach_id, profiles!coach_client_relationships_coach_id_fkey(*)",
+        )
+        .eq("client_id", user.id)
+        .eq("status", "active")
+        .single();
 
       if (relationship) {
-        setCoach(relationship.profiles)
+        setCoach(relationship.profiles);
       }
     } catch (error) {
-      console.error('Error fetching coach:', error)
+      console.error("Error fetching coach:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/login'
-  }
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
 
   return (
     <div className="min-h-screen">
@@ -54,7 +61,9 @@ export default function ClientDashboard({ user, profile }: ClientDashboardProps)
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">CoachFlow</h1>
-              <p className="text-sm text-gray-600">Welcome back, {profile.full_name}</p>
+              <p className="text-sm text-gray-600">
+                Welcome back, {profile.full_name}
+              </p>
             </div>
             <button
               onClick={handleLogout}
@@ -76,7 +85,7 @@ export default function ClientDashboard({ user, profile }: ClientDashboardProps)
           ) : coach ? (
             <div className="flex items-center space-x-4">
               <div className="h-16 w-16 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                {coach.full_name?.charAt(0) || 'C'}
+                {coach.full_name?.charAt(0) || "C"}
               </div>
               <div>
                 <h3 className="text-lg font-medium">{coach.full_name}</h3>
@@ -85,8 +94,12 @@ export default function ClientDashboard({ user, profile }: ClientDashboardProps)
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-gray-500 mb-4">You're not connected to a coach yet.</p>
-              <p className="text-sm text-gray-600">Ask your coach for an invite link to get started.</p>
+              <p className="text-gray-500 mb-4">
+                You're not connected to a coach yet.
+              </p>
+              <p className="text-sm text-gray-600">
+                Ask your coach for an invite link to get started.
+              </p>
             </div>
           )}
         </div>
@@ -98,21 +111,21 @@ export default function ClientDashboard({ user, profile }: ClientDashboardProps)
             <div className="border-b border-gray-200 mb-6">
               <nav className="-mb-px flex space-x-8">
                 <button
-                  onClick={() => setActiveTab('workouts')}
+                  onClick={() => setActiveTab("workouts")}
                   className={`${
-                    activeTab === 'workouts'
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    activeTab === "workouts"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                 >
                   My Workouts
                 </button>
                 <button
-                  onClick={() => setActiveTab('history')}
+                  onClick={() => setActiveTab("history")}
                   className={`${
-                    activeTab === 'history'
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    activeTab === "history"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                 >
                   History & Progress
@@ -122,7 +135,7 @@ export default function ClientDashboard({ user, profile }: ClientDashboardProps)
 
             {/* Tab Content */}
             <div className="bg-white rounded-lg shadow p-6">
-              {activeTab === 'workouts' ? (
+              {activeTab === "workouts" ? (
                 <ClientWorkoutView clientId={user.id} />
               ) : (
                 <WorkoutHistory clientId={user.id} />
@@ -132,5 +145,5 @@ export default function ClientDashboard({ user, profile }: ClientDashboardProps)
         )}
       </div>
     </div>
-  )
+  );
 }
