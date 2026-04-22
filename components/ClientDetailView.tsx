@@ -320,7 +320,12 @@ export default function ClientDetailView({
       {/* chat box needs to be open based on state
        * absolutely position on bottom left
        * pass in close function so it closes chatbot on button x */}
-      <ChatBox clientId={client.id} open={open} onClose={closeChat} />
+      <ChatBox
+        clientId={client.id}
+        open={open}
+        onClose={closeChat}
+        client={client}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
