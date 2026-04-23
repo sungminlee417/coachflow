@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client"; // supabase client
 // passing whole client object (supabase)
 interface Client {
@@ -38,68 +38,84 @@ export default function ChatBox({
   // array destructing 1. the current value 2. setter function
   const [isMinimized, setIsMinimized] = useState(false); // const -> variable can't be reassigned
   const minimize = () => setIsMinimized(!isMinimized); // set it to true
-  console.log("conversationId:", conversationId); // with state, never assign variable directly, use setter function
+  // with state, never assign variable directly, use setter function
   // built in react hook that runs callback on mount
   // TODO: message                creates state/ <> generic(typescript syntax) /[] array of messages
   const [messages, setMessages] = useState<Messages[]>([]); //empty array because no messages are loaded.
   const [messageText, setMessageText] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   // messages = loop through messages to display chat bubbles in UI
   // setMessages(function) = call this after fetching from Supabase to store results
   // flow
   // fetch from Supabase -> get array of messages -> setMessages(data) -> messages now has data
   // -> render them on screen.
+  const setupRan = useRef(false);
   useEffect(() => {
     // run on component mount and/or dependency change
     const setupConversation = async () => {
       // get current user
+      if (setupRan.current) return;
+      setupRan.current = true;
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
 
       // find existing conversation
+      let conversationId: string;
       const { data: existingConversation } = await supabase
         .from("conversations")
         .select("*")
         .eq("coach_id", user.id)
         .eq("client_id", clientId)
-        .maybeSingle(); // expects only 1 result and returns null if none
+        .maybeSingle();
 
-      let conversationId: string;
-
-      // create if not exists
       if (existingConversation) {
         conversationId = existingConversation.id;
       } else {
-        const { data: newConversation } = await supabase
+        const { data: newConversation, error } = await supabase
           .from("conversations")
-          .insert({
-            coach_id: user.id,
-            client_id: clientId,
-          })
+          .insert({ coach_id: user.id, client_id: clientId })
           .select()
           .single();
 
+        if (error) {
+          console.error("error creating convo:", error);
+          return;
+        }
         conversationId = newConversation.id;
       }
-      const fetchMessages = async () => {
-        const { data } = await supabase // wait here until supabase responds then continues.
-          .from("messages")
-          .select("*")
-          .eq("conversation_id", conversationId)
-          .order("created_at", { ascending: true });
-        setMessages(data || []);
-      };
+
       // save to state
       // renders (unmounted) state will go away if we unmount
       setConversationId(conversationId);
-      fetchMessages();
+      setCurrentUserId(user.id); // from line 57 user object, currentUserId = state variable.
+      fetchMessages(conversationId);
     };
     setupConversation();
   }, [clientId]); // dependency array (if this change, useEffect will run again)
+  const fetchMessages = async (convId: string) => {
+    const { data } = await supabase // wait here until supabase responds then continues.
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", convId)
+      .order("created_at", { ascending: true });
+    setMessages(data || []);
+  };
+  const sendMessage = async () => {
+    // check if messageText is empty or conversationId is null.
+    if (!messageText || !conversationId) return;
+    await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      sender_id: currentUserId,
+      content: messageText,
+    });
+    setMessageText("");
+    fetchMessages(conversationId as string);
+  };
   return open ? (
     <div
-      className={`fixed bottom-4 right-4 w-80 z-50 ${isMinimized ? "h-auto" : "h-96"} bg-white rounded-lg shadow-lg`}
+      className={`fixed bottom-4 border right-4 w-80 z-50 ${isMinimized ? "h-auto" : "h-96"} bg-white rounded-lg shadow-lg`}
     >
       {/*header div: it needs name and close/minimize button*/}
       <div className="justify-between flex border-b bg-gray-100">
@@ -120,15 +136,50 @@ export default function ChatBox({
         </div>
       </div>
       {!isMinimized && (
-        <input
-          value={messageText}
-          onChange={(e) => setMessageText(e.target.value)}
-          className="absolute bottom-0 left-0 right-0 p-1.5 w-full border rounded-full px-2 py-1"
-          placeholder="Aa"
-        ></input>
+        <div className="p-2 overflow-y-auto flex-1">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex mb-1 ${
+                message.sender_id === currentUserId
+                  ? "justify-end"
+                  : "justify-start"
+              }`}
+            >
+              <div
+                className={`px-3 py-1 rounded-full text-sm max-w-xs ${
+                  message.sender_id === currentUserId
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-200 text-gray-900"
+                }`}
+              >
+                {message.content}
+              </div>
+            </div>
+          ))}
+          {""}
+        </div>
+      )}
+      {/* input area + send button*/}
+      {!isMinimized && (
+        <div className="absolute bottom-1 left-1 right-1 flex gap-1">
+          <input
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            className="flex-1 p-1 border rounded-full px-1 py-0.5"
+            placeholder="Aa"
+          />
+          <button
+            onClick={sendMessage}
+            className="px-3 py-1 bg-blue-600 text-white rounded-full text-sm"
+          >
+            send
+          </button>
+        </div>
       )}
     </div>
   ) : null;
+
   {
     /* onClose function from ClientDetailView gets called, sets setOpen to false */
   }

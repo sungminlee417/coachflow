@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import ClientWorkoutView from "./ClientWorkoutView";
 import WorkoutHistory from "./WorkoutHistory";
+import ChatBox from "./ChatBox";
 
 interface ClientDashboardProps {
   user: User;
@@ -21,6 +22,8 @@ export default function ClientDashboard({
     "workouts",
   );
   const supabase = createClient();
+  //value     // setter
+  const [isChatOpen, setIsOpenChat] = useState(false);
 
   useEffect(() => {
     fetchCoach();
