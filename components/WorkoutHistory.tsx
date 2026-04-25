@@ -55,7 +55,11 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
 
       if (error) throw error
 
-      const workouts = data || []
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const workouts = (data || []).map((item: any) => ({
+        ...item,
+        workout: Array.isArray(item.workout) ? item.workout[0] : item.workout,
+      }))
       setCompletedWorkouts(workouts)
 
       // Calculate stats
@@ -76,8 +80,7 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
         currentWeekCompleted,
         currentMonthCompleted
       })
-    } catch (error) {
-      console.error('Error fetching workout history:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -98,17 +101,17 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Workout History</h2>
+      <h2 className="text-2xl font-bold text-slate-900 mb-6">Workout History</h2>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow p-6 text-white">
           <div className="text-3xl font-bold mb-1">{stats.currentWeekCompleted}</div>
-          <div className="text-blue-100 text-sm">This Week</div>
+          <div className="text-indigo-100 text-sm">This Week</div>
         </div>
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow p-6 text-white">
           <div className="text-3xl font-bold mb-1">{stats.currentMonthCompleted}</div>
-          <div className="text-green-100 text-sm">This Month</div>
+          <div className="text-emerald-100 text-sm">This Month</div>
         </div>
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow p-6 text-white">
           <div className="text-3xl font-bold mb-1">{stats.totalCompleted}</div>
@@ -118,29 +121,29 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
 
       {/* Workout History List */}
       {completedWorkouts.length === 0 ? (
-        <div className="bg-gray-50 rounded-lg p-8 text-center">
-          <p className="text-gray-500">No completed workouts yet</p>
-          <p className="text-sm text-gray-400 mt-2">Complete your first workout to see it here!</p>
+        <div className="bg-slate-50 rounded-lg p-8 text-center">
+          <p className="text-slate-500">No completed workouts yet</p>
+          <p className="text-sm text-slate-400 mt-2">Complete your first workout to see it here!</p>
         </div>
       ) : (
         <div className="space-y-3">
           {completedWorkouts.map((assignment) => (
             <div
               key={assignment.id}
-              className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-4 border-l-4 border-green-500"
+              className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-4 border-l-4 border-emerald-500"
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">{assignment.workout.name}</h3>
+                  <h3 className="font-semibold text-slate-900">{assignment.workout.name}</h3>
                   {assignment.workout.description && (
-                    <p className="text-sm text-gray-600 mt-1">{assignment.workout.description}</p>
+                    <p className="text-sm text-slate-600 mt-1">{assignment.workout.description}</p>
                   )}
                 </div>
                 <div className="text-right ml-4">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-slate-500">
                     {assignment.completed_at ? formatDate(assignment.completed_at) : 'Unknown'}
                   </div>
-                  <div className="flex items-center mt-1 text-green-600 text-xs font-medium">
+                  <div className="flex items-center mt-1 text-emerald-600 text-xs font-medium">
                     <span className="mr-1">✓</span>
                     Completed
                   </div>

@@ -1,8 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import CoachDashboard from '@/components/CoachDashboard'
-import ClientDashboard from '@/components/ClientDashboard'
+import UnifiedDashboard from '@/components/UnifiedDashboard'
 import ProfileNotFound from '@/components/ProfileNotFound'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+}
 
 export default async function Dashboard() {
   const supabase = await createClient()
@@ -13,7 +17,7 @@ export default async function Dashboard() {
     redirect('/login')
   }
 
-  // Get user profile with role
+  // Get user profile
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
@@ -21,17 +25,12 @@ export default async function Dashboard() {
     .single()
 
   if (!profile) {
-    // Profile doesn't exist - this means signup didn't complete properly
     return <ProfileNotFound error={profileError?.message} />
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {profile.role === 'coach' ? (
-        <CoachDashboard user={user} profile={profile} />
-      ) : (
-        <ClientDashboard user={user} profile={profile} />
-      )}
+      <UnifiedDashboard user={user} profile={profile} />
     </div>
   )
 }
