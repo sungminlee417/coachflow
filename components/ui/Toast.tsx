@@ -3,23 +3,25 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CheckCircle, XCircle } from 'lucide-react'
 
+type ToastType = 'success' | 'error'
+
 interface ToastMessage {
   id: number
   text: string
-  type: 'success' | 'error'
+  type: ToastType
 }
 
 let toastId = 0
-let addToastFn: ((text: string, type: 'success' | 'error') => void) | null = null
+let addToastFn: ((text: string, type: ToastType) => void) | null = null
 
-export function showToast(text: string, type: 'success' | 'error' = 'success') {
+export function showToast(text: string, type: ToastType = 'success') {
   addToastFn?.(text, type)
 }
 
 export default function ToastContainer() {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
-  const addToast = useCallback((text: string, type: 'success' | 'error') => {
+  const addToast = useCallback((text: string, type: ToastType) => {
     const id = ++toastId
     setToasts(prev => [...prev, { id, text, type }])
     setTimeout(() => {
@@ -29,7 +31,9 @@ export default function ToastContainer() {
 
   useEffect(() => {
     addToastFn = addToast
-    return () => { addToastFn = null }
+    return () => {
+      addToastFn = null
+    }
   }, [addToast])
 
   if (toasts.length === 0) return null
@@ -41,9 +45,7 @@ export default function ToastContainer() {
           key={toast.id}
           style={{ animation: 'slideUp 0.2s ease-out' }}
           className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${
-            toast.type === 'success'
-              ? 'bg-emerald-600 text-white'
-              : 'bg-red-600 text-white'
+            toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
           }`}
         >
           {toast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
