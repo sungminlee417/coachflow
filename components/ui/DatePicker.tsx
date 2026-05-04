@@ -103,6 +103,8 @@ export function DatePicker({
           className="absolute z-50 mt-2 bg-white rounded-xl border border-slate-200 shadow-xl p-3 left-0"
           style={
             {
+              animation: 'popIn 0.15s ease-out',
+              transformOrigin: 'top left',
               // react-day-picker v9 theme variables
               '--rdp-accent-color': '#4f46e5',
               '--rdp-accent-background-color': '#4f46e5',

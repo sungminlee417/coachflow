@@ -7,8 +7,9 @@ import { IconButton } from '@/components/ui/IconButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { showToast } from '@/components/ui/Toast'
 import { Trash2 } from 'lucide-react'
-import { todayISO, formatLongDate, unwrapJoin } from '@/lib/utils'
-import type { Exercise, WorkoutAssignment } from '@/lib/types'
+import { todayISO, formatLongDate, unwrapJoin, weekdayOf } from '@/lib/utils'
+import type { DayOfWeek, Exercise, ExerciseSet, WorkoutAssignment } from '@/lib/types'
+import { ExerciseSetLogger } from './ExerciseSetLogger'
 
 interface ClientWorkoutViewProps {
   clientId: string
@@ -42,39 +43,63 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
   const fetchAssignments = async () => {
     setLoading(true)
     try {
+      // An assignment is active on selectedDate if its [start_date, end_date]
+      // window contains the date (with nulls treated as open-ended).
       const { data, error } = await supabase
         .from('workout_assignments')
         .select(`
-          id, assigned_date, completed, notes, coach_id,
+          id, start_date, end_date, completed, completed_at, notes, coach_id,
           workout:workout_id (
-            id, name, description,
-            exercises ( id, name, sets, reps, weight, rest_seconds, notes, order_index )
+            id, name, description, days_of_week,
+            exercises (
+              id, name, sets, reps, weight, rest_seconds, notes, order_index,
+              exercise_sets ( id, set_number, target_reps, notes )
+            )
           )
         `)
         .eq('client_id', clientId)
-        .eq('assigned_date', selectedDate)
-        .order('assigned_date', { ascending: false })
+        .or(`start_date.is.null,start_date.lte.${selectedDate}`)
+        .or(`end_date.is.null,end_date.gte.${selectedDate}`)
 
       if (error) throw error
 
+      const weekday = weekdayOf(selectedDate)
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized = (data || []).map((item: any) => {
-        const workout = unwrapJoin<{
-          id: string
-          name: string
-          description: string
-          exercises: Exercise[]
-        }>(item.workout)
-        return {
-          ...item,
-          workout: {
-            ...workout,
-            exercises: (workout?.exercises || []).sort(
-              (a: Exercise, b: Exercise) => a.order_index - b.order_index
-            ),
-          },
-        }
-      })
+      const normalized = (data || [])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((item: any) => {
+          const workout = unwrapJoin<{
+            id: string
+            name: string
+            description: string
+            days_of_week: DayOfWeek[] | null
+            exercises: Exercise[]
+          }>(item.workout)
+          return {
+            ...item,
+            workout: {
+              ...workout,
+              days_of_week: workout?.days_of_week ?? [],
+              exercises: (workout?.exercises || [])
+                .slice()
+                .sort((a: Exercise, b: Exercise) => a.order_index - b.order_index)
+                .map((ex: Exercise) => ({
+                  ...ex,
+                  exercise_sets: (ex.exercise_sets || [])
+                    .slice()
+                    .sort((a: ExerciseSet, b: ExerciseSet) => a.set_number - b.set_number),
+                })),
+            },
+          }
+        })
+        // Filter to workouts scheduled for this weekday.
+        // Empty days_of_week = "every day" (always show).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((item: any) => {
+          const days: DayOfWeek[] = item.workout?.days_of_week ?? []
+          return days.length === 0 || days.includes(weekday as DayOfWeek)
+        })
 
       setAssignments(normalized)
     } catch {
@@ -85,25 +110,6 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAssignments() }, [selectedDate])
-
-  const handleComplete = async (id: string, current: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('workout_assignments')
-        .update({
-          completed: !current,
-          completed_at: !current ? new Date().toISOString() : null,
-        })
-        .eq('id', id)
-
-      if (error) throw error
-
-      setAssignments(prev =>
-        prev.map(a => (a.id === id ? { ...a, completed: !current } : a))
-      )
-    } catch {
-    }
-  }
 
   return (
     <div>
@@ -130,9 +136,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
             return (
             <div
               key={assignment.id}
-              className={`bg-white rounded-xl border overflow-hidden ${
-                assignment.completed ? 'border-emerald-500 border-2' : 'border-slate-200'
-              }`}
+              className="bg-white rounded-xl border border-slate-200 overflow-hidden"
             >
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4 gap-3">
@@ -149,32 +153,20 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleComplete(assignment.id, assignment.completed)}
-                      className={`px-4 py-2 rounded-lg font-medium text-sm cursor-pointer transition-colors ${
-                        assignment.completed
-                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
+                  {isOwnAssignment && (
+                    <IconButton
+                      tone="danger"
+                      onClick={() =>
+                        setPendingUnassign({
+                          id: assignment.id,
+                          name: assignment.workout.name,
+                        })
+                      }
+                      aria-label="Unassign workout"
                     >
-                      {assignment.completed ? '✓ Completed' : 'Mark Complete'}
-                    </button>
-                    {isOwnAssignment && (
-                      <IconButton
-                        tone="danger"
-                        onClick={() =>
-                          setPendingUnassign({
-                            id: assignment.id,
-                            name: assignment.workout.name,
-                          })
-                        }
-                        aria-label="Unassign workout"
-                      >
-                        <Trash2 size={14} />
-                      </IconButton>
-                    )}
-                  </div>
+                      <Trash2 size={14} />
+                    </IconButton>
+                  )}
                 </div>
 
                 <button
@@ -191,43 +183,28 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                   <div className="mt-4 space-y-3">
                     {assignment.workout.exercises?.map((exercise, index) => (
                       <div key={exercise.id ?? index} className="bg-slate-50 rounded-lg p-4">
-                        <div className="mb-2">
-                          <span className="text-slate-500 text-sm font-medium mr-2">
-                            {index + 1}.
-                          </span>
-                          <span className="font-semibold text-slate-900">{exercise.name}</span>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm ml-6">
-                          {exercise.sets != null && (
-                            <div>
-                              <span className="text-slate-500">Sets:</span>{' '}
-                              <span className="font-medium">{exercise.sets}</span>
-                            </div>
-                          )}
-                          {exercise.reps && (
-                            <div>
-                              <span className="text-slate-500">Reps:</span>{' '}
-                              <span className="font-medium">{exercise.reps}</span>
-                            </div>
-                          )}
-                          {exercise.weight && (
-                            <div>
-                              <span className="text-slate-500">Weight:</span>{' '}
-                              <span className="font-medium">{exercise.weight}</span>
-                            </div>
-                          )}
+                        <div className="flex items-baseline justify-between gap-3 mb-1">
+                          <div>
+                            <span className="text-slate-500 text-sm font-medium mr-2">
+                              {index + 1}.
+                            </span>
+                            <span className="font-semibold text-slate-900">{exercise.name}</span>
+                          </div>
                           {exercise.rest_seconds != null && (
-                            <div>
-                              <span className="text-slate-500">Rest:</span>{' '}
-                              <span className="font-medium">{exercise.rest_seconds}s</span>
-                            </div>
+                            <span className="text-xs text-slate-500 flex-shrink-0">
+                              Rest: <span className="font-medium">{exercise.rest_seconds}s</span>
+                            </span>
                           )}
                         </div>
                         {exercise.notes && (
-                          <p className="text-slate-600 text-sm mt-2 ml-6 italic">
-                            Note: {exercise.notes}
+                          <p className="text-slate-600 text-sm italic mb-2">
+                            {exercise.notes}
                           </p>
                         )}
+                        <ExerciseSetLogger
+                          assignmentId={assignment.id}
+                          exercise={exercise}
+                        />
                       </div>
                     ))}
                   </div>

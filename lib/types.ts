@@ -19,6 +19,7 @@ export interface Workout {
   name: string
   description: string
   is_template: boolean
+  days_of_week?: DayOfWeek[]
   created_at?: string
   exercise_count?: number
 }
@@ -26,12 +27,34 @@ export interface Workout {
 export interface Exercise {
   id?: string
   name: string
+  // Legacy single-prescription columns; now used only as a fallback for
+  // exercises that have no per-set rows.
   sets: number | null
   reps: string
   weight: string
   rest_seconds: number | null
   notes: string
   order_index: number
+  exercise_sets?: ExerciseSet[]
+}
+
+export interface ExerciseSet {
+  id?: string
+  exercise_id?: string
+  set_number: number
+  target_reps: string
+  notes: string
+}
+
+export interface SetLog {
+  id?: string
+  assignment_id: string
+  exercise_id: string
+  set_number: number
+  reps_performed: number | null
+  weight_performed: number | null
+  completed: boolean
+  notes: string | null
 }
 
 export interface WorkoutAssignment {

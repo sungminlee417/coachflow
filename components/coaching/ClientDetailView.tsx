@@ -6,7 +6,7 @@ import { showToast } from '@/components/ui/Toast'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { ArrowLeft, CheckCircle, Clock, Trash2, Apple, Dumbbell } from 'lucide-react'
+import { ArrowLeft, Trash2, Apple, Dumbbell } from 'lucide-react'
 import { formatDate, unwrapJoin } from '@/lib/utils'
 import type { Client } from '@/lib/types'
 import WorkoutAssignmentModal from './WorkoutAssignmentModal'
@@ -14,9 +14,8 @@ import MealPlanAssignmentModal from './MealPlanAssignmentModal'
 
 interface WorkoutAssignmentRow {
   id: string
-  assigned_date: string
-  completed: boolean
-  completed_at: string | null
+  start_date: string | null
+  end_date: string | null
   workout: { id: string; name: string } | null
 }
 
@@ -57,12 +56,6 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
   const [assigningWorkout, setAssigningWorkout] = useState<WorkoutOption | null>(null)
   const [assigningMealPlan, setAssigningMealPlan] = useState<MealPlanOption | null>(null)
   const [pendingDelete, setPendingDelete] = useState<DeleteTarget | null>(null)
-  const [stats, setStats] = useState({
-    totalAssigned: 0,
-    totalCompleted: 0,
-    completionRate: 0,
-    currentWeekCompleted: 0,
-  })
 
   useEffect(() => {
     Promise.all([
@@ -78,10 +71,9 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
     try {
       const { data, error } = await supabase
         .from('workout_assignments')
-        .select('id, assigned_date, completed, completed_at, workout:workout_id ( id, name )')
+        .select('id, start_date, end_date, workout:workout_id ( id, name )')
         .eq('client_id', client.id)
-        .order('assigned_date', { ascending: false })
-        .limit(30)
+        .order('start_date', { ascending: false, nullsFirst: false })
 
       if (error) throw error
 
@@ -91,18 +83,6 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
         workout: unwrapJoin<{ id: string; name: string }>(item.workout),
       }))
       setWorkoutAssignments(rows)
-
-      const totalAssigned = rows.length
-      const totalCompleted = rows.filter(w => w.completed).length
-      const completionRate =
-        totalAssigned > 0 ? Math.round((totalCompleted / totalAssigned) * 100) : 0
-
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      const currentWeekCompleted = rows.filter(
-        w => w.completed && w.completed_at && new Date(w.completed_at) >= weekAgo
-      ).length
-
-      setStats({ totalAssigned, totalCompleted, completionRate, currentWeekCompleted })
     } catch {
     } finally {
       setLoading(false)
@@ -288,22 +268,14 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-8">
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="text-2xl font-bold text-slate-900">{stats.totalAssigned}</div>
-          <div className="text-xs text-slate-500 mt-0.5">Total Assigned</div>
+          <div className="text-2xl font-bold text-indigo-600">{workoutAssignments.length}</div>
+          <div className="text-xs text-slate-500 mt-0.5">Active Workouts</div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="text-2xl font-bold text-emerald-600">{stats.totalCompleted}</div>
-          <div className="text-xs text-slate-500 mt-0.5">Completed</div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="text-2xl font-bold text-indigo-600">{stats.completionRate}%</div>
-          <div className="text-xs text-slate-500 mt-0.5">Completion Rate</div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="text-2xl font-bold text-purple-600">{stats.currentWeekCompleted}</div>
-          <div className="text-xs text-slate-500 mt-0.5">This Week</div>
+          <div className="text-2xl font-bold text-emerald-600">{mealPlanAssignments.length}</div>
+          <div className="text-xs text-slate-500 mt-0.5">Active Meal Plans</div>
         </div>
       </div>
 
@@ -361,7 +333,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
       <div className="flex items-center gap-2 mb-3">
         <Dumbbell size={14} className="text-indigo-500" />
         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
-          Recent Workout Assignments
+          Active Workouts
         </h3>
       </div>
 
@@ -379,49 +351,34 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
           {workoutAssignments.map(a => (
             <div
               key={a.id}
-              className={`flex items-center justify-between p-4 rounded-xl border ${
-                a.completed
-                  ? 'border-emerald-200 bg-emerald-50/50'
-                  : 'border-slate-200 bg-white'
-              }`}
+              className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white"
             >
               <div className="flex items-center gap-3 min-w-0">
-                {a.completed ? (
-                  <CheckCircle size={18} className="text-emerald-500 flex-shrink-0" />
-                ) : (
-                  <Clock size={18} className="text-slate-400 flex-shrink-0" />
-                )}
+                <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                  <Dumbbell size={16} className="text-indigo-600" />
+                </div>
                 <div className="min-w-0">
                   <p className="font-medium text-slate-900 text-sm truncate">
                     {a.workout?.name ?? 'Workout'}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Assigned: {formatDate(a.assigned_date)}
+                    {formatRange(a.start_date, a.end_date)}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {a.completed ? (
-                  <span className="text-xs font-medium text-emerald-600">
-                    Completed{a.completed_at ? ` ${formatDate(a.completed_at)}` : ''}
-                  </span>
-                ) : (
-                  <span className="text-xs font-medium text-slate-400">Pending</span>
-                )}
-                <IconButton
-                  tone="danger"
-                  onClick={() =>
-                    setPendingDelete({
-                      kind: 'workout',
-                      id: a.id,
-                      label: a.workout?.name ?? 'Workout',
-                    })
-                  }
-                  aria-label="Remove workout assignment"
-                >
-                  <Trash2 size={14} />
-                </IconButton>
-              </div>
+              <IconButton
+                tone="danger"
+                onClick={() =>
+                  setPendingDelete({
+                    kind: 'workout',
+                    id: a.id,
+                    label: a.workout?.name ?? 'Workout',
+                  })
+                }
+                aria-label="Remove workout assignment"
+              >
+                <Trash2 size={14} />
+              </IconButton>
             </div>
           ))}
         </div>

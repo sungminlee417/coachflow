@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Field, Textarea } from '@/components/ui/Input'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { AssigneePicker } from '@/components/ui/AssigneePicker'
-import { todayISO } from '@/lib/utils'
+import { Calendar } from 'lucide-react'
 
 interface WorkoutAssignmentModalProps {
   open: boolean
@@ -29,7 +29,9 @@ export default function WorkoutAssignmentModal({
 }: WorkoutAssignmentModalProps) {
   const supabase = useSupabase()
   const [clientId, setClientId] = useState(preselectedClientId ?? '')
-  const [assignedDate, setAssignedDate] = useState(todayISO())
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [notes, setNotes] = useState('')
   const [assigning, setAssigning] = useState(false)
 
@@ -41,17 +43,16 @@ export default function WorkoutAssignmentModal({
 
     setAssigning(true)
     try {
-      // Check for an existing assignment of the same workout on the same date.
+      // Prevent the same workout being assigned twice to the same person.
       const { data: existing } = await supabase
         .from('workout_assignments')
         .select('id')
         .eq('workout_id', workoutId)
         .eq('client_id', clientId)
-        .eq('assigned_date', assignedDate)
         .maybeSingle()
 
       if (existing) {
-        showToast('This workout is already assigned for that day', 'error')
+        showToast('This workout is already assigned to that person', 'error')
         return
       }
 
@@ -59,12 +60,13 @@ export default function WorkoutAssignmentModal({
         workout_id: workoutId,
         client_id: clientId,
         coach_id: coachId,
-        assigned_date: assignedDate,
+        start_date: showSchedule && startDate ? startDate : null,
+        end_date: showSchedule && endDate ? endDate : null,
         notes,
       })
       if (error) {
         if ((error as { code?: string }).code === '23505') {
-          showToast('This workout is already assigned for that day', 'error')
+          showToast('This workout is already assigned to that person', 'error')
           return
         }
         throw error
@@ -92,9 +94,43 @@ export default function WorkoutAssignmentModal({
           preselectedClientId={preselectedClientId}
         />
 
-        <Field id="wa-date" label="Date">
-          <DatePicker id="wa-date" value={assignedDate} onChange={setAssignedDate} />
-        </Field>
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowSchedule(!showSchedule)}
+            className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 cursor-pointer"
+          >
+            <Calendar size={14} />
+            {showSchedule ? 'Hide schedule' : 'Schedule (optional)'}
+          </button>
+          {!showSchedule && (
+            <p className="text-xs text-slate-400 mt-1 ml-6">
+              Active immediately, no end date. The workout appears on its tagged days of the week.
+            </p>
+          )}
+          {showSchedule && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field id="wa-start" label="Start" optional>
+                <DatePicker
+                  id="wa-start"
+                  value={startDate}
+                  onChange={setStartDate}
+                  placeholder="Today"
+                  allowClear
+                />
+              </Field>
+              <Field id="wa-end" label="End" optional>
+                <DatePicker
+                  id="wa-end"
+                  value={endDate}
+                  onChange={setEndDate}
+                  placeholder="No end"
+                  allowClear
+                />
+              </Field>
+            </div>
+          )}
+        </div>
 
         <Field id="wa-notes" label="Notes" optional>
           <Textarea
@@ -107,11 +143,7 @@ export default function WorkoutAssignmentModal({
         </Field>
 
         <div className="flex gap-3 pt-2">
-          <Button
-            onClick={handleAssign}
-            disabled={assigning || !clientId}
-            className="flex-1"
-          >
+          <Button onClick={handleAssign} disabled={assigning || !clientId} className="flex-1">
             {assigning ? 'Assigning...' : 'Assign Workout'}
           </Button>
           <Button variant="secondary" onClick={onClose}>

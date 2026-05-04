@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { User } from '@supabase/supabase-js'
-import { Users, Dumbbell, ClipboardList, History, LogOut, Apple, Utensils, Ruler } from 'lucide-react'
+import { Users, Dumbbell, ClipboardList, History, LogOut, Apple, Utensils, Ruler, Menu, X } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import ClientList from '@/components/coaching/ClientList'
@@ -58,6 +58,21 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
   const [activeTab, setActiveTab] = useState<Tab>('my-clients')
   const [coach, setCoach] = useState<Profile | null>(null)
   const [loadingCoach, setLoadingCoach] = useState(true)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Close the drawer on Escape and lock background scroll while open.
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false)
+    }
+    document.addEventListener('keydown', escHandler)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', escHandler)
+      document.body.style.overflow = ''
+    }
+  }, [mobileMenuOpen])
 
   useEffect(() => {
     fetchCoach()
@@ -87,27 +102,16 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
     window.location.href = '/login'
   }
 
-  const renderNavButton = (tab: TabDef, isMobile = false) => {
+  const renderNavButton = (tab: TabDef) => {
     const isActive = activeTab === tab.key
     const tone = sectionTone[tab.section]
-    if (isMobile) {
-      return (
-        <button
-          key={tab.key}
-          onClick={() => setActiveTab(tab.key)}
-          className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-            isActive ? tone.mobileActive : 'text-slate-500 hover:bg-slate-50'
-          }`}
-        >
-          {tab.icon}
-          {tab.label}
-        </button>
-      )
-    }
     return (
       <button
         key={tab.key}
-        onClick={() => setActiveTab(tab.key)}
+        onClick={() => {
+          setActiveTab(tab.key)
+          setMobileMenuOpen(false)
+        }}
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
           isActive ? tone.active : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
         }`}
@@ -117,6 +121,8 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
       </button>
     )
   }
+
+  const activeTabLabel = TABS.find(t => t.key === activeTab)?.label ?? ''
 
   const coachingTabs = TABS.filter(t => t.section === 'coaching')
   const trainingTabs = TABS.filter(t => t.section === 'training')
@@ -160,27 +166,90 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           </div>
         </aside>
 
-        {/* Mobile header */}
+        {/* Mobile header (hamburger) */}
         <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-40">
-          <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center justify-between px-3 h-14">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              aria-label="Open navigation menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              <Menu size={20} />
+            </button>
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center">
-                <Dumbbell size={14} className="text-white" />
-              </div>
-              <span className="text-base font-bold text-slate-900 tracking-tight">CoachFlow</span>
+              <span className="text-base font-semibold text-slate-900 truncate">{activeTabLabel}</span>
             </div>
-            <IconButton onClick={handleLogout} aria-label="Logout">
-              <LogOut size={16} />
-            </IconButton>
+            {/* Spacer to keep the tab name horizontally centered between the hamburger and the right edge. */}
+            <div className="w-9" />
           </div>
-          <nav className="flex overflow-x-auto px-2 pb-1 gap-1">
-            {TABS.map(t => renderNavButton(t, true))}
-          </nav>
         </div>
 
+        {/* Mobile drawer (always mounted; transitions on open/close) */}
+        <>
+          {/* Backdrop */}
+          <div
+            className={`md:hidden fixed inset-0 bg-black/40 z-50 transition-opacity duration-200 ${
+              mobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+          {/* Slide-in panel */}
+          <aside
+            className={`md:hidden fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white border-r border-slate-200 z-50 flex flex-col shadow-xl transition-transform duration-200 ease-out ${
+              mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+            role="dialog"
+            aria-label="Navigation menu"
+            aria-hidden={!mobileMenuOpen}
+          >
+              <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                    <Dumbbell size={16} className="text-white" />
+                  </div>
+                  <span className="text-lg font-bold text-slate-900 tracking-tight">CoachFlow</span>
+                </div>
+                <IconButton
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Close navigation menu"
+                >
+                  <X size={18} />
+                </IconButton>
+              </div>
+
+              <nav className="flex-1 px-3 py-6 space-y-6 overflow-y-auto">
+                <div>
+                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Coaching
+                  </p>
+                  <div className="space-y-1">{coachingTabs.map(t => renderNavButton(t))}</div>
+                </div>
+                <div>
+                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Training
+                  </p>
+                  <div className="space-y-1">{trainingTabs.map(t => renderNavButton(t))}</div>
+                </div>
+              </nav>
+
+              <div className="border-t border-slate-100 p-4 flex items-center gap-3">
+                <Avatar name={profile.full_name} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">{profile.full_name}</p>
+                  <p className="text-xs text-slate-500 truncate">{profile.email}</p>
+                </div>
+                <IconButton onClick={handleLogout} aria-label="Logout">
+                  <LogOut size={16} />
+                </IconButton>
+              </div>
+          </aside>
+        </>
+
         {/* Main content */}
-        <main className="flex-1 md:ml-64 pt-[104px] md:pt-0">
-          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+        <main className="flex-1 md:ml-64 pt-14 md:pt-0">
+          <div key={activeTab} className="tab-content max-w-5xl mx-auto px-4 sm:px-8 py-8">
             {activeTab === 'my-clients' && <ClientList coachId={user.id} />}
             {activeTab === 'my-workouts' && <WorkoutLibrary coachId={user.id} />}
             {activeTab === 'my-meal-plans' && <MealPlanLibrary coachId={user.id} />}

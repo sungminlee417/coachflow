@@ -26,10 +26,12 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      style={{ animation: 'fadeIn 0.15s ease-out' }}
       onClick={onClose}
     >
       <div
         className="bg-white rounded-xl shadow-xl max-w-md w-full"
+        style={{ animation: 'scaleIn 0.18s ease-out' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="p-6">

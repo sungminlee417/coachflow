@@ -6,10 +6,11 @@ import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Field, Input, Textarea } from '@/components/ui/Input'
+import { DayOfWeekSelector } from '@/components/ui/DayOfWeekSelector'
 import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
 import { useDirtyState } from '@/lib/use-dirty-state'
 import { ArrowLeft, Plus, X, ChevronUp, ChevronDown, Save } from 'lucide-react'
-import type { Exercise, Workout } from '@/lib/types'
+import type { DayOfWeek, Exercise, ExerciseSet, Workout } from '@/lib/types'
 
 interface WorkoutBuilderProps {
   coachId: string
@@ -17,19 +18,35 @@ interface WorkoutBuilderProps {
   onClose: () => void
 }
 
+const emptySet = (setNumber: number, copyFrom?: ExerciseSet): ExerciseSet => ({
+  set_number: setNumber,
+  target_reps: copyFrom?.target_reps ?? '',
+  notes: '',
+})
+
+// Build initial exercise_sets when an exercise has none yet — derive from
+// legacy `sets` count + flat reps so existing workouts keep rendering.
+const seedSetsFromLegacy = (ex: Exercise): ExerciseSet[] => {
+  const count = Math.max(1, ex.sets ?? 1)
+  return Array.from({ length: count }, (_, i) => ({
+    set_number: i + 1,
+    target_reps: ex.reps ?? '',
+    notes: '',
+  }))
+}
+
 export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBuilderProps) {
   const supabase = useSupabase()
   const [name, setName] = useState(workout?.name || '')
   const [description, setDescription] = useState(workout?.description || '')
   const [isTemplate, setIsTemplate] = useState(workout?.is_template || false)
+  const [daysOfWeek, setDaysOfWeek] = useState<DayOfWeek[]>(workout?.days_of_week ?? [])
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [saving, setSaving] = useState(false)
-  // For brand-new workouts, the snapshot can be taken immediately.
-  // For existing ones, wait until exercises are loaded.
   const [snapshotReady, setSnapshotReady] = useState(!workout?.id)
 
   const isDirty = useDirtyState(
-    { name, description, isTemplate, exercises },
+    { name, description, isTemplate, daysOfWeek, exercises },
     snapshotReady
   )
 
@@ -43,12 +60,23 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
     try {
       const { data, error } = await supabase
         .from('exercises')
-        .select('*')
+        .select('*, exercise_sets ( id, set_number, target_reps, target_weight, notes )')
         .eq('workout_id', workout.id)
         .order('order_index')
 
       if (error) throw error
-      setExercises(data || [])
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalized: Exercise[] = (data || []).map((ex: any) => {
+        const sets: ExerciseSet[] = (ex.exercise_sets || [])
+          .slice()
+          .sort((a: ExerciseSet, b: ExerciseSet) => a.set_number - b.set_number)
+        return {
+          ...ex,
+          exercise_sets: sets.length > 0 ? sets : seedSetsFromLegacy(ex),
+        }
+      })
+      setExercises(normalized)
     } catch {
     } finally {
       setSnapshotReady(true)
@@ -66,6 +94,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         rest_seconds: 60,
         notes: '',
         order_index: exercises.length,
+        exercise_sets: [emptySet(1)],
       },
     ])
   }
@@ -93,6 +122,52 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
     setExercises(updated)
   }
 
+  const addSet = (exIndex: number) => {
+    const updated = [...exercises]
+    const sets = updated[exIndex].exercise_sets ?? []
+    const last = sets[sets.length - 1]
+    updated[exIndex] = {
+      ...updated[exIndex],
+      exercise_sets: [...sets, emptySet(sets.length + 1, last)],
+    }
+    setExercises(updated)
+  }
+
+  const removeSet = (exIndex: number, setIndex: number) => {
+    const updated = [...exercises]
+    const sets = (updated[exIndex].exercise_sets ?? [])
+      .filter((_, i) => i !== setIndex)
+      .map((s, i) => ({ ...s, set_number: i + 1 }))
+    updated[exIndex] = { ...updated[exIndex], exercise_sets: sets }
+    setExercises(updated)
+  }
+
+  const updateSet = (
+    exIndex: number,
+    setIndex: number,
+    field: keyof ExerciseSet,
+    value: string
+  ) => {
+    const updated = [...exercises]
+    const sets = [...(updated[exIndex].exercise_sets ?? [])]
+    sets[setIndex] = { ...sets[setIndex], [field]: value }
+    updated[exIndex] = { ...updated[exIndex], exercise_sets: sets }
+    setExercises(updated)
+  }
+
+  // Apply set 1's reps to all subsequent sets — handy for "3 × 8".
+  const fillSetsFromFirst = (exIndex: number) => {
+    const updated = [...exercises]
+    const sets = updated[exIndex].exercise_sets ?? []
+    if (sets.length < 2) return
+    const first = sets[0]
+    updated[exIndex] = {
+      ...updated[exIndex],
+      exercise_sets: sets.map((s, i) => (i === 0 ? s : { ...s, target_reps: first.target_reps })),
+    }
+    setExercises(updated)
+  }
+
   const handleSave = async () => {
     if (!name.trim()) {
       showToast('Please enter a workout name', 'error')
@@ -106,36 +181,77 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
       if (workoutId) {
         const { error } = await supabase
           .from('workouts')
-          .update({ name, description, is_template: isTemplate })
+          .update({
+            name,
+            description,
+            is_template: isTemplate,
+            days_of_week: daysOfWeek,
+          })
           .eq('id', workoutId)
         if (error) throw error
       } else {
         const { data, error } = await supabase
           .from('workouts')
-          .insert({ coach_id: coachId, name, description, is_template: isTemplate })
+          .insert({
+            coach_id: coachId,
+            name,
+            description,
+            is_template: isTemplate,
+            days_of_week: daysOfWeek,
+          })
           .select()
           .single()
         if (error) throw error
         workoutId = data.id
       }
 
+      // Replace strategy: delete then re-insert exercises (which cascade-deletes sets).
       if (workout?.id) {
         await supabase.from('exercises').delete().eq('workout_id', workoutId)
       }
 
       if (exercises.length > 0) {
-        const toInsert = exercises.map(ex => ({
+        const exercisesToInsert = exercises.map(ex => ({
           workout_id: workoutId,
           name: ex.name,
-          sets: ex.sets,
-          reps: ex.reps,
-          weight: ex.weight,
+          // Keep legacy columns populated as a fallback for any non-builder readers.
+          // Weight is no longer prescribed by the coach; the column stays empty.
+          sets: ex.exercise_sets?.length ?? null,
+          reps: ex.exercise_sets?.[0]?.target_reps ?? ex.reps ?? '',
+          weight: '',
           rest_seconds: ex.rest_seconds,
           notes: ex.notes,
           order_index: ex.order_index,
         }))
-        const { error } = await supabase.from('exercises').insert(toInsert)
-        if (error) throw error
+        const { data: insertedExercises, error: exErr } = await supabase
+          .from('exercises')
+          .insert(exercisesToInsert)
+          .select('id, order_index')
+        if (exErr) throw exErr
+
+        const sortedInserted = (insertedExercises || []).sort(
+          (a, b) => a.order_index - b.order_index
+        )
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const setsToInsert: any[] = []
+        exercises.forEach((ex, exIndex) => {
+          const insertedEx = sortedInserted[exIndex]
+          if (!insertedEx) return
+          ;(ex.exercise_sets ?? []).forEach(s => {
+            setsToInsert.push({
+              exercise_id: insertedEx.id,
+              set_number: s.set_number,
+              target_reps: s.target_reps,
+              notes: s.notes,
+            })
+          })
+        })
+
+        if (setsToInsert.length > 0) {
+          const { error: setErr } = await supabase.from('exercise_sets').insert(setsToInsert)
+          if (setErr) throw setErr
+        }
       }
 
       onClose()
@@ -177,6 +293,13 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
           />
         </Field>
 
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Days <span className="text-slate-400 font-normal">(optional)</span>
+          </label>
+          <DayOfWeekSelector value={daysOfWeek} onChange={setDaysOfWeek} />
+        </div>
+
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -202,90 +325,133 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         </div>
       ) : (
         <div className="space-y-3">
-          {exercises.map((exercise, index) => (
-            <div key={index} className="bg-white rounded-xl border border-slate-200 p-4">
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                  Exercise {index + 1}
-                </span>
-                <div className="flex items-center gap-1">
-                  <IconButton
-                    onClick={() => moveExercise(index, 'up')}
-                    disabled={index === 0}
-                    aria-label="Move up"
-                  >
-                    <ChevronUp size={16} />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => moveExercise(index, 'down')}
-                    disabled={index === exercises.length - 1}
-                    aria-label="Move down"
-                  >
-                    <ChevronDown size={16} />
-                  </IconButton>
-                  <IconButton tone="danger" onClick={() => removeExercise(index)} aria-label="Remove exercise">
-                    <X size={16} />
-                  </IconButton>
+          {exercises.map((exercise, index) => {
+            const sets = exercise.exercise_sets ?? []
+            return (
+              <div key={index} className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                    Exercise {index + 1}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <IconButton
+                      onClick={() => moveExercise(index, 'up')}
+                      disabled={index === 0}
+                      aria-label="Move up"
+                    >
+                      <ChevronUp size={16} />
+                    </IconButton>
+                    <IconButton
+                      onClick={() => moveExercise(index, 'down')}
+                      disabled={index === exercises.length - 1}
+                      aria-label="Move down"
+                    >
+                      <ChevronDown size={16} />
+                    </IconButton>
+                    <IconButton tone="danger" onClick={() => removeExercise(index)} aria-label="Remove exercise">
+                      <X size={16} />
+                    </IconButton>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="md:col-span-2">
-                  <Input
-                    value={exercise.name}
-                    onChange={e => updateExercise(index, 'name', e.target.value)}
-                    placeholder="Exercise name (e.g., Barbell Squat)"
-                  />
+                <Input
+                  value={exercise.name}
+                  onChange={e => updateExercise(index, 'name', e.target.value)}
+                  placeholder="Exercise name (e.g., Barbell Squat)"
+                  className="mb-3"
+                />
+
+                {/* Per-set table */}
+                <div className="bg-slate-50 rounded-lg p-3 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                      Sets
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {sets.length >= 2 && (
+                        <button
+                          type="button"
+                          onClick={() => fillSetsFromFirst(index)}
+                          className="text-[10px] font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                        >
+                          Copy set 1 to all
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => addSet(index)}
+                        className="text-[10px] font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                      >
+                        + Add set
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1 px-1">
+                    <div className="col-span-2">Set</div>
+                    <div className="col-span-9">Reps</div>
+                    <div className="col-span-1" />
+                  </div>
+
+                  {sets.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic px-1 py-2">
+                      No sets yet. Click &ldquo;+ Add set&rdquo; to add one.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {sets.map((s, setIndex) => (
+                        <div key={setIndex} className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-2 text-sm font-medium text-slate-500 text-center">
+                            {s.set_number}
+                          </div>
+                          <div className="col-span-9">
+                            <Input
+                              value={s.target_reps}
+                              onChange={e => updateSet(index, setIndex, 'target_reps', e.target.value)}
+                              placeholder="8 or 6-10 or AMRAP"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="col-span-1 flex justify-end">
+                            <IconButton
+                              tone="danger"
+                              onClick={() => removeSet(index, setIndex)}
+                              aria-label="Remove set"
+                              disabled={sets.length === 1}
+                            >
+                              <X size={14} />
+                            </IconButton>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Sets</label>
-                  <Input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={exercise.sets ?? ''}
-                    onChange={e => updateExercise(index, 'sets', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="3"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Reps</label>
-                  <Input
-                    value={exercise.reps}
-                    onChange={e => updateExercise(index, 'reps', e.target.value)}
-                    placeholder="8-12 or AMRAP"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Weight</label>
-                  <Input
-                    value={exercise.weight}
-                    onChange={e => updateExercise(index, 'weight', e.target.value)}
-                    placeholder="135 lbs or RPE 8"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Rest (seconds)</label>
-                  <Input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={exercise.rest_seconds ?? ''}
-                    onChange={e => updateExercise(index, 'rest_seconds', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="60"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs text-slate-500 mb-1">Notes</label>
-                  <Input
-                    value={exercise.notes}
-                    onChange={e => updateExercise(index, 'notes', e.target.value)}
-                    placeholder="Form cues, tempo, etc."
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Rest (seconds)</label>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={exercise.rest_seconds ?? ''}
+                      onChange={e => updateExercise(index, 'rest_seconds', e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder="60"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Notes</label>
+                    <Input
+                      value={exercise.notes}
+                      onChange={e => updateExercise(index, 'notes', e.target.value)}
+                      placeholder="Form cues, tempo, etc."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
