@@ -117,6 +117,72 @@ export const computeMealMacros = (meal: Meal): MacroTotals =>
 export const roundMacro = (value: number): number => Math.round(value * 10) / 10
 
 /**
+ * Format a length value for display.
+ *  - inches: snaps to nearest 1/8 and renders as "14 ⅛"
+ *  - cm: shows up to 1 decimal (e.g. "35.5")
+ */
+const FRACTION_GLYPHS = ['', '⅛', '¼', '⅜', '½', '⅝', '¾', '⅞'] as const
+
+export const formatLength = (
+  value: number | null | undefined,
+  unit: 'in' | 'cm'
+): string => {
+  if (value == null) return ''
+  if (unit !== 'in') return String(Math.round(value * 10) / 10)
+
+  // Snap to nearest 1/8 inch.
+  const eighths = Math.round(value * 8)
+  const whole = Math.trunc(eighths / 8)
+  const remainder = eighths % 8
+  const sign = value < 0 && whole === 0 ? '-' : ''
+  const wholeAbs = Math.abs(whole)
+
+  if (remainder === 0) return `${sign}${wholeAbs}`
+  const glyph = FRACTION_GLYPHS[remainder]
+  if (wholeAbs === 0) return `${sign}${glyph}`
+  return `${sign}${wholeAbs} ${glyph}`
+}
+
+/**
+ * Parse a length value supporting decimals AND mixed-number fractions.
+ *  "14"        → 14
+ *  "14.125"    → 14.125
+ *  "14 1/8"    → 14.125
+ *  "14-1/8"    → 14.125
+ *  "1/8"       → 0.125
+ *  ""          → null
+ *  invalid     → null
+ */
+export const parseLength = (raw: string | null | undefined): number | null => {
+  if (raw == null) return null
+  const trimmed = String(raw).trim()
+  if (!trimmed) return null
+
+  // Mixed number with fraction: "14 1/8" or "14-1/8"
+  const mixed = trimmed.match(/^(-?\d+(?:\.\d+)?)[\s-]+(\d+)\s*\/\s*(\d+)$/)
+  if (mixed) {
+    const whole = Number(mixed[1])
+    const num = Number(mixed[2])
+    const denom = Number(mixed[3])
+    if (denom === 0) return null
+    const sign = whole < 0 ? -1 : 1
+    return whole + sign * (num / denom)
+  }
+
+  // Bare fraction: "1/8" or "-1/8"
+  const frac = trimmed.match(/^(-?\d+)\s*\/\s*(\d+)$/)
+  if (frac) {
+    const denom = Number(frac[2])
+    if (denom === 0) return null
+    return Number(frac[1]) / denom
+  }
+
+  // Plain number / decimal
+  const num = Number(trimmed)
+  return Number.isFinite(num) ? num : null
+}
+
+/**
  * Format a "HH:MM" or "HH:MM:SS" string as a friendly 12-hour time.
  * Returns "" if the input is null/empty.
  */

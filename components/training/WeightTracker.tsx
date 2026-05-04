@@ -12,9 +12,11 @@ import { Trash2, TrendingUp, TrendingDown, Minus, Scale } from 'lucide-react'
 import { todayISO, formatDate, roundMacro } from '@/lib/utils'
 import type { WeightLog } from '@/lib/types'
 import { WeightChart } from './WeightChart'
+import type { WeightUnit } from '@/lib/types'
 
 interface WeightTrackerProps {
   userId: string
+  weightUnit: WeightUnit
 }
 
 function deltaIndicator(current: number, previous: number) {
@@ -26,7 +28,7 @@ function deltaIndicator(current: number, previous: number) {
   return { Icon: TrendingDown, text: `${roundMacro(diff)}`, color: 'text-red-600' }
 }
 
-export default function WeightTracker({ userId }: WeightTrackerProps) {
+export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps) {
   const supabase = useSupabase()
   const [logs, setLogs] = useState<WeightLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -130,7 +132,10 @@ export default function WeightTracker({ userId }: WeightTrackerProps) {
           {latest && (
             <div className="text-right">
               <div className="flex items-baseline gap-2 justify-end">
-                <span className="text-3xl font-bold text-slate-900 tabular-nums">{roundMacro(latest.weight)}</span>
+                <span className="text-3xl font-bold text-slate-900 tabular-nums">
+                  {roundMacro(latest.weight)}
+                </span>
+                <span className="text-sm font-medium text-slate-400">{weightUnit}</span>
                 {delta && (
                   <span className={`flex items-center gap-0.5 text-sm font-medium ${delta.color}`}>
                     <delta.Icon size={14} />
@@ -145,7 +150,7 @@ export default function WeightTracker({ userId }: WeightTrackerProps) {
 
         {logs.length >= 2 && (
           <div className="mb-5">
-            <WeightChart logs={logs} />
+            <WeightChart logs={logs} weightUnit={weightUnit} />
           </div>
         )}
 
@@ -159,7 +164,7 @@ export default function WeightTracker({ userId }: WeightTrackerProps) {
           </div>
           <div>
             <label htmlFor="wt-weight" className="block text-[10px] text-slate-500 mb-1 uppercase tracking-wide">
-              Weight
+              Weight ({weightUnit})
             </label>
             <Input
               id="wt-weight"
@@ -168,7 +173,7 @@ export default function WeightTracker({ userId }: WeightTrackerProps) {
               min="0"
               value={newWeight}
               onChange={e => setNewWeight(e.target.value)}
-              placeholder="0"
+              placeholder={`0 ${weightUnit}`}
               className="text-sm"
             />
           </div>
@@ -193,8 +198,9 @@ export default function WeightTracker({ userId }: WeightTrackerProps) {
                     className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-50 group"
                   >
                     <span className="text-sm text-slate-500 w-24">{formatDate(log.recorded_at)}</span>
-                    <span className="text-sm font-medium text-slate-900 flex-1">
-                      {roundMacro(log.weight)}
+                    <span className="text-sm font-medium text-slate-900 flex-1 tabular-nums">
+                      {roundMacro(log.weight)}{' '}
+                      <span className="text-xs text-slate-400 font-normal">{weightUnit}</span>
                     </span>
                     {d && (
                       <span className={`flex items-center gap-0.5 text-xs ${d.color}`}>

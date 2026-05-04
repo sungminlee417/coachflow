@@ -8,12 +8,13 @@ import { IconButton } from '@/components/ui/IconButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Plus, Pencil, Trash2, Ruler, TrendingUp, TrendingDown, Minus } from 'lucide-react'
-import { formatDate, roundMacro } from '@/lib/utils'
-import type { BodyMeasurement } from '@/lib/types'
+import { formatDate, roundMacro, formatLength } from '@/lib/utils'
+import type { BodyMeasurement, LengthUnit } from '@/lib/types'
 import MeasurementForm from './MeasurementForm'
 
 interface MeasurementsTrackerProps {
   userId: string
+  lengthUnit: LengthUnit
 }
 
 interface FieldDef {
@@ -24,16 +25,16 @@ interface FieldDef {
 
 const FIELDS: FieldDef[] = [
   { key: 'neck', label: 'Neck' },
-  { key: 'shoulders', label: 'Shoulders' },
-  { key: 'chest', label: 'Chest / Back', flexedKey: 'chest_flexed' },
+  { key: 'shoulders', label: 'Shoulders', flexedKey: 'shoulders_flexed' },
+  { key: 'chest', label: 'Chest / back', flexedKey: 'chest_flexed' },
   { key: 'waist', label: 'Waist' },
   { key: 'hips', label: 'Hips' },
-  { key: 'arm_left', label: 'Left Arm', flexedKey: 'arm_left_flexed' },
-  { key: 'arm_right', label: 'Right Arm', flexedKey: 'arm_right_flexed' },
-  { key: 'thigh_left', label: 'Left Thigh', flexedKey: 'thigh_left_flexed' },
-  { key: 'thigh_right', label: 'Right Thigh', flexedKey: 'thigh_right_flexed' },
-  { key: 'calf_left', label: 'Left Calf', flexedKey: 'calf_left_flexed' },
-  { key: 'calf_right', label: 'Right Calf', flexedKey: 'calf_right_flexed' },
+  { key: 'arm_left', label: 'Left arm', flexedKey: 'arm_left_flexed' },
+  { key: 'arm_right', label: 'Right arm', flexedKey: 'arm_right_flexed' },
+  { key: 'thigh_left', label: 'Left thigh', flexedKey: 'thigh_left_flexed' },
+  { key: 'thigh_right', label: 'Right thigh', flexedKey: 'thigh_right_flexed' },
+  { key: 'calf_left', label: 'Left calf', flexedKey: 'calf_left_flexed' },
+  { key: 'calf_right', label: 'Right calf', flexedKey: 'calf_right_flexed' },
 ]
 
 function deltaIndicator(current: number, previous: number) {
@@ -53,7 +54,7 @@ function deltaIndicator(current: number, previous: number) {
   }
 }
 
-export default function MeasurementsTracker({ userId }: MeasurementsTrackerProps) {
+export default function MeasurementsTracker({ userId, lengthUnit }: MeasurementsTrackerProps) {
   const supabase = useSupabase()
   const [entries, setEntries] = useState<BodyMeasurement[]>([])
   const [loading, setLoading] = useState(true)
@@ -114,6 +115,7 @@ export default function MeasurementsTracker({ userId }: MeasurementsTrackerProps
         open={showForm}
         userId={userId}
         initial={editing}
+        lengthUnit={lengthUnit}
         onClose={() => {
           setShowForm(false)
           setEditing(null)
@@ -194,7 +196,10 @@ export default function MeasurementsTracker({ userId }: MeasurementsTrackerProps
                       )}
                     </p>
                     <div className="flex items-baseline gap-2">
-                      <p className="text-xl font-semibold text-slate-900">{roundMacro(value)}</p>
+                      <p className="text-xl font-semibold text-slate-900 tabular-nums">
+                        {formatLength(value, lengthUnit)}{' '}
+                        <span className="text-xs font-normal text-slate-400">{lengthUnit}</span>
+                      </p>
                       {delta && (
                         <span className={`flex items-center gap-0.5 text-xs font-medium ${delta.color}`}>
                           <delta.icon size={12} />
@@ -221,31 +226,39 @@ export default function MeasurementsTracker({ userId }: MeasurementsTrackerProps
             {entries.map(entry => {
               const summary = FIELDS.filter(f => entry[f.key] != null)
                 .slice(0, 4)
-                .map(f => `${f.label}: ${roundMacro(entry[f.key] as number)}`)
+                .map(
+                  f =>
+                    `${f.label}: ${formatLength(entry[f.key] as number, lengthUnit)} ${lengthUnit}`
+                )
                 .join(' · ')
               return (
                 <div
                   key={entry.id}
-                  className="bg-slate-50 rounded-lg p-3 flex items-center justify-between gap-3"
+                  className="bg-slate-50 rounded-lg flex items-center justify-between gap-3 hover:bg-slate-100 transition-colors group"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-900 text-sm">
-                      {formatDate(entry.recorded_at)}
-                    </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditing(entry)
+                      setShowForm(true)
+                    }}
+                    className="flex-1 min-w-0 text-left p-3 cursor-pointer"
+                    aria-label={`Edit measurement for ${formatDate(entry.recorded_at)}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-900 text-sm">
+                        {formatDate(entry.recorded_at)}
+                      </p>
+                      <Pencil
+                        size={11}
+                        className="text-slate-300 group-hover:text-slate-500 transition-colors"
+                      />
+                    </div>
                     {summary && (
                       <p className="text-xs text-slate-500 mt-0.5 truncate">{summary}</p>
                     )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <IconButton
-                      onClick={() => {
-                        setEditing(entry)
-                        setShowForm(true)
-                      }}
-                      aria-label="Edit measurement"
-                    >
-                      <Pencil size={14} />
-                    </IconButton>
+                  </button>
+                  <div className="pr-2 flex-shrink-0">
                     <IconButton
                       tone="danger"
                       onClick={() => entry.id && setDeletingId(entry.id)}

@@ -1,30 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { Field, Input, Textarea } from '@/components/ui/Input'
+import { Field, Textarea } from '@/components/ui/Input'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
+import { FractionInput } from './FractionInput'
 import { useDirtyState } from '@/lib/use-dirty-state'
 import { todayISO } from '@/lib/utils'
-import type { BodyMeasurement } from '@/lib/types'
+import type { BodyMeasurement, LengthUnit } from '@/lib/types'
 
 interface MeasurementFormProps {
   open: boolean
   userId: string
   initial: BodyMeasurement | null
+  lengthUnit: LengthUnit
   onClose: () => void
 }
 
 const emptyMeasurement = (): BodyMeasurement => ({
   recorded_at: todayISO(),
   neck: null,
-  shoulders: null,
   waist: null,
   hips: null,
+  shoulders: null,
+  shoulders_flexed: false,
   chest: null,
   chest_flexed: false,
   thigh_left: null,
@@ -44,7 +47,6 @@ const emptyMeasurement = (): BodyMeasurement => ({
 
 const SIMPLE_FIELDS: { key: keyof BodyMeasurement; label: string }[] = [
   { key: 'neck', label: 'Neck' },
-  { key: 'shoulders', label: 'Shoulders' },
   { key: 'waist', label: 'Waist (at belly button)' },
   { key: 'hips', label: 'Hips (around glutes)' },
 ]
@@ -54,20 +56,33 @@ const FLEXIBLE_FIELDS: {
   flexedKey: keyof BodyMeasurement
   label: string
 }[] = [
-  { key: 'chest', flexedKey: 'chest_flexed', label: 'Chest / Back' },
-  { key: 'arm_left', flexedKey: 'arm_left_flexed', label: 'Left Arm' },
-  { key: 'arm_right', flexedKey: 'arm_right_flexed', label: 'Right Arm' },
-  { key: 'thigh_left', flexedKey: 'thigh_left_flexed', label: 'Left Thigh' },
-  { key: 'thigh_right', flexedKey: 'thigh_right_flexed', label: 'Right Thigh' },
-  { key: 'calf_left', flexedKey: 'calf_left_flexed', label: 'Left Calf' },
-  { key: 'calf_right', flexedKey: 'calf_right_flexed', label: 'Right Calf' },
+  { key: 'shoulders', flexedKey: 'shoulders_flexed', label: 'Shoulders' },
+  { key: 'chest', flexedKey: 'chest_flexed', label: 'Chest / back' },
+  { key: 'arm_left', flexedKey: 'arm_left_flexed', label: 'Left arm' },
+  { key: 'arm_right', flexedKey: 'arm_right_flexed', label: 'Right arm' },
+  { key: 'thigh_left', flexedKey: 'thigh_left_flexed', label: 'Left thigh' },
+  { key: 'thigh_right', flexedKey: 'thigh_right_flexed', label: 'Right thigh' },
+  { key: 'calf_left', flexedKey: 'calf_left_flexed', label: 'Left calf' },
+  { key: 'calf_right', flexedKey: 'calf_right_flexed', label: 'Right calf' },
 ]
 
-export default function MeasurementForm({ open, userId, initial, onClose }: MeasurementFormProps) {
+export default function MeasurementForm({
+  open,
+  userId,
+  initial,
+  lengthUnit,
+  onClose,
+}: MeasurementFormProps) {
   const supabase = useSupabase()
   const [data, setData] = useState<BodyMeasurement>(initial ?? emptyMeasurement())
   const [saving, setSaving] = useState(false)
-  const isDirty = useDirtyState(data, true)
+  // Reset form state every time the modal is opened so editing pre-fills with
+  // the right entry (and "Log entry" starts empty).
+  useEffect(() => {
+    if (open) setData(initial ?? emptyMeasurement())
+  }, [open, initial])
+  // Tie dirty-state ready flag to `open` so the snapshot resets per opening.
+  const isDirty = useDirtyState(data, open)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const update = (field: keyof BodyMeasurement, value: any) => {
@@ -78,7 +93,7 @@ export default function MeasurementForm({ open, userId, initial, onClose }: Meas
     setSaving(true)
     try {
       const payload = { ...data, user_id: userId }
-      delete payload.id // Supabase will assign on insert
+      delete payload.id
 
       if (initial?.id) {
         const { error } = await supabase
@@ -111,50 +126,42 @@ export default function MeasurementForm({ open, userId, initial, onClose }: Meas
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
+        <p className="text-[10px] text-slate-400">
+          All measurements are <span className="font-semibold text-slate-600">circumference</span>
+          {' '}in <span className="font-semibold text-slate-600">{lengthUnit}</span>
+          {lengthUnit === 'in' ? ' — pick the whole inches and the fraction.' : '.'}
+        </p>
+
+        <div className="space-y-3">
           {SIMPLE_FIELDS.map(({ key, label }) => (
-            <div key={key}>
-              <label className="block text-xs text-slate-500 mb-1">{label}</label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={(data[key] as number | null) ?? ''}
-                onChange={e =>
-                  update(key, e.target.value ? parseFloat(e.target.value) : null)
-                }
-                className="text-sm"
-              />
+            <div key={key} className="grid grid-cols-12 gap-2 items-center">
+              <label className="col-span-4 text-sm text-slate-700">{label}</label>
+              <div className="col-span-8">
+                <FractionInput
+                  value={data[key] as number | null}
+                  onChange={v => update(key, v)}
+                  unit={lengthUnit}
+                />
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="space-y-2 pt-2 border-t border-slate-100">
+        <div className="space-y-3 pt-2 border-t border-slate-100">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
             Muscle measurements
           </p>
           {FLEXIBLE_FIELDS.map(({ key, flexedKey, label }) => {
             const isFlexed = data[flexedKey] as boolean
             return (
-              <div key={key} className="grid grid-cols-12 gap-2 items-center">
-                <label className="col-span-4 text-sm text-slate-700">{label}</label>
-                <div className="col-span-3">
-                  <Input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={(data[key] as number | null) ?? ''}
-                    onChange={e =>
-                      update(key, e.target.value ? parseFloat(e.target.value) : null)
-                    }
-                    className="text-sm"
-                  />
-                </div>
-                <div
-                  role="radiogroup"
-                  aria-label={`${label} state`}
-                  className="col-span-5 inline-flex bg-slate-100 rounded-lg p-0.5 text-xs"
-                >
+              <div key={key} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <label className="text-sm text-slate-700">{label}</label>
+                  <div
+                    role="radiogroup"
+                    aria-label={`${label} state`}
+                    className="inline-flex bg-slate-100 rounded-lg p-0.5 text-xs"
+                  >
                   <button
                     type="button"
                     role="radio"
@@ -181,7 +188,13 @@ export default function MeasurementForm({ open, userId, initial, onClose }: Meas
                   >
                     Flexed
                   </button>
+                  </div>
                 </div>
+                <FractionInput
+                  value={data[key] as number | null}
+                  onChange={v => update(key, v)}
+                  unit={lengthUnit}
+                />
               </div>
             )
           })}

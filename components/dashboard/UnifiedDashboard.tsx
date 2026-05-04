@@ -287,7 +287,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
             )}
 
             {activeTab === 'assigned-meals' && <ClientMealPlanView clientId={user.id} />}
-            {activeTab === 'measurements' && <BodyTracker userId={user.id} />}
+            {activeTab === 'measurements' && <BodyTracker profile={profile} />}
             {activeTab === 'history' && <WorkoutHistory clientId={user.id} />}
           </div>
         </main>

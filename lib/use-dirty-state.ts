@@ -18,12 +18,19 @@ import { useEffect, useRef, useState } from 'react'
 export function useDirtyState<T>(current: T, ready: boolean): boolean {
   const snapshotRef = useRef<string | null>(null)
   // Force a re-render once we capture the snapshot so the initial isDirty=false renders.
-  const [, setSnapshotTaken] = useState(false)
+  const [, setSnapshotTaken] = useState(0)
 
   useEffect(() => {
-    if (ready && snapshotRef.current === null) {
+    if (ready) {
+      // Take a fresh snapshot every time `ready` becomes true.
+      // This handles modal reopens with different initial data.
       snapshotRef.current = JSON.stringify(current)
-      setSnapshotTaken(true)
+      setSnapshotTaken(n => n + 1)
+    } else {
+      // Clear the snapshot when ready flips to false so the next true takes
+      // a brand-new snapshot from the (likely just-reset) `current`.
+      snapshotRef.current = null
+      setSnapshotTaken(n => n + 1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])

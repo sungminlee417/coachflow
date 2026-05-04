@@ -1,14 +1,15 @@
 'use client'
 
 import { roundMacro, formatDate } from '@/lib/utils'
-import type { WeightLog } from '@/lib/types'
+import type { WeightLog, WeightUnit } from '@/lib/types'
 
 interface WeightChartProps {
   logs: WeightLog[]
+  weightUnit?: WeightUnit
 }
 
 // Simple SVG line chart. Pure render, no dependencies.
-export function WeightChart({ logs }: WeightChartProps) {
+export function WeightChart({ logs, weightUnit = 'lbs' }: WeightChartProps) {
   // Render oldest → newest left-to-right.
   const sorted = [...logs].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
 
@@ -72,7 +73,7 @@ export function WeightChart({ logs }: WeightChartProps) {
             }`}
           >
             {deltaSign}
-            {roundMacro(delta)}
+            {roundMacro(delta)} {weightUnit}
           </span>
         </p>
       </div>

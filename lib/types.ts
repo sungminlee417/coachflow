@@ -1,8 +1,13 @@
+export type LengthUnit = 'in' | 'cm'
+export type WeightUnit = 'lbs' | 'kg'
+
 export interface Profile {
   id: string
   email: string
   full_name: string
   avatar_url?: string | null
+  length_unit?: LengthUnit
+  weight_unit?: WeightUnit
   created_at?: string
   updated_at?: string
 }
@@ -160,10 +165,11 @@ export interface BodyMeasurement {
   user_id?: string
   recorded_at: string
   neck: number | null
-  shoulders: number | null
   waist: number | null
   hips: number | null
   // Muscles where flexed/relaxed matters — store the value plus a boolean.
+  shoulders: number | null
+  shoulders_flexed: boolean
   chest: number | null
   chest_flexed: boolean
   thigh_left: number | null
