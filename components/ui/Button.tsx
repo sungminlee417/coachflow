@@ -1,4 +1,5 @@
 import { ButtonHTMLAttributes, forwardRef } from 'react'
+import { Spinner } from './Spinner'
 
 type Variant = 'primary' | 'success' | 'secondary' | 'danger'
 type Size = 'sm' | 'md'
@@ -6,6 +7,8 @@ type Size = 'sm' | 'md'
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
+  /** Show a spinner and disable the button. Pairs cleanly with async handlers. */
+  loading?: boolean
 }
 
 const base =
@@ -24,14 +27,27 @@ const sizes: Record<Size, string> = {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'primary', size = 'md', className = '', ...props },
+  {
+    variant = 'primary',
+    size = 'md',
+    loading = false,
+    disabled,
+    className = '',
+    children,
+    ...props
+  },
   ref
 ) {
   return (
     <button
       ref={ref}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
-    />
+    >
+      {loading && <Spinner size={size === 'sm' ? 12 : 14} />}
+      {children}
+    </button>
   )
 })

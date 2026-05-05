@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Plus, Send, Pencil, Trash2, Dumbbell } from 'lucide-react'
 import type { Workout } from '@/lib/types'
+import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import WorkoutBuilder from './WorkoutBuilder'
 import WorkoutAssignmentModal from './WorkoutAssignmentModal'
 
@@ -34,7 +35,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
     try {
       const { data, error } = await supabase
         .from('workouts')
-        .select('id, name, description, is_template, created_at, exercises (count)')
+        .select('id, name, description, is_template, days_of_week, created_at, exercises (count)')
         .eq('coach_id', coachId)
         .order('created_at', { ascending: false })
 
@@ -79,7 +80,19 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
     )
   }
 
-  if (loading) return <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
+  if (loading) {
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Workout Library</h2>
+            <p className="text-sm text-slate-400 mt-1">Loading workouts…</p>
+          </div>
+        </div>
+        <CardGridSkeleton count={6} />
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -131,7 +144,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
           {workouts.map(workout => (
             <div
               key={workout.id}
-              className="bg-white rounded-xl border border-slate-200 p-5 hover:border-indigo-200 transition-colors"
+              className="bg-white rounded-xl border border-slate-200 p-5 transition-all hover:border-indigo-200 hover:shadow-md hover:-translate-y-0.5"
             >
               <div className="flex justify-between items-start mb-2">
                 <h3 className="font-semibold text-slate-900">{workout.name}</h3>

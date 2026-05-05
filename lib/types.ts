@@ -29,9 +29,13 @@ export interface Workout {
   exercise_count?: number
 }
 
+export type ExerciseType = 'strength' | 'cardio'
+
 export interface Exercise {
   id?: string
   name: string
+  // 'strength' = reps/weight; 'cardio' = duration. Defaults to 'strength'.
+  exercise_type?: ExerciseType
   // Legacy single-prescription columns; now used only as a fallback for
   // exercises that have no per-set rows.
   sets: number | null
@@ -40,6 +44,9 @@ export interface Exercise {
   rest_seconds: number | null
   notes: string
   order_index: number
+  // True = this exercise is performed back-to-back with the next one (superset).
+  // Chains of true values build a superset of N exercises.
+  pair_with_next?: boolean
   exercise_sets?: ExerciseSet[]
 }
 
@@ -48,6 +55,8 @@ export interface ExerciseSet {
   exercise_id?: string
   set_number: number
   target_reps: string
+  // Only used for cardio exercises. Null for strength.
+  target_duration_seconds?: number | null
   notes: string
 }
 
@@ -58,20 +67,27 @@ export interface SetLog {
   set_number: number
   reps_performed: number | null
   weight_performed: number | null
+  // Only set for cardio exercises.
+  duration_performed_seconds?: number | null
   completed: boolean
   notes: string | null
 }
 
 export interface WorkoutAssignment {
   id: string
-  assigned_date: string
-  completed: boolean
+  start_date?: string | null
+  end_date?: string | null
+  completed?: boolean
   completed_at?: string | null
   notes?: string | null
+  // The coach who created the assignment. Equals the trainee's own id for
+  // self-assigned workouts — used to gate the "Unassign" button.
+  coach_id?: string
   workout: {
     id: string
     name: string
     description?: string
+    days_of_week?: DayOfWeek[]
     exercises?: Exercise[]
   }
 }
@@ -142,14 +158,28 @@ export interface MealPlan {
 
 export interface MealPlanAssignment {
   id: string
-  assigned_date: string
+  start_date?: string | null
+  end_date?: string | null
   notes?: string | null
+  coach_id?: string
   meal_plan: {
     id: string
     name: string
     description?: string
     meals: Meal[]
   }
+}
+
+// Daily meal-eaten checkmark. Keyed on (meal_id, user_id, logged_date) — meal
+// plans recur, so each calendar day gets its own log.
+export interface MealLog {
+  id?: string
+  assignment_id: string
+  meal_id: string
+  user_id: string
+  logged_date: string
+  completed: boolean
+  notes?: string | null
 }
 
 export interface WeightLog {

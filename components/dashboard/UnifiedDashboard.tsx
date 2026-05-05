@@ -248,7 +248,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
         </>
 
         {/* Main content */}
-        <main className="flex-1 md:ml-64 pt-14 md:pt-0">
+        <main className="flex-1 min-w-0 md:ml-64 pt-14 md:pt-0">
           <div key={activeTab} className="tab-content max-w-5xl mx-auto px-4 sm:px-8 py-8">
             {activeTab === 'my-clients' && <ClientList coachId={user.id} />}
             {activeTab === 'my-workouts' && <WorkoutLibrary coachId={user.id} />}
@@ -261,7 +261,13 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                     Coached by
                   </p>
                   {loadingCoach ? (
-                    <p className="text-slate-400 text-sm">Loading...</p>
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-slate-200/70 animate-pulse" />
+                      <div className="space-y-2">
+                        <div className="h-3 w-32 rounded bg-slate-200/70 animate-pulse" />
+                        <div className="h-3 w-44 rounded bg-slate-200/70 animate-pulse" />
+                      </div>
+                    </div>
                   ) : coach ? (
                     <div className="flex items-center gap-3">
                       <Avatar name={coach.full_name} tone="success" />

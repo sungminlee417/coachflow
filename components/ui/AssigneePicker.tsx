@@ -61,7 +61,12 @@ export function AssigneePicker({
   }, [coachId])
 
   if (loading) {
-    return <div className="text-slate-400 text-sm py-4 text-center">Loading...</div>
+    return (
+      <div className="space-y-1.5">
+        <div className="h-4 w-20 bg-slate-200/70 rounded animate-pulse" />
+        <div className="h-10 bg-slate-200/70 rounded-lg animate-pulse" />
+      </div>
+    )
   }
 
   return (

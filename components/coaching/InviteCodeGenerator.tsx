@@ -5,6 +5,7 @@ import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ListSkeleton } from '@/components/ui/Skeleton'
 import { Plus, Copy, Link as LinkIcon } from 'lucide-react'
 import { generateInviteCode, formatDate } from '@/lib/utils'
 import type { InviteCode } from '@/lib/types'
@@ -69,7 +70,19 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
     accepted: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   }
 
-  if (loading) return <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
+  if (loading) {
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Invite Codes</h2>
+            <p className="text-sm text-slate-400 mt-1">Loading invite codes…</p>
+          </div>
+        </div>
+        <ListSkeleton count={3} />
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -78,9 +91,9 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
           <h2 className="text-2xl font-bold text-slate-900">Invite Codes</h2>
           <p className="text-sm text-slate-500 mt-1">Generate invite codes to connect with new clients</p>
         </div>
-        <Button onClick={handleGenerate} disabled={generating}>
-          <Plus size={16} />
-          {generating ? 'Generating...' : 'Generate Code'}
+        <Button onClick={handleGenerate} loading={generating}>
+          {!generating && <Plus size={16} />}
+          {generating ? 'Generating…' : 'Generate Code'}
         </Button>
       </div>
 

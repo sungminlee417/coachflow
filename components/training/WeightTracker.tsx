@@ -118,20 +118,22 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
         onCancel={() => setDeletingId(null)}
       />
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <div className="flex items-center justify-between gap-3 mb-5">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
               <Scale size={18} className="text-indigo-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-base font-semibold text-slate-900">Weight</h3>
-              <p className="text-xs text-slate-500">Log daily &middot; {logs.length} {logs.length === 1 ? 'entry' : 'entries'}</p>
+              <p className="text-xs text-slate-500 truncate">
+                Log daily &middot; {logs.length} {logs.length === 1 ? 'entry' : 'entries'}
+              </p>
             </div>
           </div>
           {latest && (
-            <div className="text-right">
-              <div className="flex items-baseline gap-2 justify-end">
+            <div className="text-right ml-auto">
+              <div className="flex items-baseline gap-2 justify-end flex-wrap">
                 <span className="text-3xl font-bold text-slate-900 tabular-nums">
                   {roundMacro(latest.weight)}
                 </span>
@@ -177,8 +179,8 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
               className="text-sm"
             />
           </div>
-          <Button onClick={handleLog} disabled={saving}>
-            {saving ? 'Logging...' : 'Log'}
+          <Button onClick={handleLog} loading={saving}>
+            {saving ? 'Logging…' : 'Log'}
           </Button>
         </div>
 
@@ -195,15 +197,17 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
                 return (
                   <div
                     key={log.id}
-                    className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-50 group"
+                    className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-50 group"
                   >
-                    <span className="text-sm text-slate-500 w-24">{formatDate(log.recorded_at)}</span>
-                    <span className="text-sm font-medium text-slate-900 flex-1 tabular-nums">
+                    <span className="text-xs text-slate-500 flex-shrink-0 min-w-0 truncate">
+                      {formatDate(log.recorded_at)}
+                    </span>
+                    <span className="text-sm font-medium text-slate-900 tabular-nums ml-auto">
                       {roundMacro(log.weight)}{' '}
                       <span className="text-xs text-slate-400 font-normal">{weightUnit}</span>
                     </span>
                     {d && (
-                      <span className={`flex items-center gap-0.5 text-xs ${d.color}`}>
+                      <span className={`flex items-center gap-0.5 text-xs flex-shrink-0 ${d.color}`}>
                         <d.Icon size={11} />
                         {d.text}
                       </span>
@@ -212,7 +216,7 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
                       tone="danger"
                       onClick={() => log.id && setDeletingId(log.id)}
                       aria-label="Delete entry"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="opacity-50 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     >
                       <Trash2 size={12} />
                     </IconButton>

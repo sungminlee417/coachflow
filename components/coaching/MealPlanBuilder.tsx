@@ -209,7 +209,6 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
         days_of_week: (m.days_of_week ?? []) as DayOfWeek[],
         // Normalize "HH:MM:SS" → "HH:MM" so it works in <input type="time">.
         time: m.time ? String(m.time).slice(0, 5) : null,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         foods: (m.foods || [])
           .slice()
           .sort((a: Food, b: Food) => a.order_index - b.order_index)
@@ -838,15 +837,17 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
         </div>
       )}
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="h-24" aria-hidden />
+
+      <div className="sticky bottom-0 -mx-4 sm:-mx-8 px-4 sm:px-8 py-3 mt-6 bg-white/90 backdrop-blur border-t border-slate-200 flex items-center gap-3 z-20">
         <UnsavedBadge visible={isDirty && !saving} />
         <div className="flex-1" />
-        <Button onClick={handleSave} disabled={saving}>
-          <Save size={16} />
-          {saving ? 'Saving...' : 'Save Meal Plan'}
-        </Button>
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose} disabled={saving}>
           Cancel
+        </Button>
+        <Button onClick={handleSave} loading={saving}>
+          {!saving && <Save size={16} />}
+          {saving ? 'Saving…' : 'Save Meal Plan'}
         </Button>
       </div>
     </div>

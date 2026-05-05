@@ -72,7 +72,6 @@ export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as co
 export const generateInviteCode = () =>
   Math.random().toString(36).substring(2, 10).toUpperCase()
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const unwrapJoin = <T>(value: T | T[] | null | undefined): T | null => {
   if (Array.isArray(value)) return value[0] ?? null
   return (value ?? null) as T | null
@@ -180,6 +179,75 @@ export const parseLength = (raw: string | null | undefined): number | null => {
   // Plain number / decimal
   const num = Number(trimmed)
   return Number.isFinite(num) ? num : null
+}
+
+/**
+ * Parse a duration string into seconds. Accepts:
+ *   "20"        → 1200  (bare number = minutes)
+ *   "20:30"     → 1230  (mm:ss)
+ *   "1:20:30"   → 4830  (hh:mm:ss)
+ *   "20m"       → 1200
+ *   "20m 30s"   → 1230
+ *   "1h 20m"    → 4800
+ *   "30s"       → 30
+ *   ""          → null
+ *   invalid     → null
+ */
+export const parseDuration = (raw: string | null | undefined): number | null => {
+  if (raw == null) return null
+  const trimmed = String(raw).trim().toLowerCase()
+  if (!trimmed) return null
+
+  // Colon form: hh:mm:ss or mm:ss
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':').map(p => Number(p.trim()))
+    if (parts.some(n => !Number.isFinite(n) || n < 0)) return null
+    if (parts.length === 2) return parts[0] * 60 + parts[1]
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    return null
+  }
+
+  // Suffix form: "1h 20m 30s", "30 min", "1 hour 20 minutes", etc.
+  // Hours: h | hr | hrs | hour | hours
+  // Minutes: m | min | mins | minute | minutes
+  // Seconds: s | sec | secs | second | seconds
+  const suffixMatch = trimmed.match(
+    /^(?:(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b)?\s*(?:(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)\b)?\s*(?:(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s)\b)?$/
+  )
+  if (suffixMatch && (suffixMatch[1] || suffixMatch[2] || suffixMatch[3])) {
+    const h = Number(suffixMatch[1] ?? 0)
+    const m = Number(suffixMatch[2] ?? 0)
+    const s = Number(suffixMatch[3] ?? 0)
+    return Math.round(h * 3600 + m * 60 + s)
+  }
+
+  // Bare number = minutes
+  const num = Number(trimmed)
+  if (Number.isFinite(num) && num >= 0) return Math.round(num * 60)
+
+  return null
+}
+
+/**
+ * Format a duration in seconds as a compact, human-friendly string.
+ *   45     → "45s"
+ *   1200   → "20 min"
+ *   1230   → "20:30"
+ *   4830   → "1:20:30"
+ *   null   → ""
+ */
+export const formatDuration = (seconds: number | null | undefined): string => {
+  if (seconds == null || !Number.isFinite(seconds)) return ''
+  const s = Math.max(0, Math.round(seconds))
+  if (s < 60) return `${s}s`
+  const h = Math.trunc(s / 3600)
+  const m = Math.trunc((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+  }
+  if (sec === 0) return `${m} min`
+  return `${m}:${String(sec).padStart(2, '0')}`
 }
 
 /**

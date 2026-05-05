@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import { Plus, Send, Pencil, Trash2, Apple } from 'lucide-react'
 import type { MealPlan } from '@/lib/types'
 import MealPlanBuilder from './MealPlanBuilder'
@@ -79,7 +80,19 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
     )
   }
 
-  if (loading) return <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
+  if (loading) {
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Meal Plan Library</h2>
+            <p className="text-sm text-slate-400 mt-1">Loading meal plans…</p>
+          </div>
+        </div>
+        <CardGridSkeleton count={6} />
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -131,7 +144,7 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
           {plans.map(plan => (
             <div
               key={plan.id}
-              className="bg-white rounded-xl border border-slate-200 p-5 hover:border-indigo-200 transition-colors"
+              className="bg-white rounded-xl border border-slate-200 p-5 transition-all hover:border-emerald-200 hover:shadow-md hover:-translate-y-0.5"
             >
               <div className="flex justify-between items-start mb-2">
                 <h3 className="font-semibold text-slate-900">{plan.name}</h3>

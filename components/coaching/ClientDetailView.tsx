@@ -6,6 +6,7 @@ import { showToast } from '@/components/ui/Toast'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { ArrowLeft, Trash2, Apple, Dumbbell } from 'lucide-react'
 import { formatDate, unwrapJoin } from '@/lib/utils'
 import type { Client } from '@/lib/types'
@@ -338,7 +339,18 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
       </div>
 
       {loading ? (
-        <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3"
+            >
+              <Skeleton className="h-8 w-8 rounded-lg" />
+              <Skeleton className="h-4 flex-1 max-w-[40%]" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
       ) : workoutAssignments.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-6 text-center">
           <p className="text-slate-500 text-sm mb-1">No workouts assigned yet</p>

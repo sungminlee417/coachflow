@@ -6,28 +6,22 @@ import { WeekSelector } from '@/components/ui/WeekSelector'
 import { Flame, Beef, Wheat, Droplet, Trash2 } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { showToast } from '@/components/ui/Toast'
+import { MealLogToggle } from './MealLogToggle'
 import {
   todayISO,
   formatLongDate,
-  unwrapJoin,
   computeFoodMacros,
   computeMealMacros,
   roundMacro,
-  weekdayOf,
   formatTime,
 } from '@/lib/utils'
-import type { Meal, MealPlanAssignment, Food, Ingredient } from '@/lib/types'
+import { fetchActiveMealPlanAssignments } from '@/lib/queries'
+import type { MealPlanAssignment } from '@/lib/types'
 
 interface ClientMealPlanViewProps {
   clientId: string
-}
-
-const MEAL_TYPE_ORDER: Record<Meal['meal_type'], number> = {
-  breakfast: 0,
-  lunch: 1,
-  dinner: 2,
-  snack: 3,
 }
 
 const DAY_SHORT: Record<number, string> = {
@@ -45,6 +39,10 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
   const [assignments, setAssignments] = useState<MealPlanAssignment[]>([])
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [loading, setLoading] = useState(true)
+  // Set of meal_ids eaten on the selectedDate. Source of truth for the
+  // per-meal toggle's checked state and the daily progress chip.
+  const [eatenMealIds, setEatenMealIds] = useState<Set<string>>(new Set())
+  const [logsLoaded, setLogsLoaded] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [pendingUnassign, setPendingUnassign] = useState<{ id: string; name: string } | null>(null)
 
@@ -68,86 +66,8 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
   const fetchAssignments = async () => {
     setLoading(true)
     try {
-      // An assignment is active on selectedDate if:
-      //   (start_date IS NULL OR start_date <= selectedDate)
-      //   AND (end_date IS NULL OR end_date >= selectedDate)
-      const { data, error } = await supabase
-        .from('meal_plan_assignments')
-        .select(`
-          id, start_date, end_date, notes, coach_id,
-          meal_plan:meal_plan_id (
-            id, name, description,
-            meals (
-              id, meal_type, name, description, days_of_week, time, order_index,
-              foods (
-                id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index,
-                ingredients ( id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index )
-              )
-            )
-          )
-        `)
-        .eq('client_id', clientId)
-        .or(`start_date.is.null,start_date.lte.${selectedDate}`)
-        .or(`end_date.is.null,end_date.gte.${selectedDate}`)
-
-      if (error) throw error
-
-      // Determine the weekday (0=Sun..6=Sat) of the selected date in local time.
-      const weekday = weekdayOf(selectedDate)
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized = (data || [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((item: any) => {
-          const plan = unwrapJoin<{
-            id: string
-            name: string
-            description: string
-            meals: Meal[]
-          }>(item.meal_plan)
-          return {
-            ...item,
-            meal_plan: {
-              ...plan,
-              meals: (plan?.meals || [])
-                // Filter to meals scheduled for this weekday.
-                // Empty days_of_week = "every day" (always show).
-                .filter((m: Meal) => {
-                  const days = m.days_of_week ?? []
-                  return days.length === 0 || days.includes(weekday as Meal['days_of_week'][number])
-                })
-                .map((m: Meal) => ({
-                  ...m,
-                  days_of_week: m.days_of_week ?? [],
-                  foods: (m.foods || [])
-                    .slice()
-                    .sort((a: Food, b: Food) => a.order_index - b.order_index)
-                    .map((f: Food) => ({
-                      ...f,
-                      ingredients: (f.ingredients || [])
-                        .slice()
-                        .sort((a: Ingredient, b: Ingredient) => a.order_index - b.order_index),
-                    })),
-                }))
-                .sort((a: Meal, b: Meal) => {
-                  // Meals with a time come first, sorted chronologically.
-                  // Untimed meals fall back to meal-type order, then index.
-                  if (a.time && b.time) return a.time.localeCompare(b.time)
-                  if (a.time) return -1
-                  if (b.time) return 1
-                  return (
-                    MEAL_TYPE_ORDER[a.meal_type] - MEAL_TYPE_ORDER[b.meal_type] ||
-                    a.order_index - b.order_index
-                  )
-                }),
-            },
-          }
-        })
-        // Drop assignments where every meal got filtered out — nothing to show.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((item: any) => (item.meal_plan?.meals?.length ?? 0) > 0)
-
-      setAssignments(normalized)
+      const data = await fetchActiveMealPlanAssignments(supabase, clientId, selectedDate)
+      setAssignments(data)
     } catch {
     } finally {
       setLoading(false)
@@ -156,6 +76,50 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAssignments() }, [selectedDate])
+
+  // Load meal_logs for the selected date so the toggle reflects what the user
+  // already checked off. Independent of fetchAssignments — runs in parallel.
+  useEffect(() => {
+    let cancelled = false
+    setLogsLoaded(false)
+    setEatenMealIds(new Set())
+    ;(async () => {
+      const { data } = await supabase
+        .from('meal_logs')
+        .select('meal_id, completed')
+        .eq('user_id', clientId)
+        .eq('logged_date', selectedDate)
+      if (cancelled) return
+      const eaten = new Set<string>()
+      ;(data ?? []).forEach((row: { meal_id: string; completed: boolean }) => {
+        if (row.completed) eaten.add(row.meal_id)
+      })
+      setEatenMealIds(eaten)
+      setLogsLoaded(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [clientId, selectedDate, supabase])
+
+  const setMealEaten = (mealId: string, eaten: boolean) => {
+    setEatenMealIds(prev => {
+      const next = new Set(prev)
+      if (eaten) next.add(mealId)
+      else next.delete(mealId)
+      return next
+    })
+  }
+
+  // Total scheduled meals across all assignments for today, for the progress chip.
+  const totalMealsToday = assignments.reduce(
+    (sum, a) => sum + a.meal_plan.meals.length,
+    0
+  )
+  const eatenCountToday = assignments.reduce(
+    (sum, a) => sum + a.meal_plan.meals.filter(m => m.id && eatenMealIds.has(m.id)).length,
+    0
+  )
 
   // Compute daily totals from all meal plan assignments → meals → foods
   const dailyTotals = assignments.reduce(
@@ -185,7 +149,21 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
 
       <WeekSelector selectedDate={selectedDate} onSelect={setSelectedDate} tone="success" />
 
-      <h3 className="text-lg font-semibold mb-4">{formatLongDate(selectedDate)}</h3>
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <h3 className="text-lg font-semibold">{formatLongDate(selectedDate)}</h3>
+        {totalMealsToday > 0 && (
+          <span
+            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border tabular-nums ${
+              eatenCountToday === totalMealsToday
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-slate-50 text-slate-600 border-slate-200'
+            }`}
+            aria-live="polite"
+          >
+            {eatenCountToday} / {totalMealsToday} eaten
+          </span>
+        )}
+      </div>
 
       {assignments.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -205,7 +183,22 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
       )}
 
       {loading ? (
-        <div className="text-center py-8 text-slate-400">Loading...</div>
+        <div className="space-y-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl border border-slate-200 p-6"
+            >
+              <Skeleton className="h-5 w-1/3 mb-2" />
+              <Skeleton className="h-3 w-2/3 mb-4" />
+              <div className="flex gap-2">
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="h-6 w-16 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : assignments.length === 0 ? (
         <div className="bg-slate-50 rounded-xl p-8 text-center">
           <p className="text-slate-500">No meal plans assigned for this day</p>
@@ -216,8 +209,7 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
       ) : (
         <div className="space-y-4">
           {assignments.map(assignment => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const isOwnAssignment = (assignment as any).coach_id === clientId
+            const isOwnAssignment = assignment.coach_id === clientId
             return (
             <div key={assignment.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="p-6">
@@ -261,30 +253,54 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                   <div className="mt-4 space-y-3">
                     {assignment.meal_plan.meals.map(meal => {
                       const mealMacros = computeMealMacros(meal)
+                      const eaten = !!meal.id && eatenMealIds.has(meal.id)
                       return (
-                        <div key={meal.id} className="bg-slate-50 rounded-lg p-4">
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-                              {meal.meal_type}
-                            </span>
-                            {meal.time && (
-                              <span className="text-xs font-semibold text-slate-700 tabular-nums">
-                                {formatTime(meal.time)}
+                        <div
+                          key={meal.id}
+                          className={`rounded-lg p-4 transition-colors ${
+                            eaten ? 'bg-emerald-50/60 border border-emerald-200' : 'bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+                                {meal.meal_type}
                               </span>
-                            )}
-                            {meal.days_of_week && meal.days_of_week.length > 0 && (
-                              <div className="flex gap-1 flex-wrap">
-                                {[...meal.days_of_week]
-                                  .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
-                                  .map(d => (
-                                    <span
-                                      key={d}
-                                      className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5"
-                                    >
-                                      {DAY_SHORT[d]}
-                                    </span>
-                                  ))}
-                              </div>
+                              {meal.time && (
+                                <span className="text-xs font-semibold text-slate-700 tabular-nums">
+                                  {formatTime(meal.time)}
+                                </span>
+                              )}
+                              {eaten && (
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 rounded-full px-2 py-0.5">
+                                  Eaten
+                                </span>
+                              )}
+                              {meal.days_of_week && meal.days_of_week.length > 0 && (
+                                <div className="flex gap-1 flex-wrap">
+                                  {[...meal.days_of_week]
+                                    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+                                    .map(d => (
+                                      <span
+                                        key={d}
+                                        className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5"
+                                      >
+                                        {DAY_SHORT[d]}
+                                      </span>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
+                            {meal.id && (
+                              <MealLogToggle
+                                assignmentId={assignment.id}
+                                mealId={meal.id}
+                                userId={clientId}
+                                loggedDate={selectedDate}
+                                completed={eaten}
+                                loaded={logsLoaded}
+                                onToggled={next => setMealEaten(meal.id!, next)}
+                              />
                             )}
                           </div>
                           <p className="font-semibold text-slate-900">{meal.name}</p>

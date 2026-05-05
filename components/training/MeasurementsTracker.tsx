@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Plus, Pencil, Trash2, Ruler, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { formatDate, roundMacro, formatLength } from '@/lib/utils'
 import type { BodyMeasurement, LengthUnit } from '@/lib/types'
@@ -103,14 +104,29 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
   }
 
   if (loading) {
-    return <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-9 w-32 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-slate-50 rounded-xl p-3 space-y-2">
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-5 w-3/4" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   const latest = entries[0]
   const previous = entries[1]
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
       <MeasurementForm
         open={showForm}
         userId={userId}
@@ -133,14 +149,14 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
         onCancel={() => setDeletingId(null)}
       />
 
-      <div className="flex justify-between items-center mb-5">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+      <div className="flex justify-between items-center gap-3 mb-5 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
             <Ruler size={18} className="text-emerald-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-base font-semibold text-slate-900">Circumference</h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 truncate">
               Log periodically &middot; {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
             </p>
           </div>
@@ -167,7 +183,7 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
         <>
           {/* Latest snapshot with deltas vs previous entry */}
           <div className="bg-slate-50 rounded-xl p-4 mb-6">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                 Latest &middot; {formatDate(latest.recorded_at)}
               </p>
@@ -177,7 +193,7 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
                 </p>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
               {FIELDS.map(({ key, label, flexedKey }) => {
                 const value = latest[key] as number | null
                 if (value == null) return null

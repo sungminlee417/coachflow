@@ -16,13 +16,11 @@ export default function BodyTracker({ profile: initialProfile }: BodyTrackerProp
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Measurements</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Track your weight daily and your circumference over time
-          </p>
-        </div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-slate-900">Measurements</h2>
+        <p className="text-sm text-slate-500 mt-1 mb-4">
+          Track your weight daily and your circumference over time
+        </p>
         <UnitToggle
           profile={profile}
           onUpdate={patch => setProfile(p => ({ ...p, ...patch }))}

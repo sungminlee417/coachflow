@@ -117,7 +117,8 @@ export default function MeasurementForm({
 
   return (
     <Modal open={open} title={initial ? 'Edit Measurement' : 'Log Measurement'} onClose={onClose}>
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+      <div className="flex flex-col max-h-[75vh] -mx-1">
+      <div className="flex-1 overflow-y-auto px-1 space-y-4">
         <Field id="m-date" label="Date">
           <DatePicker
             id="m-date"
@@ -134,9 +135,12 @@ export default function MeasurementForm({
 
         <div className="space-y-3">
           {SIMPLE_FIELDS.map(({ key, label }) => (
-            <div key={key} className="grid grid-cols-12 gap-2 items-center">
-              <label className="col-span-4 text-sm text-slate-700">{label}</label>
-              <div className="col-span-8">
+            <div
+              key={key}
+              className="flex flex-col sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center gap-1.5"
+            >
+              <label className="sm:col-span-4 text-sm text-slate-700">{label}</label>
+              <div className="sm:col-span-8">
                 <FractionInput
                   value={data[key] as number | null}
                   onChange={v => update(key, v)}
@@ -209,17 +213,18 @@ export default function MeasurementForm({
             rows={2}
           />
         </Field>
+      </div>
 
-        <div className="flex items-center gap-3 pt-2">
-          <UnsavedBadge visible={isDirty && !saving} />
-          <div className="flex-1" />
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : initial ? 'Save Changes' : 'Log Measurement'}
-          </Button>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center gap-2 pt-4 mt-2 border-t border-slate-100 px-1">
+        <UnsavedBadge visible={isDirty && !saving} />
+        <div className="flex-1" />
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} loading={saving}>
+          {saving ? 'Saving…' : initial ? 'Save Changes' : 'Log Measurement'}
+        </Button>
+      </div>
       </div>
     </Modal>
   )

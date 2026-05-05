@@ -60,8 +60,8 @@ export function WeightChart({ logs, weightUnit = 'lbs' }: WeightChartProps) {
   const deltaSign = delta > 0 ? '+' : ''
 
   return (
-    <div className="bg-slate-50 rounded-xl p-4">
-      <div className="flex items-baseline justify-between mb-3">
+    <div className="bg-slate-50 rounded-xl p-4 min-w-0">
+      <div className="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
           Progress
         </p>
@@ -78,11 +78,11 @@ export function WeightChart({ logs, weightUnit = 'lbs' }: WeightChartProps) {
         </p>
       </div>
 
-      <div className="relative">
+      <div className="relative w-full">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
-          className="w-full h-32"
+          className="w-full h-32 block"
           role="img"
           aria-label="Weight progress line chart"
         >

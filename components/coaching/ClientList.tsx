@@ -5,6 +5,7 @@ import { useSupabase } from '@/lib/use-supabase'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ListSkeleton } from '@/components/ui/Skeleton'
 import { UserPlus, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { Client } from '@/lib/types'
@@ -52,7 +53,19 @@ export default function ClientList({ coachId }: ClientListProps) {
     }
   }
 
-  if (loading) return <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
+  if (loading) {
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Clients</h2>
+            <p className="text-sm text-slate-400 mt-1">Loading clients…</p>
+          </div>
+        </div>
+        <ListSkeleton count={4} />
+      </div>
+    )
+  }
 
   if (selectedClient) {
     return (
@@ -111,7 +124,7 @@ export default function ClientList({ coachId }: ClientListProps) {
             <button
               key={client.id}
               onClick={() => setSelectedClient(client)}
-              className="bg-white rounded-xl border border-slate-200 p-5 hover:border-indigo-200 hover:shadow-md transition-all text-left w-full cursor-pointer group"
+              className="bg-white rounded-xl border border-slate-200 p-5 hover:border-indigo-200 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all text-left w-full cursor-pointer group"
             >
               <div className="flex items-center gap-3">
                 <Avatar name={client.full_name} />
