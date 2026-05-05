@@ -132,9 +132,17 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4 gap-3">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-bold text-slate-900 mb-1">
-                      {assignment.workout.name}
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h3 className="text-xl font-bold text-slate-900">
+                        {assignment.workout.name}
+                      </h3>
+                      {assignment.workout.cycle_length &&
+                        assignment.workout.cycle_position && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5 tabular-nums">
+                            Day {assignment.workout.cycle_position} / {assignment.workout.cycle_length}
+                          </span>
+                        )}
+                    </div>
                     {assignment.workout.description && (
                       <p className="text-slate-600 text-sm">{assignment.workout.description}</p>
                     )}

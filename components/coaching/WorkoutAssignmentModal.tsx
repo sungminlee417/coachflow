@@ -9,12 +9,18 @@ import { Field, Textarea } from '@/components/ui/Input'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { AssigneePicker } from '@/components/ui/AssigneePicker'
 import { Calendar } from 'lucide-react'
+import { todayISO } from '@/lib/utils'
 
 interface WorkoutAssignmentModalProps {
   open: boolean
   coachId: string
   workoutId: string
   workoutName: string
+  /** When set (>=1), the workout is on an N-day rotation and the modal asks
+   *  for a cycle anchor date. */
+  cycleLength?: number | null
+  /** The workout's position within its rotation, used in helper copy. */
+  cyclePosition?: number | null
   preselectedClientId?: string
   onClose: () => void
 }
@@ -24,6 +30,8 @@ export default function WorkoutAssignmentModal({
   coachId,
   workoutId,
   workoutName,
+  cycleLength,
+  cyclePosition,
   preselectedClientId,
   onClose,
 }: WorkoutAssignmentModalProps) {
@@ -32,8 +40,11 @@ export default function WorkoutAssignmentModal({
   const [showSchedule, setShowSchedule] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [cycleAnchor, setCycleAnchor] = useState('')
   const [notes, setNotes] = useState('')
   const [assigning, setAssigning] = useState(false)
+
+  const isCycle = !!(cycleLength && cycleLength > 0)
 
   const handleAssign = async () => {
     if (!clientId) {
@@ -62,6 +73,7 @@ export default function WorkoutAssignmentModal({
         coach_id: coachId,
         start_date: showSchedule && startDate ? startDate : null,
         end_date: showSchedule && endDate ? endDate : null,
+        cycle_anchor_date: isCycle ? cycleAnchor || todayISO() : null,
         notes,
       })
       if (error) {
@@ -93,6 +105,23 @@ export default function WorkoutAssignmentModal({
           onChange={setClientId}
           preselectedClientId={preselectedClientId}
         />
+
+        {isCycle && (
+          <Field id="wa-anchor" label={`Day 1 of the ${cycleLength}-day rotation`}>
+            <DatePicker
+              id="wa-anchor"
+              value={cycleAnchor}
+              onChange={setCycleAnchor}
+              placeholder="Today"
+              allowClear
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              This workout is position {cyclePosition} of {cycleLength}. It will appear on
+              the date you pick (and every {cycleLength} days after). Leave as today if the
+              client is starting fresh.
+            </p>
+          </Field>
+        )}
 
         <div>
           <button
@@ -143,8 +172,13 @@ export default function WorkoutAssignmentModal({
         </Field>
 
         <div className="flex gap-3 pt-2">
-          <Button onClick={handleAssign} disabled={assigning || !clientId} className="flex-1">
-            {assigning ? 'Assigning...' : 'Assign Workout'}
+          <Button
+            onClick={handleAssign}
+            loading={assigning}
+            disabled={!clientId}
+            className="flex-1"
+          >
+            {assigning ? 'Assigning…' : 'Assign Workout'}
           </Button>
           <Button variant="secondary" onClick={onClose}>
             Cancel

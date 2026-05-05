@@ -35,6 +35,36 @@ export const shiftDateISO = (dateISO: string, days: number): string => {
   return toLocalISO(d)
 }
 
+/**
+ * Whole-day signed difference between two YYYY-MM-DD strings.
+ *
+ * Uses UTC math under the hood — local-time arithmetic across DST transitions
+ * can produce a 23- or 25-hour day that rounds wrong. Both operands are
+ * date-only (no time) so this is safe.
+ */
+export const daysBetween = (fromISO: string, toISO: string): number => {
+  const [ay, am, ad] = fromISO.split('-').map(Number)
+  const [by, bm, bd] = toISO.split('-').map(Number)
+  const a = Date.UTC(ay, am - 1, ad)
+  const b = Date.UTC(by, bm - 1, bd)
+  return Math.round((b - a) / (1000 * 60 * 60 * 24))
+}
+
+/**
+ * Position within an N-day rotation (1-based).
+ * Returns null if the date precedes the anchor or inputs are invalid.
+ */
+export const cyclePositionFor = (
+  anchorISO: string | null | undefined,
+  dateISO: string,
+  cycleLength: number | null | undefined
+): number | null => {
+  if (!anchorISO || !cycleLength || cycleLength < 1) return null
+  const diff = daysBetween(anchorISO, dateISO)
+  if (diff < 0) return null
+  return (diff % cycleLength) + 1
+}
+
 export const formatDate = (
   dateString: string,
   opts?: Intl.DateTimeFormatOptions

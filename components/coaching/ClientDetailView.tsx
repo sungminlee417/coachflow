@@ -30,6 +30,8 @@ interface MealPlanAssignmentRow {
 interface WorkoutOption {
   id: string
   name: string
+  cycle_length: number | null
+  cycle_position: number | null
 }
 
 interface MealPlanOption {
@@ -114,7 +116,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
     try {
       const { data, error } = await supabase
         .from('workouts')
-        .select('id, name')
+        .select('id, name, cycle_length, cycle_position')
         .eq('coach_id', coachId)
         .order('name')
 
@@ -172,6 +174,8 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
         coachId={coachId}
         workoutId={assigningWorkout?.id ?? ''}
         workoutName={assigningWorkout?.name ?? ''}
+        cycleLength={assigningWorkout?.cycle_length ?? null}
+        cyclePosition={assigningWorkout?.cycle_position ?? null}
         preselectedClientId={client.id}
         onClose={() => {
           setAssigningWorkout(null)

@@ -24,7 +24,12 @@ export interface Workout {
   name: string
   description: string
   is_template: boolean
+  // Weekly recurrence (used when cycle_length is null). Empty = every day.
   days_of_week?: DayOfWeek[]
+  // Rolling N-day rotation. Both fields are non-null together; cycle_position
+  // is 1-based and bounded by cycle_length. When set, days_of_week is ignored.
+  cycle_length?: number | null
+  cycle_position?: number | null
   created_at?: string
   exercise_count?: number
 }
@@ -86,11 +91,16 @@ export interface WorkoutAssignment {
   // The coach who created the assignment. Equals the trainee's own id for
   // self-assigned workouts — used to gate the "Unassign" button.
   coach_id?: string
+  // For cycle-based workouts: the calendar date that maps to position 1 of
+  // the rotation. Null when the workout uses weekly scheduling.
+  cycle_anchor_date?: string | null
   workout: {
     id: string
     name: string
     description?: string
     days_of_week?: DayOfWeek[]
+    cycle_length?: number | null
+    cycle_position?: number | null
     exercises?: Exercise[]
   }
 }

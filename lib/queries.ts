@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { unwrapJoin, weekdayOf } from './utils'
+import { cyclePositionFor, unwrapJoin, weekdayOf } from './utils'
 import type {
   DayOfWeek,
   Exercise,
@@ -33,6 +33,27 @@ const matchesWeekday = (
 }
 
 /**
+ * A workout shows on `dateISO` if either its rotation lands on this date
+ * (cycle mode) or its weekday matches (weekly mode). Cycle mode wins when
+ * `cycle_length` and `cycle_position` are both set on the workout AND the
+ * assignment carries a `cycle_anchor_date`.
+ */
+const matchesSchedule = (
+  cycleLength: number | null | undefined,
+  cyclePosition: number | null | undefined,
+  cycleAnchor: string | null | undefined,
+  scheduledDays: DayOfWeek[] | null | undefined,
+  weekday: number,
+  dateISO: string
+): boolean => {
+  if (cycleLength != null && cyclePosition != null && cycleAnchor) {
+    const pos = cyclePositionFor(cycleAnchor, dateISO, cycleLength)
+    return pos === cyclePosition
+  }
+  return matchesWeekday(scheduledDays, weekday)
+}
+
+/**
  * Fetch all workout assignments active on `dateISO` for `clientId`, with
  * exercises and per-set rows pre-sorted and the `pair_with_next` chain intact.
  * Filters out workouts not scheduled for the date's weekday.
@@ -45,9 +66,9 @@ export async function fetchActiveWorkoutAssignments(
   const base = supabase
     .from('workout_assignments')
     .select(`
-      id, start_date, end_date, completed, completed_at, notes, coach_id,
+      id, start_date, end_date, completed, completed_at, notes, coach_id, cycle_anchor_date,
       workout:workout_id (
-        id, name, description, days_of_week,
+        id, name, description, days_of_week, cycle_length, cycle_position,
         exercises (
           id, name, exercise_type, sets, reps, weight, rest_seconds, notes, order_index, pair_with_next,
           exercise_sets ( id, set_number, target_reps, target_duration_seconds, notes )
@@ -69,6 +90,8 @@ export async function fetchActiveWorkoutAssignments(
         name: string
         description: string
         days_of_week: DayOfWeek[] | null
+        cycle_length: number | null
+        cycle_position: number | null
         exercises: Exercise[]
       }>(item.workout)
       return {
@@ -76,6 +99,8 @@ export async function fetchActiveWorkoutAssignments(
         workout: {
           ...workout,
           days_of_week: workout?.days_of_week ?? [],
+          cycle_length: workout?.cycle_length ?? null,
+          cycle_position: workout?.cycle_position ?? null,
           exercises: (workout?.exercises ?? [])
             .slice()
             .sort((a, b) => a.order_index - b.order_index)
@@ -89,7 +114,16 @@ export async function fetchActiveWorkoutAssignments(
         },
       }
     })
-    .filter(item => matchesWeekday(item.workout?.days_of_week, weekday))
+    .filter(item =>
+      matchesSchedule(
+        item.workout?.cycle_length,
+        item.workout?.cycle_position,
+        item.cycle_anchor_date,
+        item.workout?.days_of_week,
+        weekday,
+        dateISO
+      )
+    )
 }
 
 /**

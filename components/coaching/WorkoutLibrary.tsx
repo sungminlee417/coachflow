@@ -35,7 +35,9 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
     try {
       const { data, error } = await supabase
         .from('workouts')
-        .select('id, name, description, is_template, days_of_week, created_at, exercises (count)')
+        .select(
+          'id, name, description, is_template, days_of_week, cycle_length, cycle_position, created_at, exercises (count)'
+        )
         .eq('coach_id', coachId)
         .order('created_at', { ascending: false })
 
@@ -101,6 +103,8 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
         coachId={coachId}
         workoutId={assigningWorkout?.id ?? ''}
         workoutName={assigningWorkout?.name ?? ''}
+        cycleLength={assigningWorkout?.cycle_length ?? null}
+        cyclePosition={assigningWorkout?.cycle_position ?? null}
         onClose={() => setAssigningWorkout(null)}
       />
 
@@ -157,9 +161,16 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
               {workout.description && (
                 <p className="text-sm text-slate-500 mb-3 line-clamp-2">{workout.description}</p>
               )}
-              <p className="text-xs text-slate-400 mb-4">
-                {workout.exercise_count} {workout.exercise_count === 1 ? 'exercise' : 'exercises'}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap mb-4">
+                <p className="text-xs text-slate-400">
+                  {workout.exercise_count} {workout.exercise_count === 1 ? 'exercise' : 'exercises'}
+                </p>
+                {workout.cycle_length && workout.cycle_position && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5 tabular-nums">
+                    {workout.cycle_length}-day · day {workout.cycle_position}
+                  </span>
+                )}
+              </div>
               <div className="flex gap-2">
                 <Button onClick={() => setAssigningWorkout(workout)} className="flex-1">
                   <Send size={14} />
