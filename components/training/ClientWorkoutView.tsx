@@ -6,7 +6,7 @@ import { WeekSelector } from '@/components/ui/WeekSelector'
 import { IconButton } from '@/components/ui/IconButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { showToast } from '@/components/ui/Toast'
-import { HeartPulse, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, HeartPulse, Trash2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatDuration, todayISO, formatLongDate } from '@/lib/utils'
 import { fetchActiveWorkoutAssignments } from '@/lib/queries'
@@ -47,6 +47,19 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [pendingUnassign, setPendingUnassign] = useState<{ id: string; name: string } | null>(null)
+  // Per-exercise/per-superset collapse state. Keyed by `${assignment.id}::solo::${exId}`
+  // for solos and `${assignment.id}::group::${gi}` for supersets so the same
+  // exercise across two simultaneous assignments doesn't collide.
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set())
+
+  const toggleCollapsed = (key: string) => {
+    setCollapsedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const handleUnassign = async () => {
     if (!pendingUnassign) return
@@ -147,15 +160,49 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                   )}
                 </div>
 
-                <button
-                  onClick={() =>
-                    setExpanded(expanded === assignment.id ? null : assignment.id)
-                  }
-                  className="w-full text-left text-indigo-600 hover:text-indigo-800 font-medium text-sm cursor-pointer"
-                >
-                  {expanded === assignment.id ? '▼ Hide' : '▶ Show'} Exercises (
-                  {assignment.workout.exercises?.length ?? 0})
-                </button>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <button
+                    onClick={() =>
+                      setExpanded(expanded === assignment.id ? null : assignment.id)
+                    }
+                    className="text-left text-indigo-600 hover:text-indigo-800 font-medium text-sm cursor-pointer"
+                  >
+                    {expanded === assignment.id ? '▼ Hide' : '▶ Show'} Exercises (
+                    {assignment.workout.exercises?.length ?? 0})
+                  </button>
+                  {expanded === assignment.id && (() => {
+                    // Determine if any exercise is currently collapsed so the
+                    // bulk button can pick the more useful next action.
+                    const groups = groupExercises(assignment.workout.exercises ?? [])
+                    const allKeys = groups.map((g, gi) =>
+                      g.exercises.length === 1
+                        ? `${assignment.id}::solo::${g.exercises[0].id ?? g.startIndex}`
+                        : `${assignment.id}::group::${gi}`
+                    )
+                    const anyCollapsed = allKeys.some(k => collapsedKeys.has(k))
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCollapsedKeys(prev => {
+                            const next = new Set(prev)
+                            if (anyCollapsed) {
+                              // Expand: drop every key for this assignment.
+                              for (const k of allKeys) next.delete(k)
+                            } else {
+                              // Collapse: add them all.
+                              for (const k of allKeys) next.add(k)
+                            }
+                            return next
+                          })
+                        }}
+                        className="text-xs font-semibold uppercase tracking-widest text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        {anyCollapsed ? 'Expand all' : 'Collapse all'}
+                      </button>
+                    )
+                  })()}
+                </div>
 
                 {expanded === assignment.id && (
                   <div className="mt-4 space-y-3">
@@ -164,7 +211,8 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                       if (group.exercises.length === 1) {
                         const exercise = group.exercises[0]
                         const isCardio = exercise.exercise_type === 'cardio'
-                        // For single-set cardio, show the target time inline as a hero summary.
+                        const soloKey = `${assignment.id}::solo::${exercise.id ?? group.startIndex}`
+                        const isCollapsed = collapsedKeys.has(soloKey)
                         const cardioTargets =
                           isCardio
                             ? (exercise.exercise_sets ?? [])
@@ -180,14 +228,22 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                         return (
                           <div
                             key={exercise.id ?? group.startIndex}
-                            className={`rounded-lg p-4 ${
+                            className={`rounded-lg ${
                               isCardio
                                 ? 'bg-amber-50/40 border border-amber-100'
                                 : 'bg-slate-50'
                             }`}
                           >
-                            <div className="flex items-baseline justify-between gap-3 mb-1 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => toggleCollapsed(soloKey)}
+                              aria-expanded={!isCollapsed}
+                              className="w-full p-4 flex items-baseline justify-between gap-3 flex-wrap text-left cursor-pointer"
+                            >
                               <div className="flex items-baseline gap-2 min-w-0">
+                                <span className="text-slate-400 shrink-0">
+                                  {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                                </span>
                                 <span className="text-slate-500 text-sm font-medium">
                                   {group.startIndex + 1}.
                                 </span>
@@ -217,16 +273,21 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   </span>
                                 )}
                               </div>
-                            </div>
-                            {exercise.notes && (
-                              <p className="text-slate-600 text-sm italic mb-2">
-                                {exercise.notes}
-                              </p>
+                            </button>
+                            {!isCollapsed && (
+                              <div className="px-4 pb-4">
+                                {exercise.notes && (
+                                  <p className="text-slate-600 text-sm italic mb-2">
+                                    {exercise.notes}
+                                  </p>
+                                )}
+                                <ExerciseSetLogger
+                                  assignmentId={assignment.id}
+                                  exercise={exercise}
+                                  loggedDate={selectedDate}
+                                />
+                              </div>
                             )}
-                            <ExerciseSetLogger
-                              assignmentId={assignment.id}
-                              exercise={exercise}
-                            />
                           </div>
                         )
                       }
@@ -235,13 +296,23 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                       const exerciseLetters = group.exercises
                         .map((_, i) => String.fromCharCode(65 + i))
                         .join(' → ')
+                      const groupKey = `${assignment.id}::group::${gi}`
+                      const isCollapsed = collapsedKeys.has(groupKey)
                       return (
                         <div
                           key={`group-${gi}`}
                           className="rounded-xl border-2 border-indigo-300 bg-indigo-50/30 overflow-hidden"
                         >
-                          <div className="bg-indigo-600 text-white px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => toggleCollapsed(groupKey)}
+                            aria-expanded={!isCollapsed}
+                            className="w-full bg-indigo-600 text-white px-3 py-2 flex items-center justify-between gap-2 flex-wrap text-left cursor-pointer"
+                          >
                             <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-white/80 shrink-0">
+                                {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                              </span>
                               <span className="text-[10px] font-bold uppercase tracking-widest bg-white/20 rounded-full px-2.5 py-0.5">
                                 Superset
                               </span>
@@ -250,53 +321,58 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                               </span>
                             </div>
                             <span className="text-[10px] text-indigo-100">
-                              Do them back-to-back, then rest. Repeat per round.
+                              {isCollapsed
+                                ? `${group.exercises.length} exercises`
+                                : 'Do them back-to-back, then rest. Repeat per round.'}
                             </span>
-                          </div>
-                          <div className="p-3 space-y-2">
-                            <div className="space-y-1 mb-2">
-                              {group.exercises.map((ex, j) => {
-                                const isCardio = ex.exercise_type === 'cardio'
-                                const firstDuration =
-                                  isCardio
-                                    ? ex.exercise_sets?.find(
-                                        s => s.target_duration_seconds != null && s.target_duration_seconds > 0
-                                      )?.target_duration_seconds ?? null
-                                    : null
-                                return (
-                                  <div
-                                    key={ex.id ?? j}
-                                    className="flex items-baseline gap-2 text-xs"
-                                  >
-                                    <span
-                                      className={`font-bold tabular-nums ${
-                                        isCardio ? 'text-amber-600' : 'text-indigo-700'
-                                      }`}
+                          </button>
+                          {!isCollapsed && (
+                            <div className="p-3 space-y-2">
+                              <div className="space-y-1 mb-2">
+                                {group.exercises.map((ex, j) => {
+                                  const isCardio = ex.exercise_type === 'cardio'
+                                  const firstDuration =
+                                    isCardio
+                                      ? ex.exercise_sets?.find(
+                                          s => s.target_duration_seconds != null && s.target_duration_seconds > 0
+                                        )?.target_duration_seconds ?? null
+                                      : null
+                                  return (
+                                    <div
+                                      key={ex.id ?? j}
+                                      className="flex items-baseline gap-2 text-xs"
                                     >
-                                      {String.fromCharCode(65 + j)}
-                                    </span>
-                                    <span className="font-medium text-slate-900 truncate">
-                                      {ex.name}
-                                    </span>
-                                    {isCardio && firstDuration != null && (
-                                      <span className="text-amber-700 font-medium tabular-nums">
-                                        {formatDuration(firstDuration)}
+                                      <span
+                                        className={`font-bold tabular-nums ${
+                                          isCardio ? 'text-amber-600' : 'text-indigo-700'
+                                        }`}
+                                      >
+                                        {String.fromCharCode(65 + j)}
                                       </span>
-                                    )}
-                                    {ex.notes && (
-                                      <span className="text-slate-500 italic truncate">
-                                        &middot; {ex.notes}
+                                      <span className="font-medium text-slate-900 truncate">
+                                        {ex.name}
                                       </span>
-                                    )}
-                                  </div>
-                                )
-                              })}
+                                      {isCardio && firstDuration != null && (
+                                        <span className="text-amber-700 font-medium tabular-nums">
+                                          {formatDuration(firstDuration)}
+                                        </span>
+                                      )}
+                                      {ex.notes && (
+                                        <span className="text-slate-500 italic truncate">
+                                          &middot; {ex.notes}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              <SupersetLogger
+                                assignmentId={assignment.id}
+                                exercises={group.exercises}
+                                loggedDate={selectedDate}
+                              />
                             </div>
-                            <SupersetLogger
-                              assignmentId={assignment.id}
-                              exercises={group.exercises}
-                            />
-                          </div>
+                          )}
                         </div>
                       )
                     })}

@@ -65,9 +65,12 @@ export interface SetLog {
   assignment_id: string
   exercise_id: string
   set_number: number
+  // Day this set was performed. Mirrors meal_logs.logged_date — recurring
+  // workouts get one row per occurrence so previous performances aren't
+  // overwritten and progressive overload comparisons remain possible.
+  logged_date: string
   reps_performed: number | null
   weight_performed: number | null
-  // Only set for cardio exercises.
   duration_performed_seconds?: number | null
   completed: boolean
   notes: string | null

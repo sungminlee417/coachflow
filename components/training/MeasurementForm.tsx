@@ -45,21 +45,21 @@ const emptyMeasurement = (): BodyMeasurement => ({
   notes: null,
 })
 
-const SIMPLE_FIELDS: { key: keyof BodyMeasurement; label: string }[] = [
-  { key: 'neck', label: 'Neck' },
-  { key: 'waist', label: 'Waist (at belly button)' },
-  { key: 'hips', label: 'Hips (around glutes)' },
-]
-
-const FLEXIBLE_FIELDS: {
+// One flat list, ordered roughly head-to-toe. `flexedKey` is set only on
+// muscles where the relaxed/flexed distinction matters; non-muscle fields
+// (neck, waist, hips) just omit it and get the same row layout.
+const FIELDS: {
   key: keyof BodyMeasurement
-  flexedKey: keyof BodyMeasurement
+  flexedKey?: keyof BodyMeasurement
   label: string
 }[] = [
+  { key: 'neck', label: 'Neck' },
   { key: 'shoulders', flexedKey: 'shoulders_flexed', label: 'Shoulders' },
   { key: 'chest', flexedKey: 'chest_flexed', label: 'Chest / back' },
   { key: 'arm_left', flexedKey: 'arm_left_flexed', label: 'Left arm' },
   { key: 'arm_right', flexedKey: 'arm_right_flexed', label: 'Right arm' },
+  { key: 'waist', label: 'Waist (at belly button)' },
+  { key: 'hips', label: 'Hips (around glutes)' },
   { key: 'thigh_left', flexedKey: 'thigh_left_flexed', label: 'Left thigh' },
   { key: 'thigh_right', flexedKey: 'thigh_right_flexed', label: 'Right thigh' },
   { key: 'calf_left', flexedKey: 'calf_left_flexed', label: 'Left calf' },
@@ -134,65 +134,46 @@ export default function MeasurementForm({
         </p>
 
         <div className="space-y-3">
-          {SIMPLE_FIELDS.map(({ key, label }) => (
-            <div
-              key={key}
-              className="flex flex-col sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center gap-1.5"
-            >
-              <label className="sm:col-span-4 text-sm text-slate-700">{label}</label>
-              <div className="sm:col-span-8">
-                <FractionInput
-                  value={data[key] as number | null}
-                  onChange={v => update(key, v)}
-                  unit={lengthUnit}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="space-y-3 pt-2 border-t border-slate-100">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Muscle measurements
-          </p>
-          {FLEXIBLE_FIELDS.map(({ key, flexedKey, label }) => {
-            const isFlexed = data[flexedKey] as boolean
+          {FIELDS.map(({ key, flexedKey, label }) => {
+            const isFlexed = flexedKey ? (data[flexedKey] as boolean) : false
             return (
               <div key={key} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <label className="text-sm text-slate-700">{label}</label>
-                  <div
-                    role="radiogroup"
-                    aria-label={`${label} state`}
-                    className="inline-flex bg-slate-100 rounded-lg p-0.5 text-xs"
-                  >
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={!isFlexed}
-                    onClick={() => update(flexedKey, false)}
-                    className={`flex-1 px-2 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
-                      !isFlexed
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    Relaxed
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={isFlexed}
-                    onClick={() => update(flexedKey, true)}
-                    className={`flex-1 px-2 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
-                      isFlexed
-                        ? 'bg-white text-indigo-600 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    Flexed
-                  </button>
-                  </div>
+                  {flexedKey && (
+                    <div
+                      role="radiogroup"
+                      aria-label={`${label} state`}
+                      className="inline-flex bg-slate-100 rounded-lg p-0.5 text-xs"
+                    >
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={!isFlexed}
+                        onClick={() => update(flexedKey, false)}
+                        className={`px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+                          !isFlexed
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Relaxed
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={isFlexed}
+                        onClick={() => update(flexedKey, true)}
+                        className={`px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+                          isFlexed
+                            ? 'bg-white text-indigo-600 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Flexed
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <FractionInput
                   value={data[key] as number | null}

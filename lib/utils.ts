@@ -28,6 +28,13 @@ export const weekdayOf = (dateISO: string): number => parseLocalISO(dateISO).get
 /** Get the local day-of-month for a YYYY-MM-DD string. */
 export const dayOfMonthOf = (dateISO: string): number => parseLocalISO(dateISO).getDate()
 
+/** Add (or subtract, with negative input) calendar days to a YYYY-MM-DD string. */
+export const shiftDateISO = (dateISO: string, days: number): string => {
+  const d = parseLocalISO(dateISO)
+  d.setDate(d.getDate() + days)
+  return toLocalISO(d)
+}
+
 export const formatDate = (
   dateString: string,
   opts?: Intl.DateTimeFormatOptions

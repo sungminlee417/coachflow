@@ -1,6 +1,14 @@
 'use client'
 
-import { DAY_NAMES, dayOfMonthOf, getWeekDates, todayISO } from '@/lib/utils'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  DAY_NAMES,
+  dayOfMonthOf,
+  formatDate,
+  getWeekDates,
+  shiftDateISO,
+  todayISO,
+} from '@/lib/utils'
 
 type Tone = 'brand' | 'success'
 
@@ -14,10 +22,12 @@ const toneClasses = {
   brand: {
     selected: 'bg-indigo-600 text-white',
     today: 'bg-indigo-100 text-indigo-900',
+    accent: 'text-indigo-600 hover:text-indigo-800',
   },
   success: {
     selected: 'bg-emerald-600 text-white',
     today: 'bg-emerald-100 text-emerald-900',
+    accent: 'text-emerald-600 hover:text-emerald-800',
   },
 }
 
@@ -26,30 +36,72 @@ export function WeekSelector({ selectedDate, onSelect, tone = 'brand' }: WeekSel
   const today = todayISO()
   const tones = toneClasses[tone]
 
-  return (
-    <div className="grid grid-cols-7 gap-2 mb-6">
-      {weekDates.map((date, index) => {
-        const isSelected = date === selectedDate
-        const isToday = date === today
-        const day = dayOfMonthOf(date)
+  const weekStart = weekDates[0]
+  const weekEnd = weekDates[6]
+  const isThisWeek = weekDates.includes(today)
+  const rangeLabel = `${formatDate(weekStart, { month: 'short', day: 'numeric' })} – ${formatDate(
+    weekEnd,
+    { month: 'short', day: 'numeric' }
+  )}`
 
-        return (
-          <button
-            key={date}
-            onClick={() => onSelect(date)}
-            className={`p-3 rounded-lg text-center transition-colors cursor-pointer ${
-              isSelected
-                ? tones.selected
-                : isToday
-                ? tones.today
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <div className="text-xs font-medium">{DAY_NAMES[index]}</div>
-            <div className="text-lg font-bold">{day}</div>
-          </button>
-        )
-      })}
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <button
+          type="button"
+          onClick={() => onSelect(shiftDateISO(selectedDate, -7))}
+          aria-label="Previous week"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-semibold text-slate-600 tabular-nums truncate">
+            {rangeLabel}
+          </span>
+          {!isThisWeek && (
+            <button
+              type="button"
+              onClick={() => onSelect(today)}
+              className={`text-[10px] font-semibold uppercase tracking-widest cursor-pointer ${tones.accent}`}
+            >
+              Today
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => onSelect(shiftDateISO(selectedDate, 7))}
+          aria-label="Next week"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-2">
+        {weekDates.map((date, index) => {
+          const isSelected = date === selectedDate
+          const isToday = date === today
+          const day = dayOfMonthOf(date)
+
+          return (
+            <button
+              key={date}
+              onClick={() => onSelect(date)}
+              className={`p-3 rounded-lg text-center transition-colors cursor-pointer ${
+                isSelected
+                  ? tones.selected
+                  : isToday
+                    ? tones.today
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <div className="text-xs font-medium">{DAY_NAMES[index]}</div>
+              <div className="text-lg font-bold">{day}</div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { formatDuration } from './utils'
 import type { Exercise, ExerciseSet } from './types'
 
 /**
@@ -19,4 +21,97 @@ export const buildPrescribedSets = (exercise: Exercise): ExerciseSet[] => {
     target_duration_seconds: null,
     notes: '',
   }))
+}
+
+// Compact representation of "what the client did last time on this set."
+// Sourced from set_logs; one entry per set_number, the most recent before today.
+export interface PriorPerformance {
+  set_number: number
+  reps_performed: number | null
+  weight_performed: number | null
+  duration_performed_seconds: number | null
+  logged_date: string
+}
+
+const toNum = (v: string | number | null | undefined): number | null => {
+  if (v == null) return null
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (v === '') return null
+  const n = parseFloat(v)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * Did the client beat their previous performance on this set?
+ *
+ * Strength: more reps at >= weight, or more weight at >= reps. Treats a missing
+ * previous weight as 0 so adding load to a previously bodyweight set counts.
+ *
+ * Cardio: longer duration than last time.
+ *
+ * Returns false until both rows are quantified (incomplete inputs don't pop
+ * the badge prematurely).
+ */
+export function isImprovement(
+  current: {
+    reps_performed?: string | number | null
+    weight_performed?: string | number | null
+    duration_performed_seconds?: number | null
+  },
+  prev: PriorPerformance,
+  cardio: boolean
+): boolean {
+  if (cardio) {
+    const cur = current.duration_performed_seconds
+    const prv = prev.duration_performed_seconds
+    return cur != null && prv != null && cur > prv
+  }
+  const curR = toNum(current.reps_performed)
+  if (curR == null) return false
+  const prvR = prev.reps_performed
+  if (prvR == null) return false
+  const curW = toNum(current.weight_performed) ?? 0
+  const prvW = prev.weight_performed ?? 0
+  if (curR > prvR && curW >= prvW) return true
+  if (curR >= prvR && curW > prvW) return true
+  return false
+}
+
+/** Single-line, ghost-text summary of last week's set: "8 × 135" or "25:30". */
+export function formatPriorHint(prev: PriorPerformance, cardio: boolean): string | null {
+  if (cardio) {
+    if (prev.duration_performed_seconds == null) return null
+    return formatDuration(prev.duration_performed_seconds)
+  }
+  if (prev.reps_performed == null) return null
+  if (prev.weight_performed != null) {
+    return `${prev.reps_performed} × ${prev.weight_performed}`
+  }
+  return String(prev.reps_performed)
+}
+
+/**
+ * Fetch the most recent log per `set_number` for a given assignment+exercise
+ * strictly before `beforeDate`. PostgREST doesn't have DISTINCT ON, so we pull
+ * all prior rows ordered newest-first and de-dup by set_number client-side.
+ */
+export async function fetchPriorPerformance(
+  supabase: SupabaseClient,
+  assignmentId: string,
+  exerciseId: string,
+  beforeDate: string
+): Promise<Map<number, PriorPerformance>> {
+  const { data } = await supabase
+    .from('set_logs')
+    .select('set_number, reps_performed, weight_performed, duration_performed_seconds, logged_date')
+    .eq('assignment_id', assignmentId)
+    .eq('exercise_id', exerciseId)
+    .lt('logged_date', beforeDate)
+    .order('logged_date', { ascending: false })
+
+  const map = new Map<number, PriorPerformance>()
+  for (const row of (data ?? []) as PriorPerformance[]) {
+    if (!map.has(row.set_number)) map.set(row.set_number, row)
+  }
+  return map
 }

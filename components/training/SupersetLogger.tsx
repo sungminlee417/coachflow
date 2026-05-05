@@ -6,13 +6,24 @@ import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Check } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
-import { buildPrescribedSets } from '@/lib/training'
+import {
+  buildPrescribedSets,
+  fetchPriorPerformance,
+  formatPriorHint,
+  isImprovement,
+  type PriorPerformance,
+} from '@/lib/training'
 import type { Exercise } from '@/lib/types'
 
 interface SupersetLoggerProps {
   assignmentId: string
   exercises: Exercise[]
+  loggedDate: string
 }
+
+// (exerciseId, setNumber) → previous-week performance.
+type PriorMap = Map<string, PriorPerformance>
+const priorKey = (exerciseId: string, setNumber: number) => `${exerciseId}-${setNumber}`
 
 interface RowState {
   exerciseId: string
@@ -55,42 +66,51 @@ const buildInitialMap = (exercises: Exercise[]): Map<string, RowState[]> => {
   return next
 }
 
-export function SupersetLogger({ assignmentId, exercises }: SupersetLoggerProps) {
+export function SupersetLogger({
+  assignmentId,
+  exercises,
+  loggedDate,
+}: SupersetLoggerProps) {
   const supabase = useSupabase()
   const [rowsByExercise, setRowsByExercise] = useState<Map<string, RowState[]>>(() =>
     buildInitialMap(exercises)
   )
-  // Skeleton inputs/buttons until logs are merged in — prevents the empty-then-fill
-  // flicker on already-logged rounds.
   const [loaded, setLoaded] = useState(false)
+  const [priorByKey, setPriorByKey] = useState<PriorMap>(new Map())
 
   useEffect(() => {
     let cancelled = false
-    // Re-seed prescribed-only on identity change. Same payload as lazy init on
-    // first mount, so no flicker; ensures no stale logs leak across switches.
     setRowsByExercise(buildInitialMap(exercises))
     setLoaded(false)
+    setPriorByKey(new Map())
 
     const load = async () => {
       const exerciseIds = exercises.map(e => e.id).filter(Boolean) as string[]
       if (exerciseIds.length === 0) return
 
-      const { data: logs } = await supabase
-        .from('set_logs')
-        .select('exercise_id, set_number, reps_performed, weight_performed, duration_performed_seconds, completed')
-        .eq('assignment_id', assignmentId)
-        .in('exercise_id', exerciseIds)
+      // Today's logs + each exercise's most-recent-prior performance, in parallel.
+      const [todayResult, ...priorMaps] = await Promise.all([
+        supabase
+          .from('set_logs')
+          .select('exercise_id, set_number, reps_performed, weight_performed, duration_performed_seconds, completed')
+          .eq('assignment_id', assignmentId)
+          .in('exercise_id', exerciseIds)
+          .eq('logged_date', loggedDate),
+        ...exerciseIds.map(exId =>
+          fetchPriorPerformance(supabase, assignmentId, exId, loggedDate).then(
+            map => ({ exId, map })
+          )
+        ),
+      ])
 
       if (cancelled) return
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const logIndex = new Map<string, any>(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (logs ?? []).map((l: any) => [`${l.exercise_id}-${l.set_number}`, l])
+        (todayResult.data ?? []).map((l: any) => [`${l.exercise_id}-${l.set_number}`, l])
       )
 
-      // Patch logs onto existing rows; preserve row order/length so the layout
-      // is stable across the load.
       setRowsByExercise(prev => {
         const next = new Map<string, RowState[]>()
         for (const [exId, rows] of prev) {
@@ -116,6 +136,15 @@ export function SupersetLogger({ assignmentId, exercises }: SupersetLoggerProps)
         }
         return next
       })
+
+      // Flatten the per-exercise prior maps into a single (exId, setNum) → prior.
+      const flat: PriorMap = new Map()
+      for (const { exId, map } of priorMaps as { exId: string; map: Map<number, PriorPerformance> }[]) {
+        for (const [setNum, prev] of map) {
+          flat.set(priorKey(exId, setNum), prev)
+        }
+      }
+      setPriorByKey(flat)
       setLoaded(true)
     }
     load()
@@ -123,7 +152,7 @@ export function SupersetLogger({ assignmentId, exercises }: SupersetLoggerProps)
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignmentId, exercises.map(e => e.id).join(',')])
+  }, [assignmentId, exercises.map(e => e.id).join(','), loggedDate])
 
   const updateRow = (exerciseId: string, setNumber: number, patch: Partial<RowState>) => {
     setRowsByExercise(prev => {
@@ -149,12 +178,13 @@ export function SupersetLogger({ assignmentId, exercises }: SupersetLoggerProps)
             assignment_id: assignmentId,
             exercise_id: row.exerciseId,
             set_number: row.set_number,
+            logged_date: loggedDate,
             reps_performed: Number.isNaN(reps as number) ? null : reps,
             weight_performed: Number.isNaN(weight as number) ? null : weight,
             duration_performed_seconds: row.duration_performed_seconds,
             completed: row.completed,
           },
-          { onConflict: 'assignment_id,exercise_id,set_number' }
+          { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
         )
       if (error) throw error
     } catch {
@@ -253,6 +283,9 @@ export function SupersetLogger({ assignmentId, exercises }: SupersetLoggerProps)
                     ? formatDuration(row.target_duration_seconds)
                     : null
                   : row.target_reps || null
+                const prev = loaded ? priorByKey.get(priorKey(ex.id, setNumber)) : undefined
+                const priorText = prev ? formatPriorHint(prev, isCardio) : null
+                const improved = prev ? isImprovement(row, prev, isCardio) : false
                 return (
                   <div
                     key={`${ex.id}-${setNumber}`}
@@ -285,7 +318,7 @@ export function SupersetLogger({ assignmentId, exercises }: SupersetLoggerProps)
                       )}
                     </div>
                     {isCardio ? (
-                      <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                      <div className="grid grid-cols-[1fr_auto] gap-2 items-center mb-1">
                         {loaded ? (
                           <Input
                             value={row.duration_input}
@@ -318,7 +351,7 @@ export function SupersetLogger({ assignmentId, exercises }: SupersetLoggerProps)
                         )}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center mb-1">
                         {loaded ? (
                           <Input
                             type="number"
@@ -377,6 +410,18 @@ export function SupersetLogger({ assignmentId, exercises }: SupersetLoggerProps)
                           </button>
                         ) : (
                           <div className="h-7 w-7 bg-slate-200/70 rounded-md animate-pulse" />
+                        )}
+                      </div>
+                    )}
+                    {priorText && (
+                      <div className="flex items-center justify-between gap-2 text-[10px]">
+                        <span className="text-slate-400 tabular-nums">
+                          Last: <span className="font-medium text-slate-500">{priorText}</span>
+                        </span>
+                        {improved && (
+                          <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
+                            ↑ Beat last
+                          </span>
                         )}
                       </div>
                     )}
