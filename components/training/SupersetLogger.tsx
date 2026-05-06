@@ -357,27 +357,6 @@ export function SupersetLogger({
                             type="number"
                             step="any"
                             min="0"
-                            value={row.reps_performed}
-                            onChange={e =>
-                              updateRow(ex.id!, setNumber, { reps_performed: e.target.value })
-                            }
-                            onBlur={() => {
-                              const current = rowsByExercise
-                                .get(ex.id!)
-                                ?.find(r => r.set_number === setNumber)
-                              if (current) persist(current)
-                            }}
-                            placeholder="reps"
-                            className="text-sm py-1.5"
-                          />
-                        ) : (
-                          <div className="h-8.5 w-full bg-slate-200/70 rounded-lg animate-pulse" />
-                        )}
-                        {loaded ? (
-                          <Input
-                            type="number"
-                            step="any"
-                            min="0"
                             value={row.weight_performed}
                             onChange={e =>
                               updateRow(ex.id!, setNumber, { weight_performed: e.target.value })
@@ -389,6 +368,27 @@ export function SupersetLogger({
                               if (current) persist(current)
                             }}
                             placeholder="weight"
+                            className="text-sm py-1.5"
+                          />
+                        ) : (
+                          <div className="h-8.5 w-full bg-slate-200/70 rounded-lg animate-pulse" />
+                        )}
+                        {loaded ? (
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={row.reps_performed}
+                            onChange={e =>
+                              updateRow(ex.id!, setNumber, { reps_performed: e.target.value })
+                            }
+                            onBlur={() => {
+                              const current = rowsByExercise
+                                .get(ex.id!)
+                                ?.find(r => r.set_number === setNumber)
+                              if (current) persist(current)
+                            }}
+                            placeholder="reps"
                             className="text-sm py-1.5"
                           />
                         ) : (

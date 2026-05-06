@@ -77,7 +77,13 @@ export function isImprovement(
   return false
 }
 
-/** Single-line, ghost-text summary of last week's set: "8 × 135" or "25:30". */
+/**
+ * Single-line, ghost-text summary of last week's set.
+ *
+ * Strength: "{weight} × {reps}" (e.g., "135 × 8") — matches the column order
+ * weight-then-reps so the hint reads naturally under the inputs.
+ * Cardio: formatted duration (e.g., "25:30").
+ */
 export function formatPriorHint(prev: PriorPerformance, cardio: boolean): string | null {
   if (cardio) {
     if (prev.duration_performed_seconds == null) return null
@@ -85,7 +91,7 @@ export function formatPriorHint(prev: PriorPerformance, cardio: boolean): string
   }
   if (prev.reps_performed == null) return null
   if (prev.weight_performed != null) {
-    return `${prev.reps_performed} × ${prev.weight_performed}`
+    return `${prev.weight_performed} × ${prev.reps_performed}`
   }
   return String(prev.reps_performed)
 }

@@ -305,8 +305,8 @@ export function ExerciseSetLogger({
       <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400 px-3 py-2 bg-slate-50 border-b border-slate-200">
         <div className="col-span-1 text-center">Set</div>
         <div className="col-span-2">Target</div>
-        <div className="col-span-4">Reps</div>
         <div className="col-span-4">Weight</div>
+        <div className="col-span-4">Reps</div>
         <div className="col-span-1 text-center">Done</div>
       </div>
 
@@ -338,7 +338,7 @@ export function ExerciseSetLogger({
 
               {/* Inputs — two-up grid on mobile, columns 3–4 on desktop. `sm:contents`
                   collapses the wrapper at >=sm so each Input becomes a direct child of
-                  the parent grid. */}
+                  the parent grid. Weight comes first (lift first, then count reps). */}
               <div className="grid grid-cols-2 gap-2 sm:contents">
                 <div className="sm:col-span-4">
                   {loaded ? (
@@ -347,10 +347,10 @@ export function ExerciseSetLogger({
                       step="any"
                       min="0"
                       inputMode="decimal"
-                      value={row.reps_performed}
-                      onChange={e => updateRow(row.set_number, { reps_performed: e.target.value })}
+                      value={row.weight_performed}
+                      onChange={e => updateRow(row.set_number, { weight_performed: e.target.value })}
                       onBlur={() => persist(rows.find(r => r.set_number === row.set_number)!)}
-                      placeholder="reps"
+                      placeholder="weight"
                       className="text-sm py-1.5"
                     />
                   ) : (
@@ -364,10 +364,10 @@ export function ExerciseSetLogger({
                       step="any"
                       min="0"
                       inputMode="decimal"
-                      value={row.weight_performed}
-                      onChange={e => updateRow(row.set_number, { weight_performed: e.target.value })}
+                      value={row.reps_performed}
+                      onChange={e => updateRow(row.set_number, { reps_performed: e.target.value })}
                       onBlur={() => persist(rows.find(r => r.set_number === row.set_number)!)}
-                      placeholder="weight"
+                      placeholder="reps"
                       className="text-sm py-1.5"
                     />
                   ) : (
