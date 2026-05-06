@@ -21,6 +21,9 @@ interface ExerciseSetLoggerProps {
   /** Date the user is logging against — drives both the upsert and the
    * "previous performance" lookup. */
   loggedDate: string
+  /** When the trainee swapped this exercise for the day, the substitute name.
+   *  Null means the original is in play. Drives variant-aware prior matching. */
+  currentVariant?: string | null
 }
 
 interface RowState {
@@ -51,6 +54,7 @@ export function ExerciseSetLogger({
   assignmentId,
   exercise,
   loggedDate,
+  currentVariant = null,
 }: ExerciseSetLoggerProps) {
   const supabase = useSupabase()
   const [rows, setRows] = useState<RowState[]>(() => buildInitialRows(exercise))
@@ -75,7 +79,13 @@ export function ExerciseSetLogger({
           .eq('exercise_id', exercise.id ?? '')
           .eq('logged_date', loggedDate),
         exercise.id
-          ? fetchPriorPerformance(supabase, assignmentId, exercise.id, loggedDate)
+          ? fetchPriorPerformance(
+              supabase,
+              assignmentId,
+              exercise.id,
+              loggedDate,
+              currentVariant
+            )
           : Promise.resolve(new Map<number, PriorPerformance>()),
       ])
 
@@ -110,7 +120,7 @@ export function ExerciseSetLogger({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignmentId, exercise.id, loggedDate])
+  }, [assignmentId, exercise.id, loggedDate, currentVariant])
 
   const updateRow = (setNumber: number, patch: Partial<RowState>) => {
     setRows(prev => prev.map(r => (r.set_number === setNumber ? { ...r, ...patch } : r)))

@@ -71,7 +71,8 @@ export async function fetchActiveWorkoutAssignments(
         id, name, description, days_of_week, cycle_length, cycle_position,
         exercises (
           id, name, exercise_type, sets, reps, weight, rest_seconds, notes, order_index, pair_with_next,
-          exercise_sets ( id, set_number, target_reps, target_duration_seconds, notes )
+          exercise_sets ( id, set_number, target_reps, target_duration_seconds, notes ),
+          exercise_alternatives ( id, name, order_index )
         )
       )
     `)
@@ -81,6 +82,32 @@ export async function fetchActiveWorkoutAssignments(
   if (error) throw error
 
   const weekday = weekdayOf(dateISO)
+
+  // Pull today's substitutions in one query for all matched assignments. Done
+  // after the assignment fetch so we know the candidate ids and don't have to
+  // round-trip per assignment. Failures here downgrade gracefully to "no swap".
+  const assignmentIds = (data ?? []).map((d: { id: string }) => d.id)
+  const subKey = (assignmentId: string, exerciseId: string) =>
+    `${assignmentId}::${exerciseId}`
+  const substitutions = new Map<string, string>()
+  if (assignmentIds.length > 0) {
+    try {
+      const { data: subs } = await supabase
+        .from('exercise_substitutions')
+        .select('assignment_id, exercise_id, substituted_name')
+        .in('assignment_id', assignmentIds)
+        .eq('logged_date', dateISO)
+      for (const s of (subs ?? []) as {
+        assignment_id: string
+        exercise_id: string
+        substituted_name: string
+      }[]) {
+        substitutions.set(subKey(s.assignment_id, s.exercise_id), s.substituted_name)
+      }
+    } catch {
+      // Substitutions are non-essential for rendering — swallow and continue.
+    }
+  }
 
   return (data ?? [])
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,7 +119,9 @@ export async function fetchActiveWorkoutAssignments(
         days_of_week: DayOfWeek[] | null
         cycle_length: number | null
         cycle_position: number | null
-        exercises: Exercise[]
+        exercises: (Exercise & {
+          exercise_alternatives?: { name: string; order_index: number }[]
+        })[]
       }>(item.workout)
       return {
         ...item,
@@ -110,6 +139,12 @@ export async function fetchActiveWorkoutAssignments(
               exercise_sets: (ex.exercise_sets ?? [])
                 .slice()
                 .sort((a: ExerciseSet, b: ExerciseSet) => a.set_number - b.set_number),
+              alternatives: (ex.exercise_alternatives ?? [])
+                .slice()
+                .sort((a, b) => a.order_index - b.order_index)
+                .map(alt => alt.name),
+              substitution:
+                ex.id ? substitutions.get(subKey(item.id, ex.id)) ?? null : null,
             })),
         },
       }

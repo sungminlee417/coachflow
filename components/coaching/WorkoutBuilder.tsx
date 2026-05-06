@@ -6,7 +6,7 @@ import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Field, Input, Textarea } from '@/components/ui/Input'
-import { Link2, Dumbbell, HeartPulse } from 'lucide-react'
+import { Link2, Dumbbell, HeartPulse, ArrowUpFromLine } from 'lucide-react'
 import { DayOfWeekSelector } from '@/components/ui/DayOfWeekSelector'
 import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
 import { useDirtyState } from '@/lib/use-dirty-state'
@@ -107,9 +107,10 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         return
       }
 
+      const ids = exerciseList.map(e => e.id)
+
       let setsByExercise = new Map<string, ExerciseSet[]>()
       try {
-        const ids = exerciseList.map(e => e.id)
         const { data: setRows } = await supabase
           .from('exercise_sets')
           .select('id, exercise_id, set_number, target_reps, target_duration_seconds, notes')
@@ -125,6 +126,28 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         // Fall back to legacy-derived sets if the second query fails.
       }
 
+      // Same defensive split for alternatives — if the table doesn't exist yet
+      // (migration pending) the form should still render.
+      const altsByExercise = new Map<string, string[]>()
+      try {
+        const { data: altRows } = await supabase
+          .from('exercise_alternatives')
+          .select('exercise_id, name, order_index')
+          .in('exercise_id', ids)
+          .order('order_index', { ascending: true })
+        for (const a of (altRows ?? []) as {
+          exercise_id: string
+          name: string
+          order_index: number
+        }[]) {
+          const arr = altsByExercise.get(a.exercise_id) ?? []
+          arr.push(a.name)
+          altsByExercise.set(a.exercise_id, arr)
+        }
+      } catch {
+        // Alternatives are optional — silently skip if unavailable.
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalized: Exercise[] = exerciseList.map((ex: any) => {
         const sets = (setsByExercise.get(ex.id) ?? [])
@@ -135,6 +158,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         return {
           ...ex,
           exercise_type: type,
+          alternatives: altsByExercise.get(ex.id) ?? [],
           exercise_sets: type === 'cardio' ? hydrateCardioInputs(baseSets) : baseSets,
         }
       })
@@ -249,6 +273,44 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
     setExercises(updated)
   }
 
+  const addAlternative = (exIndex: number) => {
+    const updated = [...exercises]
+    const current = updated[exIndex].alternatives ?? []
+    updated[exIndex] = { ...updated[exIndex], alternatives: [...current, ''] }
+    setExercises(updated)
+  }
+
+  const updateAlternative = (exIndex: number, altIndex: number, value: string) => {
+    const updated = [...exercises]
+    const current = [...(updated[exIndex].alternatives ?? [])]
+    current[altIndex] = value
+    updated[exIndex] = { ...updated[exIndex], alternatives: current }
+    setExercises(updated)
+  }
+
+  const removeAlternative = (exIndex: number, altIndex: number) => {
+    const updated = [...exercises]
+    const current = (updated[exIndex].alternatives ?? []).filter((_, i) => i !== altIndex)
+    updated[exIndex] = { ...updated[exIndex], alternatives: current }
+    setExercises(updated)
+  }
+
+  // Swap the alternative at `altIndex` with the main exercise name. Old main
+  // takes the alternative's slot. This is purely a form-state edit; the
+  // promotion-aware history backfill happens at save time when we can compare
+  // against the server's prior name.
+  const promoteAlternative = (exIndex: number, altIndex: number) => {
+    const updated = [...exercises]
+    const ex = updated[exIndex]
+    const alts = [...(ex.alternatives ?? [])]
+    const promoted = alts[altIndex]?.trim()
+    if (!promoted) return
+    const oldMain = ex.name
+    alts[altIndex] = oldMain
+    updated[exIndex] = { ...ex, name: promoted, alternatives: alts }
+    setExercises(updated)
+  }
+
   const handleSave = async () => {
     if (!name.trim()) {
       showToast('Please enter a workout name', 'error')
@@ -303,61 +365,279 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         workoutId = data.id
       }
 
-      // Replace strategy: delete then re-insert exercises (which cascade-deletes sets).
+      // ── Diff-based exercise sync ───────────────────────────────────────────
+      // Goal: preserve exercise IDs across edits so client-owned data
+      // (set_logs, exercise_substitutions) keyed on exercise_id stays valid.
+      // Only exercises the coach explicitly removed get deleted; everything
+      // else is updated in place.
+      const exerciseFields = (ex: Exercise, formIndex: number) => ({
+        name: ex.name,
+        exercise_type: ex.exercise_type ?? 'strength',
+        sets: ex.exercise_sets?.length ?? null,
+        reps: ex.exercise_sets?.[0]?.target_reps ?? ex.reps ?? '',
+        weight: '',
+        rest_seconds: ex.rest_seconds,
+        notes: ex.notes,
+        order_index: formIndex,
+        // Last exercise can't pair with anything.
+        pair_with_next: formIndex < exercises.length - 1 ? !!ex.pair_with_next : false,
+      })
+
+      // 1) Find what the server has now, so we can compute the delta. Also
+      // pull `name` so we can detect "promoted alternative" swaps later — the
+      // alternatives need to come from a separate query since they live in a
+      // child table.
+      const serverIds = new Set<string>()
+      const serverNameById = new Map<string, string>()
+      const serverAltsById = new Map<string, string[]>()
       if (workout?.id) {
-        await supabase.from('exercises').delete().eq('workout_id', workoutId)
+        const { data: existing } = await supabase
+          .from('exercises')
+          .select('id, name')
+          .eq('workout_id', workoutId)
+        for (const r of (existing ?? []) as { id: string; name: string }[]) {
+          serverIds.add(r.id)
+          serverNameById.set(r.id, r.name)
+        }
+        if (serverIds.size > 0) {
+          try {
+            const { data: altRows } = await supabase
+              .from('exercise_alternatives')
+              .select('exercise_id, name, order_index')
+              .in('exercise_id', Array.from(serverIds))
+              .order('order_index', { ascending: true })
+            for (const a of (altRows ?? []) as {
+              exercise_id: string
+              name: string
+            }[]) {
+              const arr = serverAltsById.get(a.exercise_id) ?? []
+              arr.push(a.name)
+              serverAltsById.set(a.exercise_id, arr)
+            }
+          } catch {
+            // Alternatives table may not exist on older deployments.
+          }
+        }
       }
 
-      if (exercises.length > 0) {
-        const exercisesToInsert = exercises.map(ex => ({
-          workout_id: workoutId,
-          name: ex.name,
-          exercise_type: ex.exercise_type ?? 'strength',
-          // Keep legacy columns populated as a fallback for any non-builder readers.
-          // Weight is no longer prescribed by the coach; the column stays empty.
-          sets: ex.exercise_sets?.length ?? null,
-          reps: ex.exercise_sets?.[0]?.target_reps ?? ex.reps ?? '',
-          weight: '',
-          rest_seconds: ex.rest_seconds,
-          notes: ex.notes,
-          order_index: ex.order_index,
-          // The last exercise can't pair with anything, so always false there.
-          pair_with_next: ex.order_index < exercises.length - 1 ? !!ex.pair_with_next : false,
-        }))
-        const { data: insertedExercises, error: exErr } = await supabase
+      const formIdSet = new Set(
+        exercises.map(ex => ex.id).filter((id): id is string => !!id)
+      )
+
+      // 2) Delete exercises the coach removed from the form. CASCADE here is
+      // intentional — set_logs / exercise_substitutions for these rows go too.
+      const toDeleteIds = Array.from(serverIds).filter(id => !formIdSet.has(id))
+      if (toDeleteIds.length > 0) {
+        const { error } = await supabase.from('exercises').delete().in('id', toDeleteIds)
+        if (error) throw error
+      }
+
+      // 2.5) Detect promotions and rewrite history so progressive-overload
+      // comparisons stay variant-aware.
+      //
+      // A "promotion" means the form's main name was previously an alternative
+      // on the server, AND the previous main name is now in the form's
+      // alternatives list. When that happens:
+      //   - Past dates with set_logs but no substitution row were performed on
+      //     the OLD main → backfill substitutions naming the old main, so
+      //     they're correctly variant-tagged after the rename.
+      //   - Past substitutions that named the NEW main are no longer swaps
+      //     (that's now the default) → delete those rows.
+      for (let i = 0; i < exercises.length; i++) {
+        const ex = exercises[i]
+        if (!ex.id || !serverIds.has(ex.id)) continue
+
+        const oldMain = serverNameById.get(ex.id)
+        if (!oldMain || oldMain === ex.name) continue
+
+        const oldAlts = serverAltsById.get(ex.id) ?? []
+        const newMain = ex.name
+        const newAlts = ex.alternatives ?? []
+        const isPromotion =
+          oldAlts.includes(newMain) && newAlts.includes(oldMain)
+        if (!isPromotion) continue
+
+        try {
+          // Each set_log row carries (assignment_id, logged_date). The
+          // workout might be assigned to several clients, and each
+          // (assignment_id, logged_date) pair needs its own substitution row
+          // since exercise_substitutions is keyed per-assignment.
+          const { data: logRows } = await supabase
+            .from('set_logs')
+            .select('assignment_id, logged_date')
+            .eq('exercise_id', ex.id)
+          const pairs = Array.from(
+            new Set(
+              (logRows ?? []).map(
+                (r: { assignment_id: string; logged_date: string }) =>
+                  `${r.assignment_id}::${r.logged_date}`
+              )
+            )
+          ).map(s => {
+            const [assignment_id, logged_date] = s.split('::')
+            return { assignment_id, logged_date }
+          })
+
+          if (pairs.length > 0) {
+            // Pre-existing substitution rows for any of these pairs — we
+            // don't want to clobber a real swap.
+            const { data: subRows } = await supabase
+              .from('exercise_substitutions')
+              .select('assignment_id, logged_date')
+              .eq('exercise_id', ex.id)
+              .in('assignment_id', Array.from(new Set(pairs.map(p => p.assignment_id))))
+            const subbed = new Set(
+              (subRows ?? []).map(
+                (r: { assignment_id: string; logged_date: string }) =>
+                  `${r.assignment_id}::${r.logged_date}`
+              )
+            )
+
+            // Pairs with logs and no substitution row = the trainee did the
+            // OLD main on those days. Tag retroactively.
+            const toBackfill = pairs.filter(
+              p => !subbed.has(`${p.assignment_id}::${p.logged_date}`)
+            )
+            if (toBackfill.length > 0) {
+              await supabase.from('exercise_substitutions').insert(
+                toBackfill.map(p => ({
+                  assignment_id: p.assignment_id,
+                  exercise_id: ex.id,
+                  logged_date: p.logged_date,
+                  substituted_name: oldMain,
+                }))
+              )
+            }
+          }
+        } catch {
+          // Backfill is best-effort — never block the promotion itself on
+          // a substitutions-table error.
+        }
+      }
+
+      // 2.6) For every promoted exercise, drop substitutions whose name
+      // matches the new main — they're no longer swaps. Done as a separate
+      // pass so we don't delete what we just inserted in step 2.5.
+      for (let i = 0; i < exercises.length; i++) {
+        const ex = exercises[i]
+        if (!ex.id || !serverIds.has(ex.id)) continue
+        const oldMain = serverNameById.get(ex.id)
+        if (!oldMain || oldMain === ex.name) continue
+        const oldAlts = serverAltsById.get(ex.id) ?? []
+        const newAlts = ex.alternatives ?? []
+        if (!(oldAlts.includes(ex.name) && newAlts.includes(oldMain))) continue
+
+        try {
+          await supabase
+            .from('exercise_substitutions')
+            .delete()
+            .eq('exercise_id', ex.id)
+            .eq('substituted_name', ex.name)
+        } catch {
+          // best-effort
+        }
+      }
+
+      // 3) Update exercises that survived (preserves exercise_id → keeps logs).
+      for (let i = 0; i < exercises.length; i++) {
+        const ex = exercises[i]
+        if (!ex.id || !serverIds.has(ex.id)) continue
+        const { error } = await supabase
           .from('exercises')
-          .insert(exercisesToInsert)
+          .update(exerciseFields(ex, i))
+          .eq('id', ex.id)
+        if (error) throw error
+      }
+
+      // 4) Insert newly added exercises in one batch and capture their ids.
+      // We use the form's order_index (unique within the form) to map the
+      // returned rows back to the corresponding form entries.
+      const newRows = exercises
+        .map((ex, i) => ({ ex, i }))
+        .filter(({ ex }) => !ex.id || !serverIds.has(ex.id))
+      const insertedIdByOrderIndex = new Map<number, string>()
+      if (newRows.length > 0) {
+        const { data: inserted, error } = await supabase
+          .from('exercises')
+          .insert(
+            newRows.map(({ ex, i }) => ({ workout_id: workoutId, ...exerciseFields(ex, i) }))
+          )
           .select('id, order_index')
-        if (exErr) throw exErr
+        if (error) throw error
+        for (const r of (inserted ?? []) as { id: string; order_index: number }[]) {
+          insertedIdByOrderIndex.set(r.order_index, r.id)
+        }
+      }
 
-        const sortedInserted = (insertedExercises || []).sort(
-          (a, b) => a.order_index - b.order_index
-        )
+      // Final exercise_id per form entry.
+      const exerciseIdAt = (formIndex: number): string => {
+        const ex = exercises[formIndex]
+        if (ex.id && serverIds.has(ex.id)) return ex.id
+        const fresh = insertedIdByOrderIndex.get(formIndex)
+        if (!fresh) {
+          // Should never happen — the insert above covers every new form row.
+          throw new Error('Missing inserted id for new exercise')
+        }
+        return fresh
+      }
+      const allExerciseIds = exercises.map((_, i) => exerciseIdAt(i))
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const setsToInsert: any[] = []
-        exercises.forEach((ex, exIndex) => {
-          const insertedEx = sortedInserted[exIndex]
-          if (!insertedEx) return
-          const isCardio = ex.exercise_type === 'cardio'
-          ;(ex.exercise_sets ?? []).forEach(s => {
-            // Cardio: parse the user's typed text into seconds; clear the reps text.
-            // Strength: keep target_reps as-is; no duration.
-            const durationSeconds = isCardio ? parseDuration(s.target_reps) : null
-            setsToInsert.push({
-              exercise_id: insertedEx.id,
-              set_number: s.set_number,
-              target_reps: isCardio ? '' : s.target_reps,
-              target_duration_seconds: durationSeconds,
-              notes: s.notes,
-            })
+      // 5) Replace exercise_sets and exercise_alternatives for every surviving
+      // exercise. set_logs reference exercise_id (not exercise_sets.id), and
+      // exercise_substitutions reference exercise_id (not exercise_alternatives.id),
+      // so wiping these child rows does NOT touch client logs.
+      if (allExerciseIds.length > 0) {
+        const { error: setDelErr } = await supabase
+          .from('exercise_sets')
+          .delete()
+          .in('exercise_id', allExerciseIds)
+        if (setDelErr) throw setDelErr
+        // Alternatives table may not exist yet on older deployments.
+        try {
+          await supabase
+            .from('exercise_alternatives')
+            .delete()
+            .in('exercise_id', allExerciseIds)
+        } catch {
+          // best-effort
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const setsToInsert: any[] = []
+      exercises.forEach((ex, i) => {
+        const exId = allExerciseIds[i]
+        const isCardio = ex.exercise_type === 'cardio'
+        ;(ex.exercise_sets ?? []).forEach(s => {
+          const durationSeconds = isCardio ? parseDuration(s.target_reps) : null
+          setsToInsert.push({
+            exercise_id: exId,
+            set_number: s.set_number,
+            target_reps: isCardio ? '' : s.target_reps,
+            target_duration_seconds: durationSeconds,
+            notes: s.notes,
           })
         })
+      })
+      if (setsToInsert.length > 0) {
+        const { error } = await supabase.from('exercise_sets').insert(setsToInsert)
+        if (error) throw error
+      }
 
-        if (setsToInsert.length > 0) {
-          const { error: setErr } = await supabase.from('exercise_sets').insert(setsToInsert)
-          if (setErr) throw setErr
-        }
+      const altsToInsert: { exercise_id: string; name: string; order_index: number }[] = []
+      exercises.forEach((ex, i) => {
+        const exId = allExerciseIds[i]
+        ;(ex.alternatives ?? [])
+          .map(n => n.trim())
+          .filter(n => n.length > 0)
+          .forEach((name, j) => {
+            altsToInsert.push({ exercise_id: exId, name, order_index: j })
+          })
+      })
+      if (altsToInsert.length > 0) {
+        // Best-effort — if the alternatives table doesn't exist on this
+        // deployment yet, the rest of the save still succeeded.
+        await supabase.from('exercise_alternatives').insert(altsToInsert)
       }
 
       onClose()
@@ -703,6 +983,57 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                       placeholder={isCardio ? 'Pace, incline, RPE, etc.' : 'Form cues, tempo, etc.'}
                     />
                   </div>
+                </div>
+
+                {/* Alternatives — fallback exercise names the trainee can swap to
+                    when the prescribed equipment isn't available. */}
+                <div className="mt-3 bg-slate-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                      Alternatives
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => addAlternative(index)}
+                      className="text-[10px] font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                    >
+                      + Add alternative
+                    </button>
+                  </div>
+                  {(exercise.alternatives ?? []).length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic px-1 py-1">
+                      None yet. Add fallbacks like &ldquo;Goblet Squat&rdquo; or &ldquo;Leg Press&rdquo;
+                      so clients can swap if the equipment isn&rsquo;t available.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {(exercise.alternatives ?? []).map((alt, altIndex) => (
+                        <div key={altIndex} className="flex items-center gap-2">
+                          <Input
+                            value={alt}
+                            onChange={e => updateAlternative(index, altIndex, e.target.value)}
+                            placeholder="e.g., Goblet Squat"
+                            className="text-sm flex-1"
+                          />
+                          <IconButton
+                            onClick={() => promoteAlternative(index, altIndex)}
+                            disabled={!alt.trim()}
+                            aria-label="Make this the main exercise"
+                            title="Make this the main exercise"
+                          >
+                            <ArrowUpFromLine size={14} />
+                          </IconButton>
+                          <IconButton
+                            tone="danger"
+                            onClick={() => removeAlternative(index, altIndex)}
+                            aria-label="Remove alternative"
+                          >
+                            <X size={14} />
+                          </IconButton>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* "Pair with next" toggle — only meaningful if there's a next exercise */}

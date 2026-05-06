@@ -19,6 +19,10 @@ interface SupersetLoggerProps {
   assignmentId: string
   exercises: Exercise[]
   loggedDate: string
+  /** Active substitution per exercise id (null/missing = original). Drives
+   *  variant-aware prior-performance lookups so a swapped exercise compares
+   *  against its own history, not the unrelated original. */
+  variantByExerciseId?: Map<string, string | null>
 }
 
 // (exerciseId, setNumber) → previous-week performance.
@@ -70,6 +74,7 @@ export function SupersetLogger({
   assignmentId,
   exercises,
   loggedDate,
+  variantByExerciseId,
 }: SupersetLoggerProps) {
   const supabase = useSupabase()
   const [rowsByExercise, setRowsByExercise] = useState<Map<string, RowState[]>>(() =>
@@ -77,6 +82,13 @@ export function SupersetLogger({
   )
   const [loaded, setLoaded] = useState(false)
   const [priorByKey, setPriorByKey] = useState<PriorMap>(new Map())
+
+  // Stable strings so the effect reruns on identity changes without putting
+  // complex expressions in the dependency array.
+  const exerciseIdsKey = exercises.map(e => e.id).join(',')
+  const variantsKey = Array.from(variantByExerciseId?.entries() ?? [])
+    .map(([k, v]) => `${k}=${v ?? ''}`)
+    .join('|')
 
   useEffect(() => {
     let cancelled = false
@@ -97,9 +109,13 @@ export function SupersetLogger({
           .in('exercise_id', exerciseIds)
           .eq('logged_date', loggedDate),
         ...exerciseIds.map(exId =>
-          fetchPriorPerformance(supabase, assignmentId, exId, loggedDate).then(
-            map => ({ exId, map })
-          )
+          fetchPriorPerformance(
+            supabase,
+            assignmentId,
+            exId,
+            loggedDate,
+            variantByExerciseId?.get(exId) ?? null
+          ).then(map => ({ exId, map }))
         ),
       ])
 
@@ -152,7 +168,7 @@ export function SupersetLogger({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignmentId, exercises.map(e => e.id).join(','), loggedDate])
+  }, [assignmentId, loggedDate, exerciseIdsKey, variantsKey])
 
   const updateRow = (exerciseId: string, setNumber: number, patch: Partial<RowState>) => {
     setRowsByExercise(prev => {

@@ -100,13 +100,37 @@ export function formatPriorHint(prev: PriorPerformance, cardio: boolean): string
  * Fetch the most recent log per `set_number` for a given assignment+exercise
  * strictly before `beforeDate`. PostgREST doesn't have DISTINCT ON, so we pull
  * all prior rows ordered newest-first and de-dup by set_number client-side.
+ *
+ * When `currentVariant` is provided (the substitute name in play today, or
+ * null for the original exercise), prior logs are filtered to dates where the
+ * SAME variant was active — so progressive-overload comparisons aren't made
+ * against a different exercise (e.g., last week's goblet squat shouldn't show
+ * up as "last" when this week is back on barbell squat).
  */
 export async function fetchPriorPerformance(
   supabase: SupabaseClient,
   assignmentId: string,
   exerciseId: string,
-  beforeDate: string
+  beforeDate: string,
+  currentVariant: string | null = null
 ): Promise<Map<number, PriorPerformance>> {
+  // Substitutions for this slot on prior dates; absence = original was active.
+  const subByDate = new Map<string, string>()
+  try {
+    const { data: subs } = await supabase
+      .from('exercise_substitutions')
+      .select('logged_date, substituted_name')
+      .eq('assignment_id', assignmentId)
+      .eq('exercise_id', exerciseId)
+      .lt('logged_date', beforeDate)
+    for (const s of (subs ?? []) as { logged_date: string; substituted_name: string }[]) {
+      subByDate.set(s.logged_date, s.substituted_name)
+    }
+  } catch {
+    // If the substitutions table doesn't exist yet (migration not run) or
+    // RLS blocks it, treat every prior date as the original variant.
+  }
+
   const { data } = await supabase
     .from('set_logs')
     .select('set_number, reps_performed, weight_performed, duration_performed_seconds, logged_date')
@@ -117,7 +141,11 @@ export async function fetchPriorPerformance(
 
   const map = new Map<number, PriorPerformance>()
   for (const row of (data ?? []) as PriorPerformance[]) {
-    if (!map.has(row.set_number)) map.set(row.set_number, row)
+    if (map.has(row.set_number)) continue
+    const variant = subByDate.get(row.logged_date) ?? null
+    if (variant === currentVariant) {
+      map.set(row.set_number, row)
+    }
   }
   return map
 }

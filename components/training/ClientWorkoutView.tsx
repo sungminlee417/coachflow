@@ -12,6 +12,7 @@ import { formatDuration, todayISO, formatLongDate } from '@/lib/utils'
 import { fetchActiveWorkoutAssignments } from '@/lib/queries'
 import type { Exercise, WorkoutAssignment } from '@/lib/types'
 import { ExerciseSetLogger } from './ExerciseSetLogger'
+import { SubstitutionPicker } from './SubstitutionPicker'
 import { SupersetLogger } from './SupersetLogger'
 
 interface ClientWorkoutViewProps {
@@ -51,12 +52,27 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
   // for solos and `${assignment.id}::group::${gi}` for supersets so the same
   // exercise across two simultaneous assignments doesn't collide.
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set())
+  // Active substitution per (assignment, exercise). Seeded from the fetched
+  // exercise.substitution; mutated by the SubstitutionPicker's onChange.
+  // null = original is in play; absent = not yet seeded.
+  const [subOverrides, setSubOverrides] = useState<Map<string, string | null>>(new Map())
+
+  const subKey = (assignmentId: string, exerciseId: string) =>
+    `${assignmentId}::${exerciseId}`
 
   const toggleCollapsed = (key: string) => {
     setCollapsedKeys(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
+      return next
+    })
+  }
+
+  const setActiveSub = (assignmentId: string, exerciseId: string, value: string | null) => {
+    setSubOverrides(prev => {
+      const next = new Map(prev)
+      next.set(subKey(assignmentId, exerciseId), value)
       return next
     })
   }
@@ -91,6 +107,19 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAssignments() }, [selectedDate])
+
+  // Reseed the substitution overrides whenever the assignments refresh — this
+  // includes the per-day swap pulled by queries.ts so the chips reflect the
+  // server's truth on first paint and after every selectedDate change.
+  useEffect(() => {
+    const next = new Map<string, string | null>()
+    for (const a of assignments) {
+      for (const ex of a.workout.exercises ?? []) {
+        if (ex.id) next.set(subKey(a.id, ex.id), ex.substitution ?? null)
+      }
+    }
+    setSubOverrides(next)
+  }, [assignments])
 
   return (
     <div>
@@ -221,6 +250,13 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                         const isCardio = exercise.exercise_type === 'cardio'
                         const soloKey = `${assignment.id}::solo::${exercise.id ?? group.startIndex}`
                         const isCollapsed = collapsedKeys.has(soloKey)
+                        // Active swap (null = original). Use override if seeded;
+                        // otherwise fall back to whatever the fetch attached.
+                        const overrideKey = exercise.id ? subKey(assignment.id, exercise.id) : null
+                        const activeSub = overrideKey && subOverrides.has(overrideKey)
+                          ? subOverrides.get(overrideKey) ?? null
+                          : exercise.substitution ?? null
+                        const displayName = activeSub ?? exercise.name
                         const cardioTargets =
                           isCardio
                             ? (exercise.exercise_sets ?? [])
@@ -248,7 +284,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                               aria-expanded={!isCollapsed}
                               className="w-full p-4 flex items-baseline justify-between gap-3 flex-wrap text-left cursor-pointer"
                             >
-                              <div className="flex items-baseline gap-2 min-w-0">
+                              <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
                                 <span className="text-slate-400 shrink-0">
                                   {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                                 </span>
@@ -256,8 +292,13 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   {group.startIndex + 1}.
                                 </span>
                                 <span className="font-semibold text-slate-900">
-                                  {exercise.name}
+                                  {displayName}
                                 </span>
+                                {activeSub && (
+                                  <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-px">
+                                    Swapped
+                                  </span>
+                                )}
                                 {isCardio && (
                                   <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-px">
                                     <HeartPulse size={10} />
@@ -284,6 +325,21 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                             </button>
                             {!isCollapsed && (
                               <div className="px-4 pb-4">
+                                {exercise.id && (exercise.alternatives?.length ?? 0) > 0 && (
+                                  <div className="mb-3">
+                                    <SubstitutionPicker
+                                      assignmentId={assignment.id}
+                                      exerciseId={exercise.id}
+                                      loggedDate={selectedDate}
+                                      originalName={exercise.name}
+                                      alternatives={exercise.alternatives ?? []}
+                                      current={activeSub}
+                                      onChange={next =>
+                                        setActiveSub(assignment.id, exercise.id!, next)
+                                      }
+                                    />
+                                  </div>
+                                )}
                                 {exercise.notes && (
                                   <p className="text-slate-600 text-sm italic mb-2">
                                     {exercise.notes}
@@ -293,6 +349,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   assignmentId={assignment.id}
                                   exercise={exercise}
                                   loggedDate={selectedDate}
+                                  currentVariant={activeSub}
                                 />
                               </div>
                             )}
@@ -336,7 +393,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                           </button>
                           {!isCollapsed && (
                             <div className="p-3 space-y-2">
-                              <div className="space-y-1 mb-2">
+                              <div className="space-y-2 mb-2">
                                 {group.exercises.map((ex, j) => {
                                   const isCardio = ex.exercise_type === 'cardio'
                                   const firstDuration =
@@ -345,30 +402,55 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                           s => s.target_duration_seconds != null && s.target_duration_seconds > 0
                                         )?.target_duration_seconds ?? null
                                       : null
+                                  const overrideKey = ex.id ? subKey(assignment.id, ex.id) : null
+                                  const activeSub =
+                                    overrideKey && subOverrides.has(overrideKey)
+                                      ? subOverrides.get(overrideKey) ?? null
+                                      : ex.substitution ?? null
+                                  const displayName = activeSub ?? ex.name
                                   return (
-                                    <div
-                                      key={ex.id ?? j}
-                                      className="flex items-baseline gap-2 text-xs"
-                                    >
-                                      <span
-                                        className={`font-bold tabular-nums ${
-                                          isCardio ? 'text-amber-600' : 'text-indigo-700'
-                                        }`}
-                                      >
-                                        {String.fromCharCode(65 + j)}
-                                      </span>
-                                      <span className="font-medium text-slate-900 truncate">
-                                        {ex.name}
-                                      </span>
-                                      {isCardio && firstDuration != null && (
-                                        <span className="text-amber-700 font-medium tabular-nums">
-                                          {formatDuration(firstDuration)}
+                                    <div key={ex.id ?? j} className="text-xs">
+                                      <div className="flex items-baseline gap-2 flex-wrap">
+                                        <span
+                                          className={`font-bold tabular-nums ${
+                                            isCardio ? 'text-amber-600' : 'text-indigo-700'
+                                          }`}
+                                        >
+                                          {String.fromCharCode(65 + j)}
                                         </span>
-                                      )}
-                                      {ex.notes && (
-                                        <span className="text-slate-500 italic truncate">
-                                          &middot; {ex.notes}
+                                        <span className="font-medium text-slate-900 truncate">
+                                          {displayName}
                                         </span>
+                                        {activeSub && (
+                                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px">
+                                            Swapped
+                                          </span>
+                                        )}
+                                        {isCardio && firstDuration != null && (
+                                          <span className="text-amber-700 font-medium tabular-nums">
+                                            {formatDuration(firstDuration)}
+                                          </span>
+                                        )}
+                                        {ex.notes && (
+                                          <span className="text-slate-500 italic truncate">
+                                            &middot; {ex.notes}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {ex.id && (ex.alternatives?.length ?? 0) > 0 && (
+                                        <div className="ml-4">
+                                          <SubstitutionPicker
+                                            assignmentId={assignment.id}
+                                            exerciseId={ex.id}
+                                            loggedDate={selectedDate}
+                                            originalName={ex.name}
+                                            alternatives={ex.alternatives ?? []}
+                                            current={activeSub}
+                                            onChange={next =>
+                                              setActiveSub(assignment.id, ex.id!, next)
+                                            }
+                                          />
+                                        </div>
                                       )}
                                     </div>
                                   )
@@ -378,6 +460,21 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                 assignmentId={assignment.id}
                                 exercises={group.exercises}
                                 loggedDate={selectedDate}
+                                variantByExerciseId={
+                                  new Map(
+                                    group.exercises
+                                      .filter(e => e.id)
+                                      .map(e => {
+                                        const k = subKey(assignment.id, e.id!)
+                                        return [
+                                          e.id!,
+                                          subOverrides.has(k)
+                                            ? subOverrides.get(k) ?? null
+                                            : e.substitution ?? null,
+                                        ] as const
+                                      })
+                                  )
+                                }
                               />
                             </div>
                           )}

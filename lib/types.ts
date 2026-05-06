@@ -53,6 +53,14 @@ export interface Exercise {
   // Chains of true values build a superset of N exercises.
   pair_with_next?: boolean
   exercise_sets?: ExerciseSet[]
+  // Coach-defined fallback names ("Goblet Squat", "Leg Press") shown as chips
+  // beneath the title for the trainee. Names only — they aren't linked to other
+  // exercise rows.
+  alternatives?: string[]
+  // The substitute the client picked for this exercise on the day being viewed.
+  // Null/undefined means the original exercise is in play. Computed per-day in
+  // the assignment fetch — not stored on the exercise itself.
+  substitution?: string | null
 }
 
 export interface ExerciseSet {
