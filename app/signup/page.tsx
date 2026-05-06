@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Dumbbell, Mail, Lock, User } from 'lucide-react'
+import { Spinner } from '@/components/ui/Spinner'
 
 export default function SignupPage() {
   return (
@@ -92,8 +93,8 @@ function Signup() {
         router.push('/dashboard')
         router.refresh()
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Signup failed')
     } finally {
       setLoading(false)
     }
@@ -196,9 +197,11 @@ function Signup() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              aria-busy={loading || undefined}
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading && <Spinner size={14} />}
+              {loading ? 'Creating account…' : 'Create account'}
             </button>
 
             <p className="text-center text-sm text-slate-500 pt-2">
