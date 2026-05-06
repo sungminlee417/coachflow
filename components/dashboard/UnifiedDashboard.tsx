@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSupabase } from '@/lib/use-supabase'
 import { User } from '@supabase/supabase-js'
 import { Users, Dumbbell, ClipboardList, History, LogOut, Apple, Utensils, Ruler, Menu, X } from 'lucide-react'
@@ -53,9 +54,30 @@ interface UnifiedDashboardProps {
   profile: Profile
 }
 
+const TAB_KEY_SET = new Set<string>(TABS.map(t => t.key))
+const DEFAULT_TAB: Tab = 'my-clients'
+const isValidTab = (k: string | null): k is Tab => k != null && TAB_KEY_SET.has(k)
+
 export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProps) {
   const supabase = useSupabase()
-  const [activeTab, setActiveTab] = useState<Tab>('my-clients')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Active tab is derived from `?tab=...` so reloads, deep links, and
+  // back/forward all preserve which section the user was on.
+  const tabParam = searchParams.get('tab')
+  const activeTab: Tab = isValidTab(tabParam) ? tabParam : DEFAULT_TAB
+
+  const setActiveTab = useCallback(
+    (next: Tab) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('tab', next)
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    },
+    [pathname, router, searchParams]
+  )
+
   const [coach, setCoach] = useState<Profile | null>(null)
   const [loadingCoach, setLoadingCoach] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)

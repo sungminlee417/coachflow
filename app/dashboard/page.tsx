@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -51,7 +52,11 @@ export default async function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <UnifiedDashboard user={user} profile={profile as Profile} />
+      {/* Suspense is required because UnifiedDashboard reads useSearchParams
+          to drive the active tab from the URL. */}
+      <Suspense fallback={null}>
+        <UnifiedDashboard user={user} profile={profile as Profile} />
+      </Suspense>
     </div>
   )
 }

@@ -294,6 +294,8 @@ export function SupersetLogger({
                 if (!row) return null
                 const positionLetter = POSITION_LETTERS[exIdx] ?? `${exIdx + 1}`
                 const isCardio = ex.exercise_type === 'cardio'
+                const activeVariant = ex.id ? variantByExerciseId?.get(ex.id) ?? null : null
+                const displayName = activeVariant ?? ex.name
                 const targetLabel = isCardio
                   ? row.target_duration_seconds && row.target_duration_seconds > 0
                     ? formatDuration(row.target_duration_seconds)
@@ -319,8 +321,13 @@ export function SupersetLogger({
                           {positionLetter}
                         </span>
                         <span className="text-sm font-medium text-slate-900 truncate">
-                          {ex.name}
+                          {displayName}
                         </span>
+                        {activeVariant && (
+                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px">
+                            Swapped
+                          </span>
+                        )}
                         {isCardio && (
                           <span className="text-[9px] uppercase tracking-widest font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-px">
                             Cardio

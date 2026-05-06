@@ -87,8 +87,8 @@ export function SubstitutionPicker({
   ]
 
   return (
-    <div className="mt-1 flex items-center gap-1 flex-wrap">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mr-1">
+    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 w-full sm:w-auto sm:mr-1">
         or:
       </span>
       {chips.map(chip => (
@@ -98,10 +98,10 @@ export function SubstitutionPicker({
           onClick={() => apply(chip.value)}
           disabled={busy}
           aria-pressed={chip.active}
-          className={`text-[11px] font-medium px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
+          className={`text-xs sm:text-[11px] font-medium px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-full border transition-colors cursor-pointer max-w-full truncate ${
             chip.active
               ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-700'
+              : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-300 hover:text-indigo-700 active:bg-indigo-50'
           } disabled:cursor-not-allowed disabled:opacity-60`}
         >
           {chip.label}
@@ -112,7 +112,7 @@ export function SubstitutionPicker({
           type="button"
           onClick={() => apply(null)}
           disabled={busy}
-          className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-slate-400 hover:text-slate-700 ml-1 cursor-pointer disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-slate-900 px-2 py-1 cursor-pointer disabled:cursor-not-allowed"
           aria-label="Revert to original"
         >
           <RotateCcw size={11} />
