@@ -14,6 +14,8 @@ A coaching-and-training platform where every user can both coach and train. One 
 
 ### For trainees
 - **Daily workout view** with a week strip + arrow navigation (past and future weeks), per-set logging that auto-saves on blur, and an `aria-live` daily progress chip.
+- **Rest timer** kicks off automatically when a set is checked off (uses the exercise's `rest_seconds`). Sticky-bottom countdown with a `+15s` button, audible chirp + haptic when it ends. For supersets the timer fires when the round completes (rest between rounds, not within).
+- **Progress view** — per-exercise all-time best (heaviest weight × reps for strength, longest duration for cardio), total volume, lifetime sets, last-performed date. Sourced from every set you've ever logged.
 - **Progressive overload hints**: `Last: 135 × 8` ghosts in below each input, plus an emerald `↑ Beat last` pill the moment you type values that beat last week. Variant-aware — barbell-squat days compare against barbell-squat history, goblet-squat days compare against goblet-squat history.
 - **Substitution chips** under each exercise (`or: Goblet Squat · Leg Press · Hack Squat`). Tap to swap; one-tap revert. Per-day, per-assignment scope so a swap doesn't bleed across workouts.
 - **Auto-collapse on completion** — finished sets and finished superset rounds collapse to a one-line summary (`Set 1 · ✓ · 135 × 8`); tap to re-expand if you misclicked, with an in-row "↑ Collapse" link to fold it back.
@@ -23,6 +25,7 @@ A coaching-and-training platform where every user can both coach and train. One 
 
 ### Cross-cutting UX
 - **URL-driven dashboard tabs** (`?tab=my-workouts`) so reload, back/forward, and deep links all preserve the active section.
+- **Bottom tab bar on mobile** — primary nav is Workouts / Meals / Body / More. The "More" slot opens the full drawer with coaching tabs and Progress.
 - **Sticky save bars** with iOS safe-area padding, exercise-count summary, and `loading` state.
 - **Unsaved-changes guard** on every builder — closing or backing out with edits prompts a confirm dialog instead of silently dropping changes.
 - **Loading toolkit**: `Spinner`, `Skeleton`, `LoadingState`, plus skeletons shaped to match the destination (card grids, list rows, tables) so layouts don't shift in.

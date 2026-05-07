@@ -7,6 +7,7 @@ import { User } from '@supabase/supabase-js'
 import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Utensils, Ruler, Menu, X } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
+import { RestTimerProvider } from '@/components/ui/RestTimer'
 import ClientList from '@/components/coaching/ClientList'
 import WorkoutLibrary from '@/components/coaching/WorkoutLibrary'
 import ProgramLibrary from '@/components/coaching/ProgramLibrary'
@@ -35,7 +36,7 @@ const TABS: TabDef[] = [
   { key: 'assigned-workouts', label: 'Assigned Workouts', icon: <ClipboardList size={16} />, section: 'training' },
   { key: 'assigned-meals', label: 'Assigned Meals', icon: <Utensils size={16} />, section: 'training' },
   { key: 'measurements', label: 'Measurements', icon: <Ruler size={16} />, section: 'training' },
-  { key: 'history', label: 'History', icon: <History size={16} />, section: 'training' },
+  { key: 'history', label: 'Progress', icon: <History size={16} />, section: 'training' },
 ]
 
 const sectionTone: Record<Section, { active: string; activeIcon: string; mobileActive: string }> = {
@@ -152,6 +153,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
   const trainingTabs = TABS.filter(t => t.section === 'training')
 
   return (
+    <RestTimerProvider>
     <div className="min-h-screen bg-slate-50">
       <div className="flex">
         {/* Sidebar (desktop) */}
@@ -190,22 +192,16 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           </div>
         </aside>
 
-        {/* Mobile header (hamburger) */}
+        {/* Mobile header — title only. Navigation is the bottom tab bar +
+            "More" drawer; the old top hamburger is gone. */}
         <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-40">
-          <div className="flex items-center justify-between px-3 h-14">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              aria-label="Open navigation menu"
-              aria-expanded={mobileMenuOpen}
-            >
-              <Menu size={20} />
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="text-base font-semibold text-slate-900 truncate">{activeTabLabel}</span>
+          <div className="flex items-center gap-2.5 px-4 h-14">
+            <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
+              <Dumbbell size={14} className="text-white" />
             </div>
-            {/* Spacer to keep the tab name horizontally centered between the hamburger and the right edge. */}
-            <div className="w-9" />
+            <span className="text-base font-semibold text-slate-900 truncate">
+              {activeTabLabel}
+            </span>
           </div>
         </div>
 
@@ -271,8 +267,8 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           </aside>
         </>
 
-        {/* Main content */}
-        <main className="flex-1 min-w-0 md:ml-64 pt-14 md:pt-0">
+        {/* Main content. Bottom padding leaves room for the mobile tab bar. */}
+        <main className="flex-1 min-w-0 md:ml-64 pt-14 md:pt-0 pb-20 md:pb-0">
           <div key={activeTab} className="tab-content max-w-5xl mx-auto px-4 sm:px-8 py-8">
             {activeTab === 'my-clients' && <ClientList coachId={user.id} />}
             {activeTab === 'my-workouts' && <WorkoutLibrary coachId={user.id} />}
@@ -322,7 +318,64 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
             {activeTab === 'history' && <WorkoutHistory clientId={user.id} />}
           </div>
         </main>
+
+        {/* Mobile bottom tab bar — primary nav on phones. The drawer (via the
+            "More" tab) holds coaching tabs + history. Hidden on desktop where
+            the sidebar already covers everything. */}
+        <nav
+          className="md:hidden fixed left-0 right-0 bottom-0 z-30 bg-white border-t border-slate-200 grid grid-cols-4"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          aria-label="Primary"
+        >
+          {(
+            [
+              { key: 'assigned-workouts' as Tab, label: 'Workouts', icon: <ClipboardList size={20} /> },
+              { key: 'assigned-meals' as Tab, label: 'Meals', icon: <Utensils size={20} /> },
+              { key: 'measurements' as Tab, label: 'Body', icon: <Ruler size={20} /> },
+            ]
+          ).map(item => {
+            const isActive = activeTab === item.key
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setActiveTab(item.key)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition-colors ${
+                  isActive ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                {item.icon}
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </button>
+            )
+          })}
+          {(() => {
+            // "More" is active when activeTab isn't one of the three primary
+            // mobile destinations above.
+            const moreActive = !(
+              activeTab === 'assigned-workouts' ||
+              activeTab === 'assigned-meals' ||
+              activeTab === 'measurements'
+            )
+            return (
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                aria-current={moreActive ? 'page' : undefined}
+                aria-haspopup="menu"
+                className={`flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition-colors ${
+                  moreActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <Menu size={20} />
+                <span className="text-[10px] font-medium">More</span>
+              </button>
+            )
+          })()}
+        </nav>
       </div>
     </div>
+    </RestTimerProvider>
   )
 }

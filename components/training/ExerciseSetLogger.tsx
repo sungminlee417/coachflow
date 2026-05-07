@@ -6,6 +6,7 @@ import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Check, ChevronUp } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
+import { useRestTimer } from '@/components/ui/RestTimer'
 import {
   buildPrescribedSets,
   fetchPriorPerformance,
@@ -57,6 +58,7 @@ export function ExerciseSetLogger({
   currentVariant = null,
 }: ExerciseSetLoggerProps) {
   const supabase = useSupabase()
+  const restTimer = useRestTimer()
   const [rows, setRows] = useState<RowState[]>(() => buildInitialRows(exercise))
   const [loaded, setLoaded] = useState(false)
   const [priorBySet, setPriorBySet] = useState<Map<number, PriorPerformance>>(new Map())
@@ -188,6 +190,11 @@ export function ExerciseSetLogger({
       out.delete(setNumber)
       return out
     })
+    // Marking a set complete kicks off the rest countdown. Skip on un-toggle
+    // and skip cardio (no inter-set rest concept) and skip when no rest is set.
+    if (next.completed && !isCardio && exercise.rest_seconds && exercise.rest_seconds > 0) {
+      restTimer.start(exercise.rest_seconds, exercise.name)
+    }
     await persist(next)
   }
 

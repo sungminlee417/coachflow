@@ -6,6 +6,7 @@ import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Check, ChevronUp } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
+import { useRestTimer } from '@/components/ui/RestTimer'
 import {
   buildPrescribedSets,
   fetchPriorPerformance,
@@ -77,6 +78,7 @@ export function SupersetLogger({
   variantByExerciseId,
 }: SupersetLoggerProps) {
   const supabase = useSupabase()
+  const restTimer = useRestTimer()
   const [rowsByExercise, setRowsByExercise] = useState<Map<string, RowState[]>>(() =>
     buildInitialMap(exercises)
   )
@@ -241,6 +243,24 @@ export function SupersetLogger({
       out.delete(setNumber)
       return out
     })
+
+    // For supersets, rest is between rounds — fire the timer only when this
+    // toggle finishes the LAST row of the round. Compute the post-toggle
+    // round status here since the state hasn't flushed yet.
+    if (next.completed) {
+      const willRoundBeComplete = exercises.every(ex => {
+        if (!ex.id) return true
+        const r = rowsByExercise.get(ex.id)?.find(rr => rr.set_number === setNumber)
+        if (!r) return true
+        if (ex.id === exerciseId) return next.completed
+        return r.completed
+      })
+      if (willRoundBeComplete) {
+        const restSec = exercises[exercises.length - 1]?.rest_seconds ?? 0
+        if (restSec > 0) restTimer.start(restSec, `Round ${setNumber}`)
+      }
+    }
+
     await persist(next)
   }
 
