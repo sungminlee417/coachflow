@@ -4,11 +4,12 @@ import { useCallback, useState, useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSupabase } from '@/lib/use-supabase'
 import { User } from '@supabase/supabase-js'
-import { Users, Dumbbell, ClipboardList, History, LogOut, Apple, Utensils, Ruler, Menu, X } from 'lucide-react'
+import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Utensils, Ruler, Menu, X } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import ClientList from '@/components/coaching/ClientList'
 import WorkoutLibrary from '@/components/coaching/WorkoutLibrary'
+import ProgramLibrary from '@/components/coaching/ProgramLibrary'
 import MealPlanLibrary from '@/components/coaching/MealPlanLibrary'
 import ClientWorkoutView from '@/components/training/ClientWorkoutView'
 import ClientMealPlanView from '@/components/training/ClientMealPlanView'
@@ -16,7 +17,7 @@ import WorkoutHistory from '@/components/training/WorkoutHistory'
 import BodyTracker from '@/components/training/BodyTracker'
 import type { Profile } from '@/lib/types'
 
-type Tab = 'my-clients' | 'my-workouts' | 'my-meal-plans' | 'assigned-workouts' | 'assigned-meals' | 'measurements' | 'history'
+type Tab = 'my-clients' | 'my-workouts' | 'my-programs' | 'my-meal-plans' | 'assigned-workouts' | 'assigned-meals' | 'measurements' | 'history'
 type Section = 'coaching' | 'training'
 
 interface TabDef {
@@ -29,6 +30,7 @@ interface TabDef {
 const TABS: TabDef[] = [
   { key: 'my-clients', label: 'My Clients', icon: <Users size={16} />, section: 'coaching' },
   { key: 'my-workouts', label: 'My Workouts', icon: <Dumbbell size={16} />, section: 'coaching' },
+  { key: 'my-programs', label: 'My Programs', icon: <ListChecks size={16} />, section: 'coaching' },
   { key: 'my-meal-plans', label: 'My Meal Plans', icon: <Apple size={16} />, section: 'coaching' },
   { key: 'assigned-workouts', label: 'Assigned Workouts', icon: <ClipboardList size={16} />, section: 'training' },
   { key: 'assigned-meals', label: 'Assigned Meals', icon: <Utensils size={16} />, section: 'training' },
@@ -274,6 +276,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           <div key={activeTab} className="tab-content max-w-5xl mx-auto px-4 sm:px-8 py-8">
             {activeTab === 'my-clients' && <ClientList coachId={user.id} />}
             {activeTab === 'my-workouts' && <WorkoutLibrary coachId={user.id} />}
+            {activeTab === 'my-programs' && <ProgramLibrary coachId={user.id} />}
             {activeTab === 'my-meal-plans' && <MealPlanLibrary coachId={user.id} />}
 
             {activeTab === 'assigned-workouts' && (

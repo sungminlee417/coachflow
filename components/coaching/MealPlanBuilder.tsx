@@ -8,10 +8,80 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Field, Input, Textarea, Select } from '@/components/ui/Input'
 import { DayOfWeekSelector } from '@/components/ui/DayOfWeekSelector'
 import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { DragHandle, type DragHandleProps } from '@/components/ui/SortableList'
 import { useDirtyState } from '@/lib/use-dirty-state'
-import { ArrowLeft, Plus, X, ChevronUp, ChevronDown, Save, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Plus, X, ChevronDown, Save, ChevronRight, Copy } from 'lucide-react'
 import { computeFoodMacros, computeMealMacros, roundMacro, formatTime } from '@/lib/utils'
 import type { Food, Ingredient, Meal, MealPlan, MealType, DayOfWeek } from '@/lib/types'
+
+// Local meal type: server `Meal` + a stable client-side key for drag-and-drop
+// + ordered identity across renders. _dndKey isn't persisted — it just gives
+// every row a sortable identity even before it has a database id.
+type DraftMeal = Meal & { _dndKey: string }
+const newMealKey = (): string =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `tmp-${Math.random().toString(36).slice(2)}-${Date.now()}`
+
+// Stable display order for a meal list:
+//   - meals with `time` set come first, sorted chronologically
+//   - meals without a time follow, in their existing order_index order
+// Reapplied after every state change so a coach can rely on "if I set a time,
+// it lands at the right spot" without manually shuffling.
+const sortMealsByTime = (meals: DraftMeal[]): DraftMeal[] => {
+  const timed = meals.filter(m => m.time)
+  const untimed = meals.filter(m => !m.time)
+  timed.sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
+  untimed.sort((a, b) => a.order_index - b.order_index)
+  const combined = [...timed, ...untimed]
+  combined.forEach((m, i) => {
+    m.order_index = i
+  })
+  return combined
+}
+
+function SortableMealShell({
+  id,
+  children,
+}: {
+  id: string
+  children: (drag: DragHandleProps) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 30 : undefined,
+        opacity: isDragging ? 0.85 : undefined,
+      }}
+    >
+      {children({ attributes, listeners, isDragging })}
+    </div>
+  )
+}
 
 interface MealPlanBuilderProps {
   coachId: string
@@ -155,8 +225,9 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
   const [name, setName] = useState(mealPlan?.name || '')
   const [description, setDescription] = useState(mealPlan?.description || '')
   const [isTemplate, setIsTemplate] = useState(mealPlan?.is_template || false)
-  const [meals, setMeals] = useState<Meal[]>([])
+  const [meals, setMeals] = useState<DraftMeal[]>([])
   const [saving, setSaving] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [expandedMeals, setExpandedMeals] = useState<Set<number>>(new Set())
   const [snapshotReady, setSnapshotReady] = useState(!mealPlan?.id)
 
@@ -204,7 +275,7 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
       if (error) throw error
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized: Meal[] = (mealRows || []).map((m: any) => ({
+      const normalized: DraftMeal[] = (mealRows || []).map((m: any) => ({
         ...m,
         days_of_week: (m.days_of_week ?? []) as DayOfWeek[],
         // Normalize "HH:MM:SS" → "HH:MM" so it works in <input type="time">.
@@ -219,8 +290,11 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
               .slice()
               .sort((a: Ingredient, b: Ingredient) => a.order_index - b.order_index),
           })),
+        // Reuse the server id as the DnD key so identity is stable across
+        // unrelated state updates.
+        _dndKey: m.id,
       }))
-      setMeals(normalized)
+      setMeals(sortMealsByTime(normalized))
     } catch {
     } finally {
       setSnapshotReady(true)
@@ -228,32 +302,67 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
   }
 
   const addMeal = () => {
-    const newIndex = meals.length
-    setMeals([
-      ...meals,
-      {
-        meal_type: 'breakfast',
-        name: '',
-        description: '',
-        days_of_week: [],
-        time: null,
-        calories: null,
-        protein_grams: null,
-        carbs_grams: null,
-        fat_grams: null,
-        order_index: newIndex,
-        foods: [],
-      },
-    ])
+    const newMeal: DraftMeal = {
+      meal_type: 'breakfast',
+      name: '',
+      description: '',
+      days_of_week: [],
+      time: null,
+      calories: null,
+      protein_grams: null,
+      carbs_grams: null,
+      fat_grams: null,
+      order_index: meals.length,
+      foods: [],
+      _dndKey: newMealKey(),
+    }
+    const next = sortMealsByTime([...meals, newMeal])
+    setMeals(next)
     // Auto-expand the freshly added meal so the coach can fill it in.
-    setExpandedMeals(prev => new Set(prev).add(newIndex))
+    const newPos = next.findIndex(m => m._dndKey === newMeal._dndKey)
+    setExpandedMeals(prev => new Set(prev).add(newPos))
+  }
+
+  // Duplicate an existing meal — including all foods + ingredients — into a
+  // new untouched copy. Strips server ids so the save flow treats it as new.
+  const duplicateMeal = (index: number) => {
+    const src = meals[index]
+    if (!src) return
+    const clone: DraftMeal = {
+      ...src,
+      id: undefined,
+      _dndKey: newMealKey(),
+      name: src.name ? `${src.name} (copy)` : '',
+      foods: (src.foods ?? []).map(f => ({
+        ...f,
+        id: undefined,
+        meal_id: undefined,
+        ingredients: (f.ingredients ?? []).map(ing => ({
+          ...ing,
+          id: undefined,
+          food_id: undefined,
+        })),
+      })),
+    }
+    // Drop right after the source for visual continuity. sortMealsByTime then
+    // pulls timed meals to their chronological positions.
+    const inserted = [...meals]
+    inserted.splice(index + 1, 0, clone)
+    inserted.forEach((m, i) => (m.order_index = i))
+    const sorted = sortMealsByTime(inserted)
+    setMeals(sorted)
+    const newPos = sorted.findIndex(m => m._dndKey === clone._dndKey)
+    setExpandedMeals(prev => new Set(prev).add(newPos))
+    showToast('Meal duplicated')
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateMeal = (index: number, field: keyof Meal, value: any) => {
     const updated = [...meals]
     updated[index] = { ...updated[index], [field]: value }
-    setMeals(updated)
+    // Re-sort whenever a time changes; timed meals must always sit at their
+    // chronological position relative to other timed meals.
+    setMeals(field === 'time' ? sortMealsByTime(updated) : updated)
   }
 
   const removeMeal = (index: number) => {
@@ -262,14 +371,26 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
     setMeals(updated)
   }
 
-  const moveMeal = (index: number, direction: 'up' | 'down') => {
-    const newIndex = direction === 'up' ? index - 1 : index + 1
-    if (newIndex < 0 || newIndex >= meals.length) return
-    const updated = [...meals]
-    const [moved] = updated.splice(index, 1)
-    updated.splice(newIndex, 0, moved)
-    updated.forEach((m, i) => (m.order_index = i))
-    setMeals(updated)
+  // dnd-kit sensors with a small distance threshold so taps inside a meal
+  // card pass through to inputs/buttons.
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = meals.findIndex(m => m._dndKey === active.id)
+    const newIndex = meals.findIndex(m => m._dndKey === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const next = arrayMove(meals, oldIndex, newIndex)
+    next.forEach((m, i) => (m.order_index = i))
+    // Re-apply the time sort: dragging a timed meal snaps back into its
+    // chronological position; dragging an untimed meal lands where the user
+    // dropped it (within the untimed tail).
+    setMeals(sortMealsByTime(next))
   }
 
   const addFood = (mealIndex: number) => {
@@ -339,6 +460,11 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
     setMeals(updated)
   }
 
+  const requestClose = () => {
+    if (isDirty && !saving) setConfirmDiscard(true)
+    else onClose()
+  }
+
   const handleSave = async () => {
     if (!name.trim()) {
       showToast('Please enter a meal plan name', 'error')
@@ -365,98 +491,157 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
         planId = data.id
       }
 
+      // ── Diff-based meal sync ────────────────────────────────────────────
+      // Preserve `meal_id` for unchanged meals so child `meal_logs` (which
+      // reference meal_id with ON DELETE CASCADE) survive the edit. Only
+      // meals the coach explicitly removed get their logs cascaded away.
+      const mealFields = (m: DraftMeal, formIndex: number) => ({
+        meal_type: m.meal_type,
+        name: m.name,
+        description: m.description,
+        days_of_week: m.days_of_week,
+        time: m.time || null,
+        // Macros are derived from foods/ingredients; never store stale values.
+        calories: null,
+        protein_grams: null,
+        carbs_grams: null,
+        fat_grams: null,
+        order_index: formIndex,
+      })
+
+      // 1) Read what's currently on the server.
+      const serverMealIds = new Set<string>()
       if (mealPlan?.id) {
-        await supabase.from('meals').delete().eq('meal_plan_id', planId)
+        const { data: existingRows } = await supabase
+          .from('meals')
+          .select('id')
+          .eq('meal_plan_id', planId)
+        for (const r of (existingRows ?? []) as { id: string }[]) {
+          serverMealIds.add(r.id)
+        }
       }
 
-      if (meals.length > 0) {
-        // Meal macros are derived; don't store stale values.
-        const mealsToInsert = meals.map(m => ({
-          meal_plan_id: planId,
-          meal_type: m.meal_type,
-          name: m.name,
-          description: m.description,
-          days_of_week: m.days_of_week,
-          time: m.time || null,
-          calories: null,
-          protein_grams: null,
-          carbs_grams: null,
-          fat_grams: null,
-          order_index: m.order_index,
-        }))
-        const { data: insertedMeals, error: mealError } = await supabase
+      const formMealIds = new Set(
+        meals.map(m => m.id).filter((id): id is string => !!id)
+      )
+
+      // 2) Delete meals the coach removed. CASCADE removes their meal_logs —
+      // intentional, since the meal itself is gone.
+      const mealsToDelete = Array.from(serverMealIds).filter(id => !formMealIds.has(id))
+      if (mealsToDelete.length > 0) {
+        const { error } = await supabase.from('meals').delete().in('id', mealsToDelete)
+        if (error) throw error
+      }
+
+      // 3) Update surviving meals in place (preserves meal_id → keeps logs).
+      for (let i = 0; i < meals.length; i++) {
+        const m = meals[i]
+        if (!m.id || !serverMealIds.has(m.id)) continue
+        const { error } = await supabase
           .from('meals')
-          .insert(mealsToInsert)
+          .update(mealFields(m, i))
+          .eq('id', m.id)
+        if (error) throw error
+      }
+
+      // 4) Insert newly-added meals; capture ids by order_index.
+      const newRows = meals
+        .map((m, i) => ({ m, i }))
+        .filter(({ m }) => !m.id || !serverMealIds.has(m.id))
+      const insertedMealIdByOrderIndex = new Map<number, string>()
+      if (newRows.length > 0) {
+        const { data: inserted, error } = await supabase
+          .from('meals')
+          .insert(
+            newRows.map(({ m, i }) => ({ meal_plan_id: planId, ...mealFields(m, i) }))
+          )
           .select('id, order_index')
-        if (mealError) throw mealError
+        if (error) throw error
+        for (const r of (inserted ?? []) as { id: string; order_index: number }[]) {
+          insertedMealIdByOrderIndex.set(r.order_index, r.id)
+        }
+      }
 
-        const sortedInsertedMeals = (insertedMeals || []).sort(
-          (a, b) => a.order_index - b.order_index
-        )
+      const mealIdAt = (formIndex: number): string => {
+        const m = meals[formIndex]
+        if (m.id && serverMealIds.has(m.id)) return m.id
+        const fresh = insertedMealIdByOrderIndex.get(formIndex)
+        if (!fresh) throw new Error('Missing inserted meal id')
+        return fresh
+      }
+      const allMealIds = meals.map((_, i) => mealIdAt(i))
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const foodsToInsert: any[] = []
-        const foodLocalRefs: { mealIndex: number; foodIndex: number }[] = []
+      // 5) Replace foods + ingredients per surviving meal. Nothing in the DB
+      // references food_id or ingredient_id from outside this meal plan, so
+      // delete-and-reinsert here is safe.
+      if (allMealIds.length > 0) {
+        const { error: foodDelErr } = await supabase
+          .from('foods')
+          .delete()
+          .in('meal_id', allMealIds)
+        if (foodDelErr) throw foodDelErr
+      }
 
-        meals.forEach((m, mealIndex) => {
-          const insertedMeal = sortedInsertedMeals[mealIndex]
-          if (!insertedMeal) return
-          ;(m.foods || []).forEach((f, foodIndex) => {
-            if (!f.name.trim()) return
-            // If a food has ingredients, its own macro fields are derived → store null.
-            const hasIngredients = (f.ingredients || []).some(ing => ing.name.trim())
-            foodsToInsert.push({
-              meal_id: insertedMeal.id,
-              name: f.name,
-              quantity: hasIngredients ? '' : f.quantity,
-              calories: hasIngredients ? null : f.calories,
-              protein_grams: hasIngredients ? null : f.protein_grams,
-              carbs_grams: hasIngredients ? null : f.carbs_grams,
-              fat_grams: hasIngredients ? null : f.fat_grams,
-              order_index: f.order_index,
-            })
-            foodLocalRefs.push({ mealIndex, foodIndex })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const foodsToInsert: any[] = []
+      const foodLocalRefs: { mealIndex: number; foodIndex: number }[] = []
+      meals.forEach((m, mealIndex) => {
+        const mealId = allMealIds[mealIndex]
+        ;(m.foods || []).forEach((f, foodIndex) => {
+          if (!f.name.trim()) return
+          // If a food has ingredients, its own macro fields are derived → store null.
+          const hasIngredients = (f.ingredients || []).some(ing => ing.name.trim())
+          foodsToInsert.push({
+            meal_id: mealId,
+            name: f.name,
+            quantity: hasIngredients ? '' : f.quantity,
+            calories: hasIngredients ? null : f.calories,
+            protein_grams: hasIngredients ? null : f.protein_grams,
+            carbs_grams: hasIngredients ? null : f.carbs_grams,
+            fat_grams: hasIngredients ? null : f.fat_grams,
+            order_index: f.order_index,
+          })
+          foodLocalRefs.push({ mealIndex, foodIndex })
+        })
+      })
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let insertedFoods: any[] = []
+      if (foodsToInsert.length > 0) {
+        const { data, error: foodError } = await supabase
+          .from('foods')
+          .insert(foodsToInsert)
+          .select('id, meal_id, order_index')
+        if (foodError) throw foodError
+        insertedFoods = data || []
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ingredientsToInsert: any[] = []
+      foodLocalRefs.forEach((ref, i) => {
+        const insertedFood = insertedFoods[i]
+        if (!insertedFood) return
+        const food = meals[ref.mealIndex].foods?.[ref.foodIndex]
+        ;(food?.ingredients || []).forEach(ing => {
+          if (!ing.name.trim()) return
+          ingredientsToInsert.push({
+            food_id: insertedFood.id,
+            name: ing.name,
+            quantity: ing.quantity,
+            calories: ing.calories,
+            protein_grams: ing.protein_grams,
+            carbs_grams: ing.carbs_grams,
+            fat_grams: ing.fat_grams,
+            order_index: ing.order_index,
           })
         })
+      })
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let insertedFoods: any[] = []
-        if (foodsToInsert.length > 0) {
-          const { data, error: foodError } = await supabase
-            .from('foods')
-            .insert(foodsToInsert)
-            .select('id, meal_id, order_index')
-          if (foodError) throw foodError
-          insertedFoods = data || []
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ingredientsToInsert: any[] = []
-        foodLocalRefs.forEach((ref, i) => {
-          const insertedFood = insertedFoods[i]
-          if (!insertedFood) return
-          const food = meals[ref.mealIndex].foods?.[ref.foodIndex]
-          ;(food?.ingredients || []).forEach(ing => {
-            if (!ing.name.trim()) return
-            ingredientsToInsert.push({
-              food_id: insertedFood.id,
-              name: ing.name,
-              quantity: ing.quantity,
-              calories: ing.calories,
-              protein_grams: ing.protein_grams,
-              carbs_grams: ing.carbs_grams,
-              fat_grams: ing.fat_grams,
-              order_index: ing.order_index,
-            })
-          })
-        })
-
-        if (ingredientsToInsert.length > 0) {
-          const { error: ingError } = await supabase
-            .from('ingredients')
-            .insert(ingredientsToInsert)
-          if (ingError) throw ingError
-        }
+      if (ingredientsToInsert.length > 0) {
+        const { error: ingError } = await supabase
+          .from('ingredients')
+          .insert(ingredientsToInsert)
+        if (ingError) throw ingError
       }
 
       onClose()
@@ -470,7 +655,7 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <IconButton onClick={onClose} aria-label="Go back">
+        <IconButton onClick={requestClose} aria-label="Go back">
           <ArrowLeft size={18} />
         </IconButton>
         <h2 className="text-xl font-bold text-slate-900">
@@ -522,14 +707,27 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
           <p className="text-slate-400 text-sm">No meals yet. Add your first meal above.</p>
         </div>
       ) : (
+        <DndContext
+          sensors={dndSensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        >
+          <SortableContext
+            items={meals.map(m => m._dndKey)}
+            strategy={verticalListSortingStrategy}
+          >
         <div className="space-y-3">
           {meals.map((meal, index) => {
             const mealMacros = computeMealMacros(meal)
             const isExpanded = expandedMeals.has(index)
             return (
-              <div key={index} className="bg-white rounded-xl border border-slate-200 p-4">
+            <SortableMealShell key={meal._dndKey} id={meal._dndKey}>
+              {drag => (
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
                 {/* Collapsible header — click anywhere except the action buttons to toggle */}
                 <div className="flex justify-between items-center gap-2">
+                  <DragHandle {...drag} />
                   <button
                     type="button"
                     onClick={() => toggleMealExpanded(index)}
@@ -539,7 +737,7 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                     <span className="text-slate-400 group-hover:text-slate-700 transition-transform">
                       {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </span>
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex-shrink-0">
+                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide shrink-0">
                       Meal {index + 1}
                     </span>
                     {meal.name && (
@@ -547,30 +745,27 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                         {meal.name}
                       </span>
                     )}
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 flex-shrink-0">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 shrink-0">
                       {meal.meal_type}
                     </span>
                     {meal.time && (
-                      <span className="text-xs text-slate-500 flex-shrink-0 tabular-nums">
+                      <span className="text-xs text-slate-500 shrink-0 tabular-nums">
                         {formatTime(meal.time)}
                       </span>
                     )}
                     {!isExpanded && (
-                      <span className="text-xs text-slate-400 flex-shrink-0 ml-auto pr-2 hidden sm:inline">
+                      <span className="text-xs text-slate-400 shrink-0 ml-auto pr-2 hidden sm:inline">
                         {Math.round(mealMacros.calories)} cal
                       </span>
                     )}
                   </button>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <IconButton onClick={() => moveMeal(index, 'up')} disabled={index === 0} aria-label="Move up">
-                      <ChevronUp size={16} />
-                    </IconButton>
+                  <div className="flex items-center gap-1 shrink-0">
                     <IconButton
-                      onClick={() => moveMeal(index, 'down')}
-                      disabled={index === meals.length - 1}
-                      aria-label="Move down"
+                      onClick={() => duplicateMeal(index)}
+                      aria-label="Duplicate meal"
+                      title="Duplicate this meal"
                     >
-                      <ChevronDown size={16} />
+                      <Copy size={14} />
                     </IconButton>
                     <IconButton tone="danger" onClick={() => removeMeal(index)} aria-label="Remove meal">
                       <X size={16} />
@@ -702,7 +897,7 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                                       : 'Expand item'
                                   }
                                   aria-expanded={expandedFoods.has(foodKey(index, foodIndex))}
-                                  className="mt-2 text-slate-400 hover:text-slate-700 cursor-pointer flex-shrink-0"
+                                  className="mt-2 text-slate-400 hover:text-slate-700 cursor-pointer shrink-0"
                                 >
                                   {expandedFoods.has(foodKey(index, foodIndex)) ? (
                                     <ChevronDown size={16} />
@@ -832,24 +1027,66 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                   </div>
                 )}
               </div>
+              )}
+            </SortableMealShell>
             )
           })}
         </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {/* Bottom "Add meal" — saves a long scroll back to the top after
+          appending a card. Hidden in the empty state since the dashed empty
+          card already prompts the action. */}
+      {meals.length > 0 && (
+        <button
+          type="button"
+          onClick={addMeal}
+          className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50/40 transition-colors cursor-pointer text-sm font-medium"
+        >
+          <Plus size={16} />
+          Add Meal
+        </button>
       )}
 
       <div className="h-24" aria-hidden />
 
-      <div className="sticky bottom-0 -mx-4 sm:-mx-8 px-4 sm:px-8 py-3 mt-6 bg-white/90 backdrop-blur border-t border-slate-200 flex items-center gap-3 z-20">
-        <UnsavedBadge visible={isDirty && !saving} />
+      <div className="sticky bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+          <span className="tabular-nums">
+            <span className="font-semibold text-slate-700">{meals.length}</span>{' '}
+            {meals.length === 1 ? 'meal' : 'meals'}
+          </span>
+          <UnsavedBadge visible={isDirty && !saving} />
+        </div>
+        <div className="sm:hidden">
+          <UnsavedBadge visible={isDirty && !saving} />
+        </div>
         <div className="flex-1" />
-        <Button variant="secondary" onClick={onClose} disabled={saving}>
+        <Button variant="secondary" onClick={requestClose} disabled={saving} size="sm">
           Cancel
         </Button>
-        <Button onClick={handleSave} loading={saving}>
-          {!saving && <Save size={16} />}
+        <Button
+          onClick={handleSave}
+          loading={saving}
+          disabled={!isDirty}
+          size="sm"
+        >
+          {!saving && <Save size={14} />}
           {saving ? 'Saving…' : 'Save Meal Plan'}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDiscard}
+        title="Discard changes?"
+        message="You have unsaved edits to this meal plan. They'll be lost if you leave now."
+        confirmLabel="Discard"
+        destructive
+        onConfirm={onClose}
+        onCancel={() => setConfirmDiscard(false)}
+      />
     </div>
   )
 }

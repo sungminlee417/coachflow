@@ -1,162 +1,177 @@
 # CoachFlow
 
-A modern fitness platform connecting coaches and clients for seamless workout and meal planning.
+A coaching-and-training platform where every user can both coach and train. One account, two hats — assign yourself a workout, or grab an invite code and let someone else coach you. Built on Next.js 16 + Supabase, mobile-first, no role flag to manage.
 
-## Features
+## Highlights
 
-- **Role-based Authentication**: Separate coach and client dashboards
-- **Invite System**: Coaches can generate invite codes/links for clients to join
-- **Coach Dashboard**: View all clients and manage invite codes
-- **Client Dashboard**: View assigned coach, workouts, and meal plans
-- **Secure Database**: Row-level security ensures users only see their own data
+### For coaches
+- **Workout builder** with strength + cardio exercises, supersets (chains of `pair_with_next`), per-set prescriptions, alternatives that the trainee can swap to, and either weekly or N-day rotation scheduling.
+- **Drag-and-drop** reordering for exercises, alternatives, and workouts inside programs (`@dnd-kit`, mouse + touch + keyboard).
+- **Programs** group workouts together (Push/Pull/Legs, beginner plan, etc.). Assigning a program creates one `workout_assignments` row per member workout — no separate "program assignment" entity, so existing per-workout assignments aren't disturbed.
+- **Meal-plan builder** with meals → foods → optional ingredients, auto-rolled-up macros, days-of-week scheduling, and optional time-of-day. Meals can be **duplicated** (deep copy of foods + ingredients) and reorder via drag-and-drop. Times auto-sort meals chronologically; untimed meals follow in manual order.
+- **Invite-based client onboarding** (`/invite?code=…`).
+- **Diff-based saves** preserve `exercise_id` (workouts) and `meal_id` (meal plans) across edits. Renaming, reordering, swapping types, editing alternatives, duplicating a meal — none of those touch the trainee's `set_logs` or `meal_logs`. Only explicitly removing a row cascades.
 
-## Tech Stack
+### For trainees
+- **Daily workout view** with a week strip + arrow navigation (past and future weeks), per-set logging that auto-saves on blur, and an `aria-live` daily progress chip.
+- **Progressive overload hints**: `Last: 135 × 8` ghosts in below each input, plus an emerald `↑ Beat last` pill the moment you type values that beat last week. Variant-aware — barbell-squat days compare against barbell-squat history, goblet-squat days compare against goblet-squat history.
+- **Substitution chips** under each exercise (`or: Goblet Squat · Leg Press · Hack Squat`). Tap to swap; one-tap revert. Per-day, per-assignment scope so a swap doesn't bleed across workouts.
+- **Auto-collapse on completion** — finished sets and finished superset rounds collapse to a one-line summary (`Set 1 · ✓ · 135 × 8`); tap to re-expand if you misclicked, with an in-row "↑ Collapse" link to fold it back.
+- **Cardio support** — duration in `mm:ss`, `1h 20m`, or bare-number minutes; intervals supported.
+- **Meal logging** — per-day check on each meal with a daily "X / Y eaten" chip; coach can see their clients' check history via RLS.
+- **Body measurements + weight chart** (Recharts) with a smooth area line, hover crosshair, lowest/avg/highest stats, and configurable units (lb/kg, in/cm).
 
-- **Frontend**: Next.js 15 with App Router, React, TypeScript
-- **Styling**: Tailwind CSS
-- **Backend**: Supabase (PostgreSQL + Auth)
-- **Authentication**: Supabase Auth with SSR support
+### Cross-cutting UX
+- **URL-driven dashboard tabs** (`?tab=my-workouts`) so reload, back/forward, and deep links all preserve the active section.
+- **Sticky save bars** with iOS safe-area padding, exercise-count summary, and `loading` state.
+- **Unsaved-changes guard** on every builder — closing or backing out with edits prompts a confirm dialog instead of silently dropping changes.
+- **Loading toolkit**: `Spinner`, `Skeleton`, `LoadingState`, plus skeletons shaped to match the destination (card grids, list rows, tables) so layouts don't shift in.
+- **Toast deduplication** — identical messages within 1.5s collapse, so a flaky save retry doesn't stack two error toasts.
 
-## Getting Started
+## Tech stack
+
+- **Next.js 16** (App Router, Turbopack)
+- **React 19** + **TypeScript** (strict)
+- **Tailwind CSS v4**
+- **Supabase** — Postgres, Auth, Row Level Security
+- **Recharts** — weight progress chart
+- **@dnd-kit** — drag-and-drop reordering
+- **date-fns** + **react-day-picker** — date input
+- **lucide-react** — icons
+
+## Getting started
 
 ### Prerequisites
+- Node.js 18+
+- A Supabase project (free tier works)
 
-- Node.js 18+ installed
-- A Supabase account (free tier works great)
+### 1. Clone + install
 
-### 1. Supabase Setup
+```bash
+git clone <repo>
+cd coachflow
+npm install
+```
 
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Wait for your database to be provisioned
-3. Go to **Project Settings** > **API** and copy:
-   - Project URL
-   - Anon/Public Key
+### 2. Environment
 
-### 2. Environment Variables
-
-The `.env.local` file has already been created. Update it with your Supabase credentials:
+Create `.env.local`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-### 3. Database Migration
+(Found at **Supabase → Project Settings → API**.)
 
-Run the database migration to create all necessary tables:
+### 3. Database
 
-1. Go to your Supabase dashboard
-2. Navigate to **SQL Editor**
-3. Click **New Query**
-4. Copy the contents of `supabase/migrations/20240101000000_initial_schema.sql`
-5. Paste it into the SQL editor and click **Run**
+This project's schema evolved across many additive migrations during development. The consolidated SQL needed to bring a fresh Supabase project up to date is collected in `supabase/migrations/`. Run them top-to-bottom in the **SQL Editor**, then run:
 
-This will create:
-- User profiles table with role support (coach/client)
-- Coach profiles table for additional coach info
-- Invite codes table
-- Coach-client relationships table
-- Workouts, exercises, and workout assignments tables
-- Meal plans, meals, and meal plan assignments tables
-- All necessary Row Level Security (RLS) policies
+```sql
+NOTIFY pgrst, 'reload schema';
+```
 
-### 4. Install Dependencies & Run
+The schema includes:
+
+| Area | Tables |
+| --- | --- |
+| Identity | `profiles` (with `length_unit`, `weight_unit`) |
+| Coaching | `coach_client_relationships`, `invite_codes` |
+| Workouts | `workouts`, `exercises`, `exercise_sets`, `exercise_alternatives` |
+| Programs | `workout_programs`, `workout_program_workouts` |
+| Assignments | `workout_assignments` (with `cycle_anchor_date`) |
+| Logs | `set_logs` (with `logged_date` for progressive overload), `exercise_substitutions` |
+| Nutrition | `meal_plans`, `meals`, `foods`, `ingredients`, `meal_plan_assignments`, `meal_logs` |
+| Tracking | `weight_logs`, `body_measurements` |
+
+All tables enable **Row Level Security**. Trainees see only their own data; coaches see their clients' assignments, set/meal logs, and substitutions through the `coach_client_relationships` join.
+
+### 4. Run
 
 ```bash
-npm install
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see your app.
+Open <http://localhost:3000>.
 
-## How It Works
+## How it's wired
 
-### For Coaches:
+### The unified user model
+There is no `role` flag. Every account is both a coach and a trainee:
+- A self-coaching `coach_client_relationships` row (`coach_id = client_id`) is created on first dashboard load, so anyone can assign themselves workouts and meal plans.
+- An invite link (`/invite?code=…`) creates an additional relationship where another user is the coach. A user can be coached by multiple people and coach multiple clients simultaneously.
 
-1. **Sign up** as a coach at `/signup`
-2. **Generate invite codes** from your dashboard
-3. **Share invite links** with clients (they look like: `/signup?invite=ABC123XYZ`)
-4. **View your clients** in the dashboard
-5. (Future) Assign workouts and meal plans
+### Scheduling
+Workouts and meals support two scheduling modes:
 
-### For Clients:
+- **Weekly** (default): `days_of_week SMALLINT[]` (Sun=0…Sat=6). Empty array = every day.
+- **N-day rotation**: `cycle_length` + `cycle_position` on the workout, `cycle_anchor_date` on the assignment. The trainee view computes today's position as `(daysSince(anchor) mod length) + 1` and matches against `cycle_position`. Lets coaches build 8-day, 5-day, 6-on-1-off splits without forcing them into a 7-day grid.
 
-1. **Receive an invite link** from your coach
-2. **Sign up** using the invite link (automatically connects you to the coach)
-3. **View your coach** in the dashboard
-4. (Future) See assigned workouts and meal plans
+### Progressive overload
+- `set_logs` is keyed `(assignment_id, exercise_id, set_number, logged_date)`. Same workout next week creates new rows instead of overwriting last week's.
+- `exercise_substitutions` records which alternative was active per `(assignment_id, exercise_id, logged_date)`.
+- The "Last: 135 × 8" hint pulls the most recent prior log whose substitution variant matches today's. So when you swap to goblet squat for one day and go back to barbell next week, the hint compares against the most recent barbell session — not last week's goblet.
 
-## Database Schema
+### Diff-based builder saves
+[`WorkoutBuilder.handleSave`](components/coaching/WorkoutBuilder.tsx) does not delete-and-reinsert. It:
+1. Pulls server-side exercise IDs.
+2. Deletes only exercises the form removed (cascades their `set_logs`).
+3. Updates surviving exercises in place — `exercise_id` stays stable so all logs and substitutions remain attached.
+4. Inserts new exercises and maps returned IDs back via `order_index`.
+5. Replaces `exercise_sets` and `exercise_alternatives` per surviving exercise (these are prescription metadata; nothing in the DB references their IDs).
 
-### Core Tables:
+The builder also detects "promote alternative to main" swaps and back-fills `exercise_substitutions` so historical sessions remain correctly labeled.
 
-- `profiles` - User profiles with role (coach/client)
-- `coach_profiles` - Additional coach information
-- `invite_codes` - Invite codes generated by coaches
-- `coach_client_relationships` - Links coaches to their clients
-- `workouts` & `exercises` - Workout templates and assignments
-- `meal_plans` & `meals` - Meal plan templates and assignments
-
-### Security:
-
-All tables have Row Level Security (RLS) enabled:
-- Users can only view/edit their own data
-- Coaches can view their clients' data
-- Clients can view their coach's data
-- Proper access controls for all operations
-
-## Project Structure
+## Project layout
 
 ```
 coachflow/
 ├── app/
-│   ├── dashboard/          # Main dashboard (role-based)
-│   ├── login/              # Login page
-│   ├── signup/             # Signup page with invite code support
-│   └── page.tsx            # Landing page
+│   ├── dashboard/                  # Server-rendered shell + Suspense boundary
+│   ├── login/, signup/, invite/    # Auth + onboarding
+│   └── globals.css                 # Tokens, animations, iOS quirks
 ├── components/
-│   ├── CoachDashboard.tsx  # Coach view
-│   ├── ClientDashboard.tsx # Client view
-│   ├── InviteCodeGenerator.tsx
-│   └── ClientList.tsx
+│   ├── coaching/                   # Coach-side: builders, libraries, modals
+│   │   ├── WorkoutBuilder.tsx
+│   │   ├── ScheduleSection.tsx
+│   │   ├── ProgramBuilder.tsx
+│   │   ├── MealPlanBuilder.tsx
+│   │   └── …AssignmentModal.tsx
+│   ├── training/                   # Trainee-side: assigned views + loggers
+│   │   ├── ClientWorkoutView.tsx
+│   │   ├── ExerciseSetLogger.tsx, SupersetLogger.tsx
+│   │   ├── SubstitutionPicker.tsx
+│   │   ├── MealLogToggle.tsx
+│   │   ├── WeightChart.tsx
+│   │   └── MeasurementsTracker.tsx
+│   ├── dashboard/UnifiedDashboard.tsx
+│   └── ui/                         # Buttons, inputs, modal, toast, skeletons,
+│                                   # SortableList, etc.
 ├── lib/
-│   └── supabase/
-│       ├── client.ts       # Browser client
-│       ├── server.ts       # Server client
-│       └── middleware.ts   # Auth middleware
-├── supabase/
-│   └── migrations/         # Database migrations
-└── middleware.ts           # Next.js middleware for auth
+│   ├── queries.ts                  # Centralized assignment fetchers
+│   ├── training.ts                 # buildPrescribedSets, fetchPriorPerformance,
+│   │                               # isImprovement, formatPriorHint
+│   ├── utils.ts                    # Date helpers, fraction parse/format,
+│   │                               # duration helpers, macro math
+│   ├── use-dirty-state.ts          # Snapshot-based dirty detection
+│   ├── use-supabase.ts             # Memoized client
+│   └── supabase/                   # Browser/server/middleware clients
+├── supabase/migrations/            # SQL migrations (additive, idempotent)
+└── proxy.ts                        # Next.js middleware for auth refresh
 ```
 
-## Next Steps
+## Conventions
 
-Here are some features you can build next:
+- **No `any`** at boundaries — Supabase row shapes are explicitly typed in `lib/queries.ts`.
+- **Local time everywhere user-visible.** Date helpers in `lib/utils.ts` (`parseLocalISO`, `weekdayOf`, `daysBetween` etc.) avoid the `new Date('YYYY-MM-DD')` UTC trap.
+- **Optimistic UI** for fire-and-forget actions (meal toggle, substitution picker), with rollback + toast on error.
+- **Skeleton-first loading** — every fetch site renders a skeleton shaped like the eventual content so layouts don't shift.
 
-1. **Workout Builder**: Allow coaches to create workout templates
-2. **Calendar View**: Weekly/monthly calendar for clients
-3. **Workout Assignment**: Assign workouts to specific dates
-4. **Meal Plan Builder**: Create and assign meal plans
-5. **Progress Tracking**: Clients can log completed workouts
-6. **Messaging**: In-app communication between coach and client
-7. **File Uploads**: Share videos, PDFs, images
-8. **Analytics**: Track client progress over time
+## Deploy
 
-## Development Tips
-
-- The app uses Next.js App Router with Server Components
-- Authentication state is managed via Supabase cookies
-- The middleware refreshes auth tokens automatically
-- All database queries use Supabase's JavaScript client
-- TypeScript ensures type safety throughout
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deploys cleanly on Vercel. Push to a Git remote, import in Vercel, set the two `NEXT_PUBLIC_SUPABASE_*` env vars, and the build runs as `next build` (Turbopack).
 
 ## License
 
 MIT
-# coachflow

@@ -34,6 +34,20 @@ export interface Workout {
   exercise_count?: number
 }
 
+// A coach-side bundle of workouts. Assigning a program fans out into one
+// `workout_assignments` row per member workout, so trainees still see
+// individual workouts and existing assignments are unaffected.
+export interface WorkoutProgram {
+  id: string
+  name: string
+  description: string
+  is_template: boolean
+  created_at?: string
+  workout_count?: number
+  // Populated when fetching with members (in `ProgramBuilder`).
+  workouts?: Workout[]
+}
+
 export type ExerciseType = 'strength' | 'cardio'
 
 export interface Exercise {

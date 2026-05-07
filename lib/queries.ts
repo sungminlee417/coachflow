@@ -12,6 +12,61 @@ import type {
   WorkoutAssignment,
 } from './types'
 
+// Row shapes returned by the joined PostgREST queries below. PostgREST returns
+// the joined `workout`/`meal_plan` either as a single object or a single-element
+// array depending on the relationship — `unwrapJoin()` collapses both to the
+// scalar form. Defining these explicitly here drops the `any` casts and makes
+// the field surface visible at a glance.
+interface AlternativeRow {
+  id?: string
+  name: string
+  order_index: number
+}
+
+interface ExerciseJoinedRow extends Exercise {
+  exercise_alternatives?: AlternativeRow[]
+}
+
+interface WorkoutJoinedRow {
+  id: string
+  name: string
+  description: string
+  days_of_week: DayOfWeek[] | null
+  cycle_length: number | null
+  cycle_position: number | null
+  exercises: ExerciseJoinedRow[]
+}
+
+interface WorkoutAssignmentRow {
+  id: string
+  start_date: string | null
+  end_date: string | null
+  completed: boolean | null
+  completed_at: string | null
+  notes: string | null
+  coach_id: string
+  cycle_anchor_date: string | null
+  // Supabase serializes single-row joins as either an object or an array
+  // depending on relationship cardinality.
+  workout: WorkoutJoinedRow | WorkoutJoinedRow[] | null
+}
+
+interface MealPlanJoinedRow {
+  id: string
+  name: string
+  description: string
+  meals: Meal[]
+}
+
+interface MealPlanAssignmentRow {
+  id: string
+  start_date: string | null
+  end_date: string | null
+  notes: string | null
+  coach_id: string
+  meal_plan: MealPlanJoinedRow | MealPlanJoinedRow[] | null
+}
+
 /**
  * `start_date.is.null,start_date.lte.{date}` and `end_date.is.null,end_date.gte.{date}`
  * are the two `.or()` filters Supabase needs to express "active on this day"
@@ -109,24 +164,25 @@ export async function fetchActiveWorkoutAssignments(
     }
   }
 
-  return (data ?? [])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((item: any): WorkoutAssignment => {
-      const workout = unwrapJoin<{
-        id: string
-        name: string
-        description: string
-        days_of_week: DayOfWeek[] | null
-        cycle_length: number | null
-        cycle_position: number | null
-        exercises: (Exercise & {
-          exercise_alternatives?: { name: string; order_index: number }[]
-        })[]
-      }>(item.workout)
+  return ((data ?? []) as WorkoutAssignmentRow[])
+    .map((item): WorkoutAssignment => {
+      const workout = unwrapJoin<WorkoutJoinedRow>(item.workout)
       return {
-        ...item,
+        id: item.id,
+        start_date: item.start_date,
+        end_date: item.end_date,
+        // The DB row uses `null` for missing values; the public type uses
+        // `undefined`. Normalize at the boundary so consumers don't need to
+        // handle both.
+        completed: item.completed ?? undefined,
+        completed_at: item.completed_at,
+        notes: item.notes,
+        coach_id: item.coach_id,
+        cycle_anchor_date: item.cycle_anchor_date,
         workout: {
-          ...workout,
+          id: workout?.id ?? '',
+          name: workout?.name ?? '',
+          description: workout?.description ?? '',
           days_of_week: workout?.days_of_week ?? [],
           cycle_length: workout?.cycle_length ?? null,
           cycle_position: workout?.cycle_position ?? null,
@@ -200,19 +256,19 @@ export async function fetchActiveMealPlanAssignments(
     snack: 3,
   }
 
-  return (data ?? [])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((item: any): MealPlanAssignment => {
-      const plan = unwrapJoin<{
-        id: string
-        name: string
-        description: string
-        meals: Meal[]
-      }>(item.meal_plan)
+  return ((data ?? []) as MealPlanAssignmentRow[])
+    .map((item): MealPlanAssignment => {
+      const plan = unwrapJoin<MealPlanJoinedRow>(item.meal_plan)
       return {
-        ...item,
+        id: item.id,
+        start_date: item.start_date,
+        end_date: item.end_date,
+        notes: item.notes,
+        coach_id: item.coach_id,
         meal_plan: {
-          ...plan,
+          id: plan?.id ?? '',
+          name: plan?.name ?? '',
+          description: plan?.description ?? '',
           meals: (plan?.meals ?? [])
             .filter(m => matchesWeekday(m.days_of_week, weekday))
             .map(m => ({

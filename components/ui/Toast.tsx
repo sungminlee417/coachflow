@@ -14,7 +14,24 @@ interface ToastMessage {
 let toastId = 0
 let addToastFn: ((text: string, type: ToastType) => void) | null = null
 
+// Dedupe identical toasts fired within this window — prevents the same error
+// stacking when a flaky save retries or two callers race to surface the same
+// message. Resolution is small enough that a single intentional double-tap of
+// "Saved" still queues both.
+const DEDUPE_WINDOW_MS = 1500
+let lastShown: { text: string; type: ToastType; at: number } | null = null
+
 export function showToast(text: string, type: ToastType = 'success') {
+  const now = Date.now()
+  if (
+    lastShown &&
+    lastShown.text === text &&
+    lastShown.type === type &&
+    now - lastShown.at < DEDUPE_WINDOW_MS
+  ) {
+    return
+  }
+  lastShown = { text, type, at: now }
   addToastFn?.(text, type)
 }
 
@@ -40,7 +57,9 @@ export default function ToastContainer() {
 
   return (
     <div
-      className="fixed left-4 right-4 bottom-4 sm:left-auto sm:right-4 sm:max-w-sm z-60 flex flex-col gap-2 pointer-events-none"
+      // `bottom-[max(...)]` keeps the toasts above the iOS home-indicator gesture
+      // zone. Falls back to the original 1rem offset on devices with no inset.
+      className="fixed left-4 right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] sm:left-auto sm:right-4 sm:max-w-sm z-60 flex flex-col gap-2 pointer-events-none"
       role="status"
       aria-live="polite"
     >

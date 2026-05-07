@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { Check } from 'lucide-react'
+import { Check, ChevronUp } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
 import {
   buildPrescribedSets,
@@ -82,6 +82,9 @@ export function SupersetLogger({
   )
   const [loaded, setLoaded] = useState(false)
   const [priorByKey, setPriorByKey] = useState<PriorMap>(new Map())
+  // Round numbers the user manually re-expanded after auto-collapse fired.
+  // Reset on every load so a freshly-completed round always auto-collapses.
+  const [manuallyExpandedRounds, setManuallyExpandedRounds] = useState<Set<number>>(new Set())
 
   // Stable strings so the effect reruns on identity changes without putting
   // complex expressions in the dependency array.
@@ -95,6 +98,7 @@ export function SupersetLogger({
     setRowsByExercise(buildInitialMap(exercises))
     setLoaded(false)
     setPriorByKey(new Map())
+    setManuallyExpandedRounds(new Set())
 
     const load = async () => {
       const exerciseIds = exercises.map(e => e.id).filter(Boolean) as string[]
@@ -229,7 +233,35 @@ export function SupersetLogger({
     if (!row) return
     const next = { ...row, completed: !row.completed }
     updateRow(exerciseId, setNumber, { completed: next.completed })
+    // Each completion cycle starts fresh — re-completing should auto-collapse
+    // the round again. Drop the manual override for this round if present.
+    setManuallyExpandedRounds(prev => {
+      if (!prev.has(setNumber)) return prev
+      const out = new Set(prev)
+      out.delete(setNumber)
+      return out
+    })
     await persist(next)
+  }
+
+  // Re-expand a round that auto-collapsed after all its rows were completed.
+  const expandRound = (setNumber: number) => {
+    setManuallyExpandedRounds(prev => {
+      if (prev.has(setNumber)) return prev
+      const out = new Set(prev)
+      out.add(setNumber)
+      return out
+    })
+  }
+
+  // Re-collapse a round the user previously tapped to expand.
+  const collapseRound = (setNumber: number) => {
+    setManuallyExpandedRounds(prev => {
+      if (!prev.has(setNumber)) return prev
+      const out = new Set(prev)
+      out.delete(setNumber)
+      return out
+    })
   }
 
   const maxRounds = exercises.reduce((max, ex) => {
@@ -253,12 +285,130 @@ export function SupersetLogger({
 
   const restBetweenRounds = exercises[exercises.length - 1]?.rest_seconds ?? null
 
+  // Tiny per-exercise summary used in the auto-collapsed round bar:
+  // strength → "A 135×8", cardio → "B 25:30".
+  const summarizeRow = (
+    ex: Exercise,
+    row: RowState,
+    letterIdx: number
+  ): { letter: string; text: string } => {
+    const letter = POSITION_LETTERS[letterIdx] ?? `${letterIdx + 1}`
+    if (ex.exercise_type === 'cardio') {
+      const t =
+        row.duration_performed_seconds != null
+          ? formatDuration(row.duration_performed_seconds)
+          : '—'
+      return { letter, text: t }
+    }
+    const w = row.weight_performed
+    const r = row.reps_performed
+    const text =
+      w !== '' && r !== ''
+        ? `${w}×${r}`
+        : r !== ''
+          ? `${r} reps`
+          : w !== ''
+            ? `${w}`
+            : '—'
+    return { letter, text }
+  }
+
   return (
     <div className="space-y-2">
       {Array.from({ length: maxRounds }, (_, roundIdx) => {
         const setNumber = roundIdx + 1
         const complete = isRoundComplete(setNumber)
         const isLastRound = setNumber === maxRounds
+        const isAutoCollapsed =
+          loaded && complete && !manuallyExpandedRounds.has(setNumber)
+
+        // Collapsed round bar — one tappable line summarizing every exercise
+        // in the round. Tap to re-expand the full editing UI.
+        if (isAutoCollapsed) {
+          const summaries = exercises
+            .map((ex, exIdx) => {
+              if (!ex.id) return null
+              const row = rowsByExercise.get(ex.id)?.find(r => r.set_number === setNumber)
+              if (!row) return null
+              return summarizeRow(ex, row, exIdx)
+            })
+            .filter((s): s is { letter: string; text: string } => s !== null)
+
+          return (
+            <div key={`round-${setNumber}`}>
+              <button
+                type="button"
+                onClick={() => expandRound(setNumber)}
+                aria-expanded={false}
+                aria-label={`Expand round ${setNumber}`}
+                className="w-full bg-white rounded-lg border border-emerald-300 hover:border-emerald-400 transition-colors cursor-pointer overflow-hidden text-left"
+              >
+                <div className="bg-emerald-50 px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">
+                      Round {setNumber}
+                    </span>
+                    <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-emerald-500 text-white shrink-0">
+                      <Check size={11} />
+                    </span>
+                    {summaries.map(s => (
+                      <span
+                        key={s.letter}
+                        className="text-xs text-slate-600 tabular-nums"
+                      >
+                        <span className="font-bold text-indigo-600 mr-0.5">{s.letter}</span>
+                        {s.text}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0">Tap to edit</span>
+                </div>
+              </button>
+              {!isLastRound && restBetweenRounds != null && restBetweenRounds > 0 && (
+                <div className="flex items-center gap-2 my-1 px-3">
+                  <div className="flex-1 h-px bg-slate-200" />
+                  <span className="text-[10px] font-medium text-slate-400 tabular-nums">
+                    Rest {restBetweenRounds}s
+                  </span>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        // If the round is complete and the user manually expanded it back open,
+        // tapping the header recollapses — saves them from unchecking just to
+        // tidy up.
+        const headerCanCollapse =
+          loaded && complete && manuallyExpandedRounds.has(setNumber)
+
+        const headerInner = (
+          <>
+            <span
+              className={`text-[10px] font-bold uppercase tracking-widest ${
+                complete ? 'text-emerald-700' : 'text-slate-500'
+              }`}
+            >
+              Round {setNumber}
+            </span>
+            <div className="flex items-center gap-2">
+              {complete && (
+                <span className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1">
+                  <Check size={11} />
+                  Complete
+                </span>
+              )}
+              {headerCanCollapse && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500">
+                  <ChevronUp size={11} />
+                  Collapse
+                </span>
+              )}
+            </div>
+          </>
+        )
+
         return (
           <div key={`round-${setNumber}`}>
           <div
@@ -266,27 +416,30 @@ export function SupersetLogger({
               complete ? 'border-emerald-300' : 'border-slate-200'
             }`}
           >
-            <div
-              className={`px-3 py-1.5 border-b flex items-center justify-between gap-2 ${
-                complete
-                  ? 'bg-emerald-50 border-emerald-200'
-                  : 'bg-slate-50 border-slate-200'
-              }`}
-            >
-              <span
-                className={`text-[10px] font-bold uppercase tracking-widest ${
-                  complete ? 'text-emerald-700' : 'text-slate-500'
+            {headerCanCollapse ? (
+              <button
+                type="button"
+                onClick={() => collapseRound(setNumber)}
+                aria-label={`Collapse round ${setNumber}`}
+                className={`w-full px-3 py-1.5 border-b flex items-center justify-between gap-2 cursor-pointer ${
+                  complete
+                    ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200'
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
                 }`}
               >
-                Round {setNumber}
-              </span>
-              {complete && (
-                <span className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1">
-                  <Check size={11} />
-                  Complete
-                </span>
-              )}
-            </div>
+                {headerInner}
+              </button>
+            ) : (
+              <div
+                className={`px-3 py-1.5 border-b flex items-center justify-between gap-2 ${
+                  complete
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-slate-50 border-slate-200'
+                }`}
+              >
+                {headerInner}
+              </div>
+            )}
             <div className="divide-y divide-slate-100">
               {exercises.map((ex, exIdx) => {
                 if (!ex.id) return null

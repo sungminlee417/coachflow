@@ -7,12 +7,69 @@ import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Field, Input, Textarea } from '@/components/ui/Input'
 import { Link2, Dumbbell, HeartPulse, ArrowUpFromLine } from 'lucide-react'
-import { DayOfWeekSelector } from '@/components/ui/DayOfWeekSelector'
+import { ScheduleSection, type ScheduleMode } from './ScheduleSection'
 import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useDirtyState } from '@/lib/use-dirty-state'
-import { ArrowLeft, Plus, X, ChevronUp, ChevronDown, Save } from 'lucide-react'
+import { ArrowLeft, Plus, X, Save } from 'lucide-react'
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { DragHandle, type DragHandleProps } from '@/components/ui/SortableList'
 import { parseDuration, formatDuration } from '@/lib/utils'
 import type { DayOfWeek, Exercise, ExerciseSet, ExerciseType, Workout } from '@/lib/types'
+
+// Internal exercise type carrying a stable client-side id for drag-and-drop.
+// _dndKey isn't persisted; it just gives every row a sortable identity even
+// before it has a real database id.
+type DraftExercise = Exercise & { _dndKey: string }
+const newDndKey = (): string =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `tmp-${Math.random().toString(36).slice(2)}-${Date.now()}`
+
+// Wraps an exercise card with the dnd-kit sortable bindings. Keeps useSortable
+// out of the WorkoutBuilder body (where it'd be inside a render callback —
+// against the rules of hooks). Children receive drag-handle props to attach
+// to the card's grip icon.
+function SortableExerciseShell({
+  id,
+  children,
+}: {
+  id: string
+  children: (drag: DragHandleProps) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 30 : undefined,
+        opacity: isDragging ? 0.85 : undefined,
+      }}
+    >
+      {children({ attributes, listeners, isDragging })}
+    </div>
+  )
+}
 
 interface WorkoutBuilderProps {
   coachId: string
@@ -51,8 +108,6 @@ const hydrateCardioInputs = (sets: ExerciseSet[]): ExerciseSet[] =>
         : s.target_reps,
   }))
 
-type ScheduleMode = 'weekly' | 'cycle'
-
 export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBuilderProps) {
   const supabase = useSupabase()
   const [name, setName] = useState(workout?.name || '')
@@ -66,8 +121,9 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
   )
   const [cycleLength, setCycleLength] = useState<number>(workout?.cycle_length ?? 8)
   const [cyclePosition, setCyclePosition] = useState<number>(workout?.cycle_position ?? 1)
-  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [exercises, setExercises] = useState<DraftExercise[]>([])
   const [saving, setSaving] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [snapshotReady, setSnapshotReady] = useState(!workout?.id)
 
   const isDirty = useDirtyState(
@@ -149,7 +205,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized: Exercise[] = exerciseList.map((ex: any) => {
+      const normalized: DraftExercise[] = exerciseList.map((ex: any) => {
         const sets = (setsByExercise.get(ex.id) ?? [])
           .slice()
           .sort((a: ExerciseSet, b: ExerciseSet) => a.set_number - b.set_number)
@@ -160,6 +216,9 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
           exercise_type: type,
           alternatives: altsByExercise.get(ex.id) ?? [],
           exercise_sets: type === 'cardio' ? hydrateCardioInputs(baseSets) : baseSets,
+          // Reuse the server id as the DnD key so identity is stable across
+          // unrelated state updates.
+          _dndKey: ex.id,
         }
       })
       setExercises(normalized)
@@ -183,8 +242,30 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         order_index: exercises.length,
         pair_with_next: false,
         exercise_sets: [emptySet(1)],
+        _dndKey: newDndKey(),
       },
     ])
+  }
+
+  // dnd-kit sensors: small distance threshold so taps inside the card pass
+  // through to inputs/buttons; longer touch delay tolerates scroll gestures.
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = exercises.findIndex(ex => ex._dndKey === active.id)
+    const newIndex = exercises.findIndex(ex => ex._dndKey === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const next = arrayMove(exercises, oldIndex, newIndex)
+    // Re-sync order_index to match the new positions; everything else
+    // (pair_with_next chains, exercise_sets, alternatives) follows the row.
+    next.forEach((ex, i) => (ex.order_index = i))
+    setExercises(next)
   }
 
   // Switching type resets the per-set inputs since reps and durations don't translate.
@@ -217,15 +298,6 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
     setExercises(updated)
   }
 
-  const moveExercise = (index: number, direction: 'up' | 'down') => {
-    const newIndex = direction === 'up' ? index - 1 : index + 1
-    if (newIndex < 0 || newIndex >= exercises.length) return
-    const updated = [...exercises]
-    const [moved] = updated.splice(index, 1)
-    updated.splice(newIndex, 0, moved)
-    updated.forEach((ex, i) => (ex.order_index = i))
-    setExercises(updated)
-  }
 
   const addSet = (exIndex: number) => {
     const updated = [...exercises]
@@ -309,6 +381,12 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
     alts[altIndex] = oldMain
     updated[exIndex] = { ...ex, name: promoted, alternatives: alts }
     setExercises(updated)
+  }
+
+  // Intercept close attempts so unsaved edits aren't silently dropped.
+  const requestClose = () => {
+    if (isDirty && !saving) setConfirmDiscard(true)
+    else onClose()
   }
 
   const handleSave = async () => {
@@ -651,7 +729,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <IconButton onClick={onClose} aria-label="Go back">
+        <IconButton onClick={requestClose} aria-label="Go back">
           <ArrowLeft size={18} />
         </IconButton>
         <h2 className="text-xl font-bold text-slate-900">
@@ -679,90 +757,16 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
           />
         </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Schedule</label>
-          <div className="inline-flex rounded-lg border border-slate-200 p-0.5 mb-3 bg-slate-50">
-            {(
-              [
-                { value: 'weekly', label: 'Weekly', help: 'Pick days of the week' },
-                { value: 'cycle', label: 'N-day rotation', help: 'For 8-day splits, etc.' },
-              ] as const
-            ).map(({ value, label }) => {
-              const active = scheduleMode === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setScheduleMode(value)}
-                  aria-pressed={active}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                    active ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-
-          {scheduleMode === 'weekly' ? (
-            <>
-              <p className="text-[11px] text-slate-500 mb-2">
-                Leave days empty to show this workout every day.
-              </p>
-              <DayOfWeekSelector value={daysOfWeek} onChange={setDaysOfWeek} />
-            </>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-[11px] text-slate-500">
-                For rotations that don&rsquo;t fit a 7-day week. The workout shows on its
-                position once every <span className="font-medium">{cycleLength}</span> days.
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Rotation length</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="60"
-                    step="1"
-                    value={cycleLength}
-                    onChange={e => {
-                      const n = Math.max(1, Math.min(60, Math.floor(Number(e.target.value) || 1)))
-                      setCycleLength(n)
-                      // Clamp position so it's never out of range.
-                      if (cyclePosition > n) setCyclePosition(n)
-                    }}
-                    placeholder="8"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">
-                    Position (1–{cycleLength})
-                  </label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max={cycleLength}
-                    step="1"
-                    value={cyclePosition}
-                    onChange={e => {
-                      const n = Math.max(
-                        1,
-                        Math.min(cycleLength, Math.floor(Number(e.target.value) || 1))
-                      )
-                      setCyclePosition(n)
-                    }}
-                  />
-                </div>
-              </div>
-              <p className="text-[10px] text-slate-400">
-                Day {cyclePosition} of a {cycleLength}-day rotation. When you assign this
-                workout, you&rsquo;ll pick the date that&rsquo;s Day 1.
-              </p>
-            </div>
-          )}
-        </div>
+        <ScheduleSection
+          scheduleMode={scheduleMode}
+          setScheduleMode={setScheduleMode}
+          daysOfWeek={daysOfWeek}
+          setDaysOfWeek={setDaysOfWeek}
+          cycleLength={cycleLength}
+          setCycleLength={setCycleLength}
+          cyclePosition={cyclePosition}
+          setCyclePosition={setCyclePosition}
+        />
 
         <label className="flex items-center gap-2 cursor-pointer">
           <input
@@ -788,10 +792,20 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
           <p className="text-slate-400 text-sm">No exercises yet. Add your first exercise above.</p>
         </div>
       ) : (
+        <DndContext
+          sensors={dndSensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        >
+          <SortableContext
+            items={exercises.map(ex => ex._dndKey)}
+            strategy={verticalListSortingStrategy}
+          >
         <div className="space-y-3">
           {(() => {
             // Group consecutive paired exercises so the visual frame matches the data.
-            type ExerciseGroup = { startIndex: number; exercises: Exercise[] }
+            type ExerciseGroup = { startIndex: number; exercises: DraftExercise[] }
             const groups: ExerciseGroup[] = []
             exercises.forEach((ex, i) => {
               const prev = exercises[i - 1]
@@ -801,36 +815,24 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
               else groups.push({ startIndex: i, exercises: [ex] })
             })
 
-            const renderCard = (exercise: Exercise, index: number) => {
+            const renderCard = (
+              exercise: DraftExercise,
+              index: number,
+              drag: DragHandleProps
+            ) => {
               const sets = exercise.exercise_sets ?? []
               const type: ExerciseType = exercise.exercise_type ?? 'strength'
               const isCardio = type === 'cardio'
               return (
-              <div
-                key={index}
-                className="bg-white rounded-xl border border-slate-200 p-4"
-              >
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
                 <div className="flex justify-between items-center mb-3 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
+                    <DragHandle {...drag} />
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
                       Exercise {index + 1}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <IconButton
-                      onClick={() => moveExercise(index, 'up')}
-                      disabled={index === 0}
-                      aria-label="Move up"
-                    >
-                      <ChevronUp size={16} />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => moveExercise(index, 'down')}
-                      disabled={index === exercises.length - 1}
-                      aria-label="Move down"
-                    >
-                      <ChevronDown size={16} />
-                    </IconButton>
                     <IconButton tone="danger" onClick={() => removeExercise(index)} aria-label="Remove exercise">
                       <X size={16} />
                     </IconButton>
@@ -1060,7 +1062,12 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
 
             return groups.map((group, gi) => {
               if (group.exercises.length === 1) {
-                return renderCard(group.exercises[0], group.startIndex)
+                const ex = group.exercises[0]
+                return (
+                  <SortableExerciseShell key={ex._dndKey} id={ex._dndKey}>
+                    {drag => renderCard(ex, group.startIndex, drag)}
+                  </SortableExerciseShell>
+                )
               }
               return (
                 <div
@@ -1076,32 +1083,74 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {group.exercises.map((ex, j) =>
-                      renderCard(ex, group.startIndex + j)
-                    )}
+                    {group.exercises.map((ex, j) => (
+                      <SortableExerciseShell key={ex._dndKey} id={ex._dndKey}>
+                        {drag => renderCard(ex, group.startIndex + j, drag)}
+                      </SortableExerciseShell>
+                    ))}
                   </div>
                 </div>
               )
             })
           })()}
         </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {/* Bottom "Add exercise" — saves the coach a long scroll back to the
+          top button after appending a card. Hidden in the empty state since
+          the dashed empty card already prompts the action. */}
+      {exercises.length > 0 && (
+        <button
+          type="button"
+          onClick={addExercise}
+          className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50/40 transition-colors cursor-pointer text-sm font-medium"
+        >
+          <Plus size={16} />
+          Add Exercise
+        </button>
       )}
 
       {/* Spacer so the sticky bar never covers the last card */}
       <div className="h-24" aria-hidden />
 
-      {/* Sticky action bar — persistent save target on long forms (esp. mobile). */}
-      <div className="sticky bottom-0 -mx-4 sm:-mx-8 px-4 sm:px-8 py-3 mt-6 bg-white/90 backdrop-blur border-t border-slate-200 flex items-center gap-3 z-20">
-        <UnsavedBadge visible={isDirty && !saving} />
+      {/* Floating action bar — persistent save target on long forms (esp. mobile). */}
+      <div className="sticky bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+          <span className="tabular-nums">
+            <span className="font-semibold text-slate-700">{exercises.length}</span>{' '}
+            {exercises.length === 1 ? 'exercise' : 'exercises'}
+          </span>
+          <UnsavedBadge visible={isDirty && !saving} />
+        </div>
+        <div className="sm:hidden">
+          <UnsavedBadge visible={isDirty && !saving} />
+        </div>
         <div className="flex-1" />
-        <Button variant="secondary" onClick={onClose} disabled={saving}>
+        <Button variant="secondary" onClick={requestClose} disabled={saving} size="sm">
           Cancel
         </Button>
-        <Button onClick={handleSave} loading={saving}>
-          {!saving && <Save size={16} />}
+        <Button
+          onClick={handleSave}
+          loading={saving}
+          disabled={!isDirty}
+          size="sm"
+        >
+          {!saving && <Save size={14} />}
           {saving ? 'Saving…' : 'Save Workout'}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDiscard}
+        title="Discard changes?"
+        message="You have unsaved edits to this workout. They'll be lost if you leave now."
+        confirmLabel="Discard"
+        destructive
+        onConfirm={onClose}
+        onCancel={() => setConfirmDiscard(false)}
+      />
     </div>
   )
 }

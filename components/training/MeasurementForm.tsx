@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Button } from '@/components/ui/Button'
 import { Field, Textarea } from '@/components/ui/Input'
 import { DatePicker } from '@/components/ui/DatePicker'
@@ -76,13 +77,22 @@ export default function MeasurementForm({
   const supabase = useSupabase()
   const [data, setData] = useState<BodyMeasurement>(initial ?? emptyMeasurement())
   const [saving, setSaving] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   // Reset form state every time the modal is opened so editing pre-fills with
   // the right entry (and "Log entry" starts empty).
   useEffect(() => {
-    if (open) setData(initial ?? emptyMeasurement())
+    if (open) {
+      setData(initial ?? emptyMeasurement())
+      setConfirmDiscard(false)
+    }
   }, [open, initial])
   // Tie dirty-state ready flag to `open` so the snapshot resets per opening.
   const isDirty = useDirtyState(data, open)
+
+  const requestClose = () => {
+    if (isDirty && !saving) setConfirmDiscard(true)
+    else onClose()
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const update = (field: keyof BodyMeasurement, value: any) => {
@@ -116,7 +126,7 @@ export default function MeasurementForm({
   }
 
   return (
-    <Modal open={open} title={initial ? 'Edit Measurement' : 'Log Measurement'} onClose={onClose}>
+    <Modal open={open} title={initial ? 'Edit Measurement' : 'Log Measurement'} onClose={requestClose}>
       <div className="flex flex-col max-h-[75vh] -mx-1">
       <div className="flex-1 overflow-y-auto px-1 space-y-4">
         <Field id="m-date" label="Date">
@@ -199,14 +209,24 @@ export default function MeasurementForm({
       <div className="flex flex-wrap items-center gap-2 pt-4 mt-2 border-t border-slate-100 px-1">
         <UnsavedBadge visible={isDirty && !saving} />
         <div className="flex-1" />
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={requestClose}>
           Cancel
         </Button>
-        <Button onClick={handleSave} loading={saving}>
+        <Button onClick={handleSave} loading={saving} disabled={!isDirty}>
           {saving ? 'Saving…' : initial ? 'Save Changes' : 'Log Measurement'}
         </Button>
       </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDiscard}
+        title="Discard changes?"
+        message="You have unsaved measurement edits. They'll be lost if you leave now."
+        confirmLabel="Discard"
+        destructive
+        onConfirm={onClose}
+        onCancel={() => setConfirmDiscard(false)}
+      />
     </Modal>
   )
 }

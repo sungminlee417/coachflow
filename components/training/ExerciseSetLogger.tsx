@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { Check } from 'lucide-react'
+import { Check, ChevronUp } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
 import {
   buildPrescribedSets,
@@ -60,6 +60,9 @@ export function ExerciseSetLogger({
   const [rows, setRows] = useState<RowState[]>(() => buildInitialRows(exercise))
   const [loaded, setLoaded] = useState(false)
   const [priorBySet, setPriorBySet] = useState<Map<number, PriorPerformance>>(new Map())
+  // Set numbers the user manually re-expanded after auto-collapse fired. Reset
+  // on every load and per-toggle so a fresh "complete" always auto-collapses.
+  const [manuallyExpanded, setManuallyExpanded] = useState<Set<number>>(new Set())
   const isCardio = exercise.exercise_type === 'cardio'
 
   useEffect(() => {
@@ -67,6 +70,7 @@ export function ExerciseSetLogger({
     setRows(buildInitialRows(exercise))
     setLoaded(false)
     setPriorBySet(new Map())
+    setManuallyExpanded(new Set())
 
     const load = async () => {
       // Today's logs (the values to populate the inputs) and prior performance
@@ -176,32 +180,81 @@ export function ExerciseSetLogger({
     if (!row) return
     const next = { ...row, completed: !row.completed }
     updateRow(setNumber, { completed: next.completed })
+    // Each completion cycle starts fresh — re-completing after editing should
+    // auto-collapse again, even if the user previously tapped to re-expand.
+    setManuallyExpanded(prev => {
+      if (!prev.has(setNumber)) return prev
+      const out = new Set(prev)
+      out.delete(setNumber)
+      return out
+    })
     await persist(next)
+  }
+
+  // Re-expand a row that auto-collapsed after completion (without unchecking).
+  const expandRow = (setNumber: number) => {
+    setManuallyExpanded(prev => {
+      if (prev.has(setNumber)) return prev
+      const out = new Set(prev)
+      out.add(setNumber)
+      return out
+    })
+  }
+
+  // Re-collapse a row the user previously tapped to expand. Lets the trainee
+  // tidy back up after editing without having to uncheck-then-recheck Done.
+  const collapseRow = (setNumber: number) => {
+    setManuallyExpanded(prev => {
+      if (!prev.has(setNumber)) return prev
+      const out = new Set(prev)
+      out.delete(setNumber)
+      return out
+    })
   }
 
   if (rows.length === 0) {
     return <p className="text-xs text-slate-400 italic mt-2">No sets prescribed.</p>
   }
 
-  // Inline component rendering the ghost "Last week" hint and an "improved"
-  // pill once the user beats their previous values for that set.
+  // Inline component rendering the ghost "Last week" hint, an "improved" pill
+  // when the user beats their previous values, and (when applicable) a
+  // "Collapse" link so a manually-re-expanded row can be tidied back up.
   const PriorHint = ({ row }: { row: RowState }) => {
-    if (!loaded) return null
-    const prev = priorBySet.get(row.set_number)
-    if (!prev) return null
-    const hint = formatPriorHint(prev, isCardio)
-    if (!hint) return null
-    const improved = isImprovement(row, prev, isCardio)
+    const prev = loaded ? priorBySet.get(row.set_number) : undefined
+    const hint = prev ? formatPriorHint(prev, isCardio) : null
+    const improved = prev ? isImprovement(row, prev, isCardio) : false
+    const showCollapse =
+      loaded && row.completed && manuallyExpanded.has(row.set_number)
+
+    if (!hint && !showCollapse) return null
+
     return (
       <div className="flex items-center justify-between gap-2 text-[10px] px-3 pb-1.5">
         <span className="text-slate-400 tabular-nums">
-          Last: <span className="font-medium text-slate-500">{hint}</span>
+          {hint && (
+            <>
+              Last: <span className="font-medium text-slate-500">{hint}</span>
+            </>
+          )}
         </span>
-        {improved && (
-          <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
-            ↑ Beat last
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {improved && (
+            <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
+              ↑ Beat last
+            </span>
+          )}
+          {showCollapse && (
+            <button
+              type="button"
+              onClick={() => collapseRow(row.set_number)}
+              className="inline-flex items-center gap-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+              aria-label="Collapse this set"
+            >
+              <ChevronUp size={11} />
+              Collapse
+            </button>
+          )}
+        </div>
       </div>
     )
   }
@@ -226,6 +279,49 @@ export function ExerciseSetLogger({
       <div className="h-6 w-6 bg-slate-200/70 rounded-md animate-pulse shrink-0" />
     )
 
+  // True when a row should render as the auto-collapsed one-liner. Forced
+  // expansion (after a tap) wins over completed-state.
+  const isAutoCollapsed = (row: RowState) =>
+    loaded && row.completed && !manuallyExpanded.has(row.set_number)
+
+  // One-line summary for an auto-collapsed completed row. Click anywhere on
+  // it to re-expand the full editing UI.
+  const renderCollapsedRow = (row: RowState) => {
+    const summary = isCardio
+      ? row.duration_performed_seconds != null
+        ? formatDuration(row.duration_performed_seconds)
+        : '—'
+      : (() => {
+          const w = row.weight_performed
+          const r = row.reps_performed
+          if (w !== '' && r !== '') return `${w} × ${r}`
+          if (r !== '') return `${r} reps`
+          if (w !== '') return `${w}`
+          return '—'
+        })()
+    return (
+      <button
+        key={row.set_number}
+        type="button"
+        onClick={() => expandRow(row.set_number)}
+        className="w-full px-3 py-2 flex items-center gap-2 text-left bg-emerald-50/40 hover:bg-emerald-50 transition-colors cursor-pointer"
+        aria-expanded={false}
+        aria-label={`Expand set ${row.set_number}`}
+      >
+        <span className="text-sm font-semibold text-slate-700 tabular-nums">
+          {isCardio && rows.length === 1 ? '' : `Set ${row.set_number}`}
+        </span>
+        <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-emerald-500 text-white shrink-0">
+          <Check size={11} />
+        </span>
+        <span className="text-sm text-slate-600 tabular-nums truncate flex-1">
+          {summary}
+        </span>
+        <span className="text-[10px] text-slate-400 shrink-0">Tap to edit</span>
+      </button>
+    )
+  }
+
   if (isCardio) {
     return (
       <div className="mt-3 bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -238,6 +334,7 @@ export function ExerciseSetLogger({
         </div>
         <div className="divide-y divide-slate-100">
           {rows.map(row => {
+            if (isAutoCollapsed(row)) return renderCollapsedRow(row)
             const targetLabel =
               row.target_duration_seconds != null && row.target_duration_seconds > 0
                 ? formatDuration(row.target_duration_seconds)
@@ -321,7 +418,9 @@ export function ExerciseSetLogger({
       </div>
 
       <div className="divide-y divide-slate-100">
-        {rows.map(row => (
+        {rows.map(row => {
+          if (isAutoCollapsed(row)) return renderCollapsedRow(row)
+          return (
           <div
             key={row.set_number}
             className={`transition-colors ${row.completed ? 'bg-emerald-50/40' : ''}`}
@@ -393,7 +492,8 @@ export function ExerciseSetLogger({
             </div>
             <PriorHint row={row} />
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
