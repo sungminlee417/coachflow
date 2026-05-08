@@ -237,7 +237,8 @@ export async function fetchActiveMealPlanAssignments(
           id, meal_type, name, description, days_of_week, time, order_index,
           foods (
             id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index,
-            ingredients ( id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index )
+            ingredients ( id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index ),
+            food_alternatives ( id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index )
           )
         )
       )
@@ -256,7 +257,7 @@ export async function fetchActiveMealPlanAssignments(
     snack: 3,
   }
 
-  return ((data ?? []) as MealPlanAssignmentRow[])
+  return ((data ?? []) as unknown as MealPlanAssignmentRow[])
     .map((item): MealPlanAssignment => {
       const plan = unwrapJoin<MealPlanJoinedRow>(item.meal_plan)
       return {
@@ -277,12 +278,44 @@ export async function fetchActiveMealPlanAssignments(
               foods: (m.foods ?? [])
                 .slice()
                 .sort((a: Food, b: Food) => a.order_index - b.order_index)
-                .map(f => ({
-                  ...f,
-                  ingredients: (f.ingredients ?? [])
-                    .slice()
-                    .sort((a: Ingredient, b: Ingredient) => a.order_index - b.order_index),
-                })),
+                .map(f => {
+                  // PostgREST returns the join as `food_alternatives` on the
+                  // food row; lift it into the public `alternatives` shape
+                  // (full FoodAlternative records, not just names).
+                  const fWithAlts = f as Food & {
+                    food_alternatives?: Array<{
+                      id?: string
+                      name: string
+                      quantity: string | null
+                      calories: number | null
+                      protein_grams: number | null
+                      carbs_grams: number | null
+                      fat_grams: number | null
+                      order_index: number
+                    }>
+                  }
+                  return {
+                    ...f,
+                    ingredients: (f.ingredients ?? [])
+                      .slice()
+                      .sort((a: Ingredient, b: Ingredient) => a.order_index - b.order_index),
+                    alternatives: (fWithAlts.food_alternatives ?? [])
+                      .slice()
+                      .sort((a, b) => a.order_index - b.order_index)
+                      .map(alt => ({
+                        id: alt.id,
+                        name: alt.name,
+                        // Older rows had only `name` populated; coerce to the
+                        // empty/null defaults so consumers can render uniformly.
+                        quantity: alt.quantity ?? '',
+                        calories: alt.calories,
+                        protein_grams: alt.protein_grams,
+                        carbs_grams: alt.carbs_grams,
+                        fat_grams: alt.fat_grams,
+                        order_index: alt.order_index,
+                      })),
+                  }
+                }),
             }))
             .sort((a, b) => {
               // Timed meals chronological; untimed fall back to type then index.

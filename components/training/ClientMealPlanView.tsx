@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { WeekSelector } from '@/components/ui/WeekSelector'
-import { Flame, Beef, Wheat, Droplet, Trash2 } from 'lucide-react'
+import { Bell, Flame, Beef, Wheat, Droplet, Trash2, X } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -24,16 +24,6 @@ interface ClientMealPlanViewProps {
   clientId: string
 }
 
-const DAY_SHORT: Record<number, string> = {
-  0: 'Sun',
-  1: 'Mon',
-  2: 'Tue',
-  3: 'Wed',
-  4: 'Thu',
-  5: 'Fri',
-  6: 'Sat',
-}
-
 export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps) {
   const supabase = useSupabase()
   const [assignments, setAssignments] = useState<MealPlanAssignment[]>([])
@@ -43,6 +33,16 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
   // per-meal toggle's checked state and the daily progress chip.
   const [eatenMealIds, setEatenMealIds] = useState<Set<string>>(new Set())
   const [logsLoaded, setLogsLoaded] = useState(false)
+  // Per-session dismissal of the missed-meal banner so the user can hide it
+  // without it nagging them again on the same day.
+  const [missedBannerDismissed, setMissedBannerDismissed] = useState(false)
+  // Tick every minute so the missed-meal banner updates as scheduled times
+  // come and go without requiring a route change.
+  const [, setMinuteTick] = useState(0)
+  useEffect(() => {
+    const handle = window.setInterval(() => setMinuteTick(n => n + 1), 60_000)
+    return () => window.clearInterval(handle)
+  }, [])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [pendingUnassign, setPendingUnassign] = useState<{ id: string; name: string } | null>(null)
 
@@ -76,6 +76,35 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAssignments() }, [selectedDate])
+
+  // Reset the banner-dismiss state whenever the user navigates to a new date —
+  // a fresh day deserves a fresh nudge.
+  useEffect(() => {
+    setMissedBannerDismissed(false)
+  }, [selectedDate])
+
+  // 30-minute grace period after the scheduled time before we count a meal
+  // as "missed". Avoids nagging the user the moment the clock ticks past.
+  const MISSED_GRACE_MS = 30 * 60 * 1000
+
+  const missedMeals = (() => {
+    if (selectedDate !== todayISO()) return [] as { id: string; name: string; time: string }[]
+    const now = Date.now()
+    const out: { id: string; name: string; time: string }[] = []
+    for (const a of assignments) {
+      for (const m of a.meal_plan.meals) {
+        if (!m.id || !m.time) continue
+        if (eatenMealIds.has(m.id)) continue
+        const [h, mi] = m.time.split(':').map(Number)
+        if (Number.isNaN(h) || Number.isNaN(mi)) continue
+        const scheduled = new Date()
+        scheduled.setHours(h, mi, 0, 0)
+        if (now <= scheduled.getTime() + MISSED_GRACE_MS) continue
+        out.push({ id: m.id, name: m.name, time: m.time })
+      }
+    }
+    return out
+  })()
 
   // Load meal_logs for the selected date so the toggle reflects what the user
   // already checked off. Independent of fetchAssignments — runs in parallel.
@@ -182,6 +211,39 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
         </div>
       )}
 
+      {!loading &&
+        logsLoaded &&
+        !missedBannerDismissed &&
+        missedMeals.length > 0 && (
+          <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-start gap-3">
+            <Bell size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800">
+                {missedMeals.length === 1
+                  ? "Don't forget to log this meal"
+                  : `Don't forget to log ${missedMeals.length} meals`}
+              </p>
+              <ul className="text-xs text-amber-700 mt-1 space-y-0.5">
+                {missedMeals.map(m => (
+                  <li key={m.id}>
+                    <span className="font-medium">{m.name || 'Untitled meal'}</span>
+                    {' · '}
+                    <span className="tabular-nums">{formatTime(m.time)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMissedBannerDismissed(true)}
+              className="h-7 w-7 flex items-center justify-center rounded-md text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer shrink-0"
+              aria-label="Dismiss reminder"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
       {loading ? (
         <div className="space-y-4">
           {Array.from({ length: 2 }).map((_, i) => (
@@ -276,20 +338,6 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                                   Eaten
                                 </span>
                               )}
-                              {meal.days_of_week && meal.days_of_week.length > 0 && (
-                                <div className="flex gap-1 flex-wrap">
-                                  {[...meal.days_of_week]
-                                    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
-                                    .map(d => (
-                                      <span
-                                        key={d}
-                                        className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5"
-                                      >
-                                        {DAY_SHORT[d]}
-                                      </span>
-                                    ))}
-                                </div>
-                              )}
                             </div>
                             {meal.id && (
                               <MealLogToggle
@@ -379,6 +427,38 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                                               )}
                                             </li>
                                           ))}
+                                        </ul>
+                                      )}
+                                      {food.alternatives && food.alternatives.length > 0 && (
+                                        <ul className="mt-1 ml-4 pl-3 border-l-2 border-emerald-200 space-y-0.5">
+                                          {food.alternatives.map((alt, i) => {
+                                            const macroBits: string[] = []
+                                            if (alt.calories != null && alt.calories > 0)
+                                              macroBits.push(`${roundMacro(alt.calories)} cal`)
+                                            if (alt.protein_grams != null && alt.protein_grams > 0)
+                                              macroBits.push(`${roundMacro(alt.protein_grams)}g P`)
+                                            return (
+                                              <li
+                                                key={alt.id ?? i}
+                                                className="text-xs text-slate-600 flex items-baseline justify-between gap-3"
+                                              >
+                                                <span>
+                                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-emerald-700 mr-1.5">
+                                                    or
+                                                  </span>
+                                                  <span className="font-medium">{alt.name}</span>
+                                                  {alt.quantity && (
+                                                    <span className="text-slate-400"> — {alt.quantity}</span>
+                                                  )}
+                                                </span>
+                                                {macroBits.length > 0 && (
+                                                  <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                                                    {macroBits.join(' · ')}
+                                                  </span>
+                                                )}
+                                              </li>
+                                            )
+                                          })}
                                         </ul>
                                       )}
                                     </li>

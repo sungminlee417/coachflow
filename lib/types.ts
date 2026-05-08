@@ -144,6 +144,22 @@ export interface Ingredient {
   order_index: number
 }
 
+// Coach-defined fallback for a food, with its own quantity + macros so the
+// trainee knows exactly how much of the substitute to eat (218 cal of rice is
+// a different weight than 218 cal of potato). Quantity and macros are all
+// optional; legacy rows that only have a name still render as a name chip.
+export interface FoodAlternative {
+  id?: string
+  food_id?: string
+  name: string
+  quantity: string
+  calories: number | null
+  protein_grams: number | null
+  carbs_grams: number | null
+  fat_grams: number | null
+  order_index: number
+}
+
 export interface Food {
   id?: string
   meal_id?: string
@@ -155,6 +171,10 @@ export interface Food {
   fat_grams: number | null
   order_index: number
   ingredients?: Ingredient[]
+  // Coach-defined fallbacks ("Greek yogurt", "Cottage cheese") shown beneath
+  // the food on the trainee side. Display-only — picking one doesn't record
+  // a per-day substitution.
+  alternatives?: FoodAlternative[]
 }
 
 export interface Meal {

@@ -32,7 +32,15 @@ import { DragHandle, type DragHandleProps } from '@/components/ui/SortableList'
 import { useDirtyState } from '@/lib/use-dirty-state'
 import { ArrowLeft, Plus, X, ChevronDown, Save, ChevronRight, Copy } from 'lucide-react'
 import { computeFoodMacros, computeMealMacros, roundMacro, formatTime } from '@/lib/utils'
-import type { Food, Ingredient, Meal, MealPlan, MealType, DayOfWeek } from '@/lib/types'
+import type {
+  Food,
+  FoodAlternative,
+  Ingredient,
+  Meal,
+  MealPlan,
+  MealType,
+  DayOfWeek,
+} from '@/lib/types'
 
 // Local meal type: server `Meal` + a stable client-side key for drag-and-drop
 // + ordered identity across renders. _dndKey isn't persisted — it just gives
@@ -191,6 +199,16 @@ const emptyIngredient = (orderIndex: number): Ingredient => ({
   order_index: orderIndex,
 })
 
+const emptyFoodAlternative = (orderIndex: number): FoodAlternative => ({
+  name: '',
+  quantity: '',
+  calories: null,
+  protein_grams: null,
+  carbs_grams: null,
+  fat_grams: null,
+  order_index: orderIndex,
+})
+
 function MacroSummary({
   macros,
   className = '',
@@ -268,7 +286,9 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
     try {
       const { data: mealRows, error } = await supabase
         .from('meals')
-        .select('*, foods ( *, ingredients (*) )')
+        .select(
+          '*, foods ( *, ingredients (*), food_alternatives ( id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index ) )'
+        )
         .eq('meal_plan_id', mealPlan.id)
         .order('order_index')
 
@@ -289,6 +309,30 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
             ingredients: (f.ingredients || [])
               .slice()
               .sort((a: Ingredient, b: Ingredient) => a.order_index - b.order_index),
+            alternatives: (
+              (f.food_alternatives ?? []) as Array<{
+                id?: string
+                name: string
+                quantity: string | null
+                calories: number | null
+                protein_grams: number | null
+                carbs_grams: number | null
+                fat_grams: number | null
+                order_index: number
+              }>
+            )
+              .slice()
+              .sort((a, b) => a.order_index - b.order_index)
+              .map(alt => ({
+                id: alt.id,
+                name: alt.name,
+                quantity: alt.quantity ?? '',
+                calories: alt.calories,
+                protein_grams: alt.protein_grams,
+                carbs_grams: alt.carbs_grams,
+                fat_grams: alt.fat_grams,
+                order_index: alt.order_index,
+              })),
           })),
         // Reuse the server id as the DnD key so identity is stable across
         // unrelated state updates.
@@ -456,6 +500,50 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
     )
     ingredients.forEach((ing, i) => (ing.order_index = i))
     foods[foodIndex] = { ...foods[foodIndex], ingredients }
+    updated[mealIndex] = { ...updated[mealIndex], foods }
+    setMeals(updated)
+  }
+
+  // Food alternatives — coach-defined fallbacks ("Greek yogurt" instead of
+  // "Eggs"). Each alternative carries its own quantity + macros since a
+  // calorie-equivalent portion of a different food can have very different
+  // weights and macros.
+  const addFoodAlternative = (mealIndex: number, foodIndex: number) => {
+    const updated = [...meals]
+    const foods = [...(updated[mealIndex].foods || [])]
+    const current = foods[foodIndex].alternatives ?? []
+    foods[foodIndex] = {
+      ...foods[foodIndex],
+      alternatives: [...current, emptyFoodAlternative(current.length)],
+    }
+    updated[mealIndex] = { ...updated[mealIndex], foods }
+    setMeals(updated)
+  }
+
+  const updateFoodAlternative = (
+    mealIndex: number,
+    foodIndex: number,
+    altIndex: number,
+    field: keyof FoodAlternative,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    value: any
+  ) => {
+    const updated = [...meals]
+    const foods = [...(updated[mealIndex].foods || [])]
+    const current = [...(foods[foodIndex].alternatives ?? [])]
+    current[altIndex] = { ...current[altIndex], [field]: value }
+    foods[foodIndex] = { ...foods[foodIndex], alternatives: current }
+    updated[mealIndex] = { ...updated[mealIndex], foods }
+    setMeals(updated)
+  }
+
+  const removeFoodAlternative = (mealIndex: number, foodIndex: number, altIndex: number) => {
+    const updated = [...meals]
+    const foods = [...(updated[mealIndex].foods || [])]
+    const current = (foods[foodIndex].alternatives ?? [])
+      .filter((_, i) => i !== altIndex)
+      .map((alt, i) => ({ ...alt, order_index: i }))
+    foods[foodIndex] = { ...foods[foodIndex], alternatives: current }
     updated[mealIndex] = { ...updated[mealIndex], foods }
     setMeals(updated)
   }
@@ -642,6 +730,45 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
           .from('ingredients')
           .insert(ingredientsToInsert)
         if (ingError) throw ingError
+      }
+
+      // Food alternatives: parallel structure to ingredients. Old rows were
+      // wiped via the foods cascade-delete above, so this is pure insert.
+      // Each alternative carries its own quantity + macros so portion sizes
+      // (218 cal of rice ≠ 218 cal of potato) round-trip correctly.
+      const altsToInsert: {
+        food_id: string
+        name: string
+        quantity: string | null
+        calories: number | null
+        protein_grams: number | null
+        carbs_grams: number | null
+        fat_grams: number | null
+        order_index: number
+      }[] = []
+      foodLocalRefs.forEach((ref, i) => {
+        const insertedFood = insertedFoods[i]
+        if (!insertedFood) return
+        const food = meals[ref.mealIndex].foods?.[ref.foodIndex]
+        ;(food?.alternatives ?? [])
+          .filter(alt => alt.name.trim().length > 0)
+          .forEach((alt, j) => {
+            altsToInsert.push({
+              food_id: insertedFood.id,
+              name: alt.name.trim(),
+              quantity: alt.quantity?.trim() ? alt.quantity.trim() : null,
+              calories: alt.calories,
+              protein_grams: alt.protein_grams,
+              carbs_grams: alt.carbs_grams,
+              fat_grams: alt.fat_grams,
+              order_index: j,
+            })
+          })
+      })
+      if (altsToInsert.length > 0) {
+        // Best-effort — if the table or new columns don't exist on this
+        // deployment yet, the rest of the save still succeeded.
+        await supabase.from('food_alternatives').insert(altsToInsert)
       }
 
       onClose()
@@ -1018,6 +1145,53 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                                 </div>
                               </>
                             )}
+
+                            {/* Coach-defined alternatives. Display-only on the
+                                trainee side ("If no eggs, try Greek yogurt"). */}
+                            <div className="mt-2 ml-4 pl-3 border-l-2 border-slate-200">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                                  Alternatives
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => addFoodAlternative(index, foodIndex)}
+                                  className="text-[10px] font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                                >
+                                  + Add Alternative
+                                </button>
+                              </div>
+                              {(food.alternatives ?? []).length === 0 ? (
+                                <p className="text-[10px] text-slate-400 italic px-1 py-0.5">
+                                  None yet. Add &ldquo;Greek yogurt&rdquo; or &ldquo;Cottage
+                                  cheese&rdquo; so clients can swap if they don&rsquo;t have
+                                  the original on hand.
+                                </p>
+                              ) : (
+                                <div className="space-y-1">
+                                  {/* Reuse IngredientRow — FoodAlternative
+                                      shares its field shape (name + qty + macros). */}
+                                  {(food.alternatives ?? []).map((alt, altIdx) => (
+                                    <IngredientRow
+                                      key={altIdx}
+                                      ingredient={alt}
+                                      onChange={(field, value) =>
+                                        updateFoodAlternative(
+                                          index,
+                                          foodIndex,
+                                          altIdx,
+                                          field as keyof FoodAlternative,
+                                          value
+                                        )
+                                      }
+                                      onRemove={() =>
+                                        removeFoodAlternative(index, foodIndex, altIdx)
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )
                       })}
