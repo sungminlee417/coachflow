@@ -239,3 +239,4 @@ export interface InviteCode {
   expires_at: string | null
   created_at: string
 }
+

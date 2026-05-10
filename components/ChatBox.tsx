@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { createClient } from "@/lib/supabase/client"; // supabase client
+import { useSupabase } from "@/lib/use-supabase"; // supabase client
+import type { Client } from "@/lib/types";
 // passing whole client object (supabase)
-interface Client {
-  id: string;
-  full_name: string;
-  email: string;
-}
 interface Messages {
   id: string;
   conversation_id: string;
@@ -18,6 +14,7 @@ interface Messages {
 
 type ChatBoxProps = {
   clientId: string;
+  coachId: string;
   client: Client;
   open: boolean;
   onClose: () => void;
@@ -31,16 +28,10 @@ export default function ChatBox({
   onClose,
   client,
 }: ChatBoxProps) {
-  const supabase = createClient();
-  // state - some that persist (value that persis on component render)
-  // component -> fragment of jsx/tsx logic for it
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  // array destructing 1. the current value 2. setter function
+  const supabase = useSupabase(); // state - some that persist (value that persis on component render) /// component -> fragment of jsx/tsx logic for it
+  const [conversationId, setConversationId] = useState<string | null>(null); // array destructing 1. the current value 2. setter function
   const [isMinimized, setIsMinimized] = useState(false); // const -> variable can't be reassigned
-  const minimize = () => setIsMinimized(!isMinimized); // set it to true
-  // with state, never assign variable directly, use setter function
-  // built in react hook that runs callback on mount
-  // TODO: message                creates state/ <> generic(typescript syntax) /[] array of messages
+  const minimize = () => setIsMinimized(!isMinimized); // set it to true //                creates state/ <> generic(typescript syntax) /[] array of messages
   const [messages, setMessages] = useState<Messages[]>([]); //empty array because no messages are loaded.
   const [messageText, setMessageText] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
