@@ -7,7 +7,7 @@ import { IconButton } from '@/components/ui/IconButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { showToast } from '@/components/ui/Toast'
 import { ChevronDown, ChevronRight, HeartPulse, Trash2 } from 'lucide-react'
-import { Skeleton } from '@/components/ui/Skeleton'
+import { AssignmentCardSkeleton } from '@/components/ui/Skeleton'
 import { formatDuration, todayISO, formatLongDate } from '@/lib/utils'
 import { fetchActiveWorkoutAssignments } from '@/lib/queries'
 import type { Exercise, WorkoutAssignment } from '@/lib/types'
@@ -132,14 +132,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
       {loading ? (
         <div className="space-y-4">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-xl border border-slate-200 p-6"
-            >
-              <Skeleton className="h-5 w-1/3 mb-2" />
-              <Skeleton className="h-3 w-2/3 mb-4" />
-              <Skeleton className="h-3 w-32" />
-            </div>
+            <AssignmentCardSkeleton key={i} />
           ))}
         </div>
       ) : assignments.length === 0 ? (

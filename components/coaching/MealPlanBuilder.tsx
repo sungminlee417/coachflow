@@ -247,6 +247,11 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
   const [saving, setSaving] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [expandedMeals, setExpandedMeals] = useState<Set<number>>(new Set())
+  // _dndKey → slot key captured at expand-time. While a meal is expanded,
+  // its rendered slot stays the same as when expansion began so editing the
+  // time field doesn't make the card jump out from under the user. Cleared
+  // on collapse / removal / fresh load.
+  const [pinnedSlotKey, setPinnedSlotKey] = useState<Map<string, string>>(new Map())
   const [snapshotReady, setSnapshotReady] = useState(!mealPlan?.id)
 
   const isDirty = useDirtyState(
@@ -257,11 +262,26 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
 
   const foodKey = (mealIndex: number, foodIndex: number) => `${mealIndex}-${foodIndex}`
 
+  const slotKeyOf = (m: DraftMeal): string =>
+    `${m.meal_type}::${m.time ?? '__notime'}`
+
   const toggleMealExpanded = (index: number) => {
+    const meal = meals[index]
     setExpandedMeals(prev => {
       const next = new Set(prev)
-      if (next.has(index)) next.delete(index)
+      const wasExpanded = next.has(index)
+      if (wasExpanded) next.delete(index)
       else next.add(index)
+      // Pin on expand, drop on collapse — keyed by stable _dndKey so an
+      // index shuffle (drag, sort) doesn't strand the pin on the wrong meal.
+      if (meal) {
+        setPinnedSlotKey(p => {
+          const np = new Map(p)
+          if (wasExpanded) np.delete(meal._dndKey)
+          else np.set(meal._dndKey, slotKeyOf(meal))
+          return np
+        })
+      }
       return next
     })
   }
@@ -339,6 +359,7 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
         _dndKey: m.id,
       }))
       setMeals(sortMealsByTime(normalized))
+      setPinnedSlotKey(new Map())
     } catch {
     } finally {
       setSnapshotReady(true)
@@ -404,15 +425,26 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
   const updateMeal = (index: number, field: keyof Meal, value: any) => {
     const updated = [...meals]
     updated[index] = { ...updated[index], [field]: value }
-    // Re-sort whenever a time changes; timed meals must always sit at their
-    // chronological position relative to other timed meals.
-    setMeals(field === 'time' ? sortMealsByTime(updated) : updated)
+    // Don't re-sort on time change while the user is actively editing —
+    // jumping the row mid-edit is jarring. The slot view pins expanded
+    // meals to their original slot until collapsed; on collapse the
+    // grouping (and the flat sort, on save) picks up the new value.
+    setMeals(updated)
   }
 
   const removeMeal = (index: number) => {
+    const removed = meals[index]
     const updated = meals.filter((_, i) => i !== index)
     updated.forEach((m, i) => (m.order_index = i))
     setMeals(updated)
+    if (removed?._dndKey) {
+      setPinnedSlotKey(p => {
+        if (!p.has(removed._dndKey)) return p
+        const np = new Map(p)
+        np.delete(removed._dndKey)
+        return np
+      })
+    }
   }
 
   // dnd-kit sensors with a small distance threshold so taps inside a meal
@@ -779,6 +811,62 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
     }
   }
 
+  // Group meals by `(meal_type, time)` slot so similar entries (e.g., the
+  // Mon–Thu version of breakfast and the Fri-only version) cluster under one
+  // header instead of getting "Meal 8 / Meal 9" treatment in a flat list.
+  // Slots are ordered: timed first chronologically, then untimed by meal_type.
+  const MEAL_TYPE_ORDER: Record<MealType, number> = {
+    breakfast: 0,
+    lunch: 1,
+    dinner: 2,
+    snack: 3,
+  }
+  type MealSlot = {
+    key: string
+    meal_type: MealType
+    time: string | null
+    meals: DraftMeal[]
+  }
+  // Decode a slot key back into its meal_type + time so a pinned key can
+  // produce a synthetic slot when the meal's actual time has drifted away
+  // from where it was at expand-time.
+  const decodeSlotKey = (
+    key: string
+  ): { meal_type: MealType; time: string | null } => {
+    const sep = key.indexOf('::')
+    const mt = (sep > 0 ? key.slice(0, sep) : key) as MealType
+    const t = sep > 0 ? key.slice(sep + 2) : '__notime'
+    return { meal_type: mt, time: t === '__notime' ? null : t }
+  }
+
+  const mealSlots: MealSlot[] = (() => {
+    const map = new Map<string, MealSlot>()
+    for (const m of meals) {
+      // Pinned slot wins while the meal is being edited, so it doesn't jump
+      // out from under the user when they change the time field.
+      const naturalKey = slotKeyOf(m)
+      const useKey = pinnedSlotKey.get(m._dndKey) ?? naturalKey
+      let existing = map.get(useKey)
+      if (!existing) {
+        const decoded = decodeSlotKey(useKey)
+        existing = {
+          key: useKey,
+          meal_type: decoded.meal_type,
+          time: decoded.time,
+          meals: [],
+        }
+        map.set(useKey, existing)
+      }
+      existing.meals.push(m)
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.time && b.time) return a.time.localeCompare(b.time)
+      if (a.time) return -1
+      if (b.time) return 1
+      return MEAL_TYPE_ORDER[a.meal_type] - MEAL_TYPE_ORDER[b.meal_type]
+    })
+  })()
+
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
@@ -844,11 +932,42 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
             items={meals.map(m => m._dndKey)}
             strategy={verticalListSortingStrategy}
           >
-        <div className="space-y-3">
-          {meals.map((meal, index) => {
-            const mealMacros = computeMealMacros(meal)
-            const isExpanded = expandedMeals.has(index)
-            return (
+        <div className="space-y-6">
+          {mealSlots.map(slot => (
+            <div key={slot.key}>
+              {/* Slot header — `Breakfast · 8:00 AM`. Identical-time variants
+                  cluster here so Mon-Thu and Fri versions of the same meal are
+                  visibly siblings, not sequential "Meal 8 / Meal 9". */}
+              <div className="flex items-baseline gap-2 mb-2 px-1 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+                  {slot.meal_type}
+                </span>
+                {slot.time ? (
+                  <span className="text-xs font-semibold text-slate-700 tabular-nums">
+                    {formatTime(slot.time)}
+                  </span>
+                ) : (
+                  <span className="text-[10px] uppercase tracking-widest text-slate-400">
+                    No time set
+                  </span>
+                )}
+                <span className="text-[10px] text-slate-400 ml-auto tabular-nums">
+                  {slot.meals.length}{' '}
+                  {slot.meals.length === 1 ? 'option' : 'options'}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {slot.meals.map(meal => {
+                  const index = meals.indexOf(meal)
+                  const mealMacros = computeMealMacros(meal)
+                  const isExpanded = expandedMeals.has(index)
+                  // Day pills on the collapsed header — main differentiator
+                  // between two meals in the same slot.
+                  const dayLabels = (meal.days_of_week ?? [])
+                    .slice()
+                    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+                    .map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d])
+                  return (
             <SortableMealShell key={meal._dndKey} id={meal._dndKey}>
               {drag => (
               <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -864,24 +983,29 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                     <span className="text-slate-400 group-hover:text-slate-700 transition-transform">
                       {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </span>
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide shrink-0">
-                      Meal {index + 1}
-                    </span>
                     {meal.name && (
                       <span className="text-sm font-medium text-slate-900 truncate">
                         {meal.name}
                       </span>
                     )}
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 shrink-0">
-                      {meal.meal_type}
-                    </span>
-                    {meal.time && (
-                      <span className="text-xs text-slate-500 shrink-0 tabular-nums">
-                        {formatTime(meal.time)}
+                    {dayLabels.length > 0 ? (
+                      <div className="flex gap-1.5 flex-wrap shrink-0">
+                        {dayLabels.map(d => (
+                          <span
+                            key={d}
+                            className="text-[9px] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-1.5 py-px"
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[9px] uppercase tracking-widest text-slate-400 shrink-0">
+                        Every day
                       </span>
                     )}
                     {!isExpanded && (
-                      <span className="text-xs text-slate-400 shrink-0 ml-auto pr-2 hidden sm:inline">
+                      <span className="text-xs text-slate-400 shrink-0 ml-auto pr-2 hidden sm:inline tabular-nums">
                         {Math.round(mealMacros.calories)} cal
                       </span>
                     )}
@@ -927,8 +1051,34 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                   </div>
                 )}
 
-                {isExpanded && (
+                {isExpanded && (() => {
+                  // While pinned, surface a small hint when the meal's
+                  // current type+time no longer matches where it's parked,
+                  // so the coach knows the row will jump on collapse.
+                  const pinned = pinnedSlotKey.get(meal._dndKey)
+                  const naturalKey = slotKeyOf(meal)
+                  const driftHint = pinned && pinned !== naturalKey
+                    ? (() => {
+                        const { meal_type, time } = decodeSlotKey(naturalKey)
+                        const label = time
+                          ? `${meal_type} · ${formatTime(time)}`
+                          : `${meal_type} (no time)`
+                        return label
+                      })()
+                    : null
+                  return (
                   <div className="mt-4">
+                    {driftHint && (
+                      <div className="mb-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 flex items-center gap-1.5">
+                        <span className="font-semibold uppercase tracking-widest text-[9px]">
+                          Will move
+                        </span>
+                        <span className="text-slate-700">→ {driftHint}</span>
+                        <span className="ml-auto text-[10px] text-amber-600">
+                          on close
+                        </span>
+                      </div>
+                    )}
                     <div className="mb-3">
                       <label className="block text-xs text-slate-500 mb-2">Days</label>
                       <DayOfWeekSelector
@@ -1199,12 +1349,16 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                   )}
                 </div>
                   </div>
-                )}
+                  )
+                })()}
               </div>
               )}
             </SortableMealShell>
             )
-          })}
+                })}
+              </div>
+            </div>
+          ))}
         </div>
           </SortableContext>
         </DndContext>
@@ -1226,7 +1380,7 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
 
       <div className="h-24" aria-hidden />
 
-      <div className="sticky bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
+      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
           <span className="tabular-nums">
             <span className="font-semibold text-slate-700">{meals.length}</span>{' '}

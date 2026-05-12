@@ -76,12 +76,16 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
   // Logged in - validate and accept the invite
   const { data: invite, error: inviteError } = await supabase
     .from('invite_codes')
-    .select('id, coach_id, status, times_used, max_uses, expires_at')
+    .select('id, coach_id, status, times_used, max_uses, expires_at, revoked_at')
     .eq('code', code)
     .single()
 
   if (inviteError || !invite) {
     return <AcceptInvite status="error" message="Invalid invite code." />
+  }
+
+  if (invite.revoked_at) {
+    return <AcceptInvite status="error" message="This invite code has been revoked by the coach." />
   }
 
   if (invite.status !== 'pending') {

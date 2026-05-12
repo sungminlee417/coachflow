@@ -19,7 +19,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   return (
     <button
       ref={ref}
-      className={`p-2 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${toneClasses[tone]} ${className}`}
+      // 2.5 padding gives ~40px square on mobile (closer to the Apple 44pt
+      // touch-target recommendation). Cluster-spacing risk is real on the
+      // builder rows where multiple IconButtons sit side-by-side.
+      className={`p-2.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${toneClasses[tone]} ${className}`}
       {...props}
     />
   )

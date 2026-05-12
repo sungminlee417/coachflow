@@ -127,8 +127,7 @@ export default function MeasurementForm({
 
   return (
     <Modal open={open} title={initial ? 'Edit Measurement' : 'Log Measurement'} onClose={requestClose}>
-      <div className="flex flex-col max-h-[75vh] -mx-1">
-      <div className="flex-1 overflow-y-auto px-1 space-y-4">
+      <div className="space-y-4">
         <Field id="m-date" label="Date">
           <DatePicker
             id="m-date"
@@ -206,7 +205,7 @@ export default function MeasurementForm({
         </Field>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 pt-4 mt-2 border-t border-slate-100 px-1">
+      <div className="flex flex-wrap items-center gap-2 pt-4 mt-2 border-t border-slate-100">
         <UnsavedBadge visible={isDirty && !saving} />
         <div className="flex-1" />
         <Button variant="secondary" onClick={requestClose}>
@@ -215,7 +214,6 @@ export default function MeasurementForm({
         <Button onClick={handleSave} loading={saving} disabled={!isDirty}>
           {saving ? 'Saving…' : initial ? 'Save Changes' : 'Log Measurement'}
         </Button>
-      </div>
       </div>
 
       <ConfirmDialog

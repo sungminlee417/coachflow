@@ -141,6 +141,21 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
         programId = data.id
       }
 
+      // Capture which workouts were on the program *before* the save so we
+      // can compute what got added and fan those out to clients who already
+      // have the program assigned. Removed workouts intentionally don't
+      // touch existing client assignments — we never auto-unassign.
+      const previousWorkoutIds = new Set<string>()
+      if (program?.id) {
+        const { data: existing } = await supabase
+          .from('workout_program_workouts')
+          .select('workout_id')
+          .eq('program_id', programId)
+        for (const r of (existing ?? []) as { workout_id: string }[]) {
+          previousWorkoutIds.add(r.workout_id)
+        }
+      }
+
       // Replace strategy on the join table — these rows are pure metadata,
       // never referenced by anything else, so a clean delete-then-reinsert
       // doesn't risk client data.
@@ -158,6 +173,52 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
         }))
         const { error } = await supabase.from('workout_program_workouts').insert(rows)
         if (error) throw error
+      }
+
+      // ── Auto-fan-out: any newly-added workouts get assigned to every
+      // client that already has this program. Purely additive — uses the
+      // same upsert + ignoreDuplicates pattern as the assign flow, so it
+      // can never overwrite or delete existing client data.
+      const addedWorkouts = members.filter(m => !previousWorkoutIds.has(m.id))
+      if (program?.id && addedWorkouts.length > 0) {
+        try {
+          const { data: tracked } = await supabase
+            .from('program_assignments')
+            .select('client_id, coach_id, cycle_anchor_date')
+            .eq('program_id', programId)
+          const tracking = (tracked ?? []) as {
+            client_id: string
+            coach_id: string
+            cycle_anchor_date: string | null
+          }[]
+          if (tracking.length > 0) {
+            const newRows = tracking.flatMap(t =>
+              addedWorkouts.map(w => ({
+                workout_id: w.id,
+                client_id: t.client_id,
+                coach_id: t.coach_id,
+                start_date: null,
+                end_date: null,
+                // Cycle workouts use the anchor that was set when the
+                // program was originally assigned to this client, so the
+                // rotation stays in phase with the rest of the program.
+                cycle_anchor_date:
+                  w.cycle_length && w.cycle_position
+                    ? t.cycle_anchor_date ?? new Date().toISOString().slice(0, 10)
+                    : null,
+                notes: null,
+              }))
+            )
+            await supabase
+              .from('workout_assignments')
+              .upsert(newRows, {
+                onConflict: 'workout_id,client_id',
+                ignoreDuplicates: true,
+              })
+          }
+        } catch {
+          // Auto-sync is best-effort; the program save itself already succeeded.
+        }
       }
 
       showToast(program?.id ? 'Program updated' : 'Program created')
@@ -290,7 +351,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
 
       <div className="h-24" aria-hidden />
 
-      <div className="sticky bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
+      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
           <span className="tabular-nums">
             <span className="font-semibold text-slate-700">{members.length}</span>{' '}

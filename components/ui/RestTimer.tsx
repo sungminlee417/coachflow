@@ -187,8 +187,9 @@ function RestTimerBar() {
       aria-live="polite"
       // Sits above any sticky save bar (z-30 there, z-40 here). Bottom safe-area
       // padding mirrors the save bar so it doesn't sit under the home indicator.
-      className="fixed left-3 right-3 bottom-3 z-40 sm:left-auto sm:right-4 sm:max-w-sm pointer-events-none"
-      style={{ bottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      // On mobile, lift above the bottom tab bar (~3.5rem + safe-area).
+      // On desktop (sm:) there's no bottom nav, so a 1rem offset is enough.
+      className="fixed left-3 right-3 z-40 bottom-[calc(env(safe-area-inset-bottom)+4rem)] sm:left-auto sm:right-4 sm:max-w-sm sm:bottom-4 pointer-events-none"
     >
       <div
         className={`pointer-events-auto rounded-2xl shadow-xl border overflow-hidden transition-colors ${

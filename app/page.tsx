@@ -74,7 +74,7 @@ export default async function Home() {
       {/* Social proof bar */}
       <section className="border-y border-slate-100 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-3 gap-8 text-center">
+          <div className="grid grid-cols-3 gap-3 sm:gap-8 text-center">
             <div>
               <div className="text-2xl font-bold text-slate-900">Free</div>
               <div className="text-xs text-slate-500 mt-1">No credit card required</div>
@@ -162,7 +162,7 @@ export default async function Home() {
                 desc: 'Create workout templates, assign them to clients on specific dates, and track their progress.',
               },
             ].map((item) => (
-              <div key={item.step} className="flex gap-6 items-start bg-white rounded-2xl border border-slate-200 p-6 sm:p-8">
+              <div key={item.step} className="flex gap-4 sm:gap-6 items-start bg-white rounded-2xl border border-slate-200 p-5 sm:p-8">
                 <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
                   {item.icon}
                 </div>

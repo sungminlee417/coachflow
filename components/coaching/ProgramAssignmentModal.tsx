@@ -120,6 +120,28 @@ export default function ProgramAssignmentModal({
         .upsert(rows, { onConflict: 'workout_id,client_id', ignoreDuplicates: true })
       if (error) throw error
 
+      // Record the program-level assignment so adding a workout to the
+      // program later can auto-fan-out to this client. Best-effort — if the
+      // table doesn't exist on this deployment yet, the assign still succeeds.
+      try {
+        // ignoreDuplicates so re-clicking Assign on an already-assigned client
+        // doesn't overwrite the original anchor (which would shift the
+        // rotation phase for cycle workouts mid-program).
+        await supabase
+          .from('program_assignments')
+          .upsert(
+            {
+              program_id: programId,
+              client_id: clientId,
+              coach_id: coachId,
+              cycle_anchor_date: anchorFallback,
+            },
+            { onConflict: 'program_id,client_id', ignoreDuplicates: true }
+          )
+      } catch {
+        // Tracking row is non-essential for the assign itself.
+      }
+
       showToast(`Program assigned (${rows.length} ${rows.length === 1 ? 'workout' : 'workouts'})`)
       onClose()
     } catch {

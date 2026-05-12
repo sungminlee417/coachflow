@@ -7,9 +7,9 @@ A coaching-and-training platform where every user can both coach and train. One 
 ### For coaches
 - **Workout builder** with strength + cardio exercises, supersets (chains of `pair_with_next`), per-set prescriptions, alternatives that the trainee can swap to, and either weekly or N-day rotation scheduling.
 - **Drag-and-drop** reordering for exercises, alternatives, and workouts inside programs (`@dnd-kit`, mouse + touch + keyboard).
-- **Programs** group workouts together (Push/Pull/Legs, beginner plan, etc.). Assigning a program creates one `workout_assignments` row per member workout — no separate "program assignment" entity, so existing per-workout assignments aren't disturbed.
+- **Programs** group workouts together (Push/Pull/Legs, beginner plan, etc.). Assigning a program creates one `workout_assignments` row per member workout, plus a `program_assignments` tracking row. Adding a workout to a program later **auto-fans-out** to every client who already has the program — no need to re-click Assign. Removing a workout from the program never auto-unassigns from clients (deliberate). Cycle workouts added later reuse the anchor date stored at original assign time so the rotation stays in phase.
 - **Meal-plan builder** with meals → foods → optional ingredients, auto-rolled-up macros, days-of-week scheduling, and optional time-of-day. Meals can be **duplicated** (deep copy of foods + ingredients) and reorder via drag-and-drop. Times auto-sort meals chronologically; untimed meals follow in manual order. Each food can also have **alternatives** with their own quantity + macros ("Greek yogurt — 200g · 200 cal · 20g P"), since 218 cal of rice and 218 cal of potato are very different weights.
-- **Invite-based client onboarding** (`/invite?code=…`).
+- **Invite-based client onboarding** (`/invite?code=…`) with configurable max uses (1 / 5 / unlimited) and expiration (24h / 7d / 30d / never). Unused codes can be hard-deleted; used codes are soft-revoked (`revoked_at`) so the audit trail and `coach_client_relationships.invite_code_id` references stay intact. Revoked or expired codes are rejected at acceptance.
 - **Diff-based saves** preserve `exercise_id` (workouts) and `meal_id` (meal plans) across edits. Renaming, reordering, swapping types, editing alternatives, duplicating a meal — none of those touch the trainee's `set_logs` or `meal_logs`. Only explicitly removing a row cascades.
 
 ### For trainees
@@ -81,9 +81,9 @@ The schema includes:
 | Area | Tables |
 | --- | --- |
 | Identity | `profiles` (with `length_unit`, `weight_unit`) |
-| Coaching | `coach_client_relationships`, `invite_codes` |
+| Coaching | `coach_client_relationships`, `invite_codes` (with `expires_at`, `revoked_at`, `max_uses`) |
 | Workouts | `workouts`, `exercises`, `exercise_sets`, `exercise_alternatives` |
-| Programs | `workout_programs`, `workout_program_workouts` |
+| Programs | `workout_programs`, `workout_program_workouts`, `program_assignments` |
 | Assignments | `workout_assignments` (with `cycle_anchor_date`) |
 | Logs | `set_logs` (with `logged_date` for progressive overload), `exercise_substitutions` |
 | Nutrition | `meal_plans`, `meals`, `foods`, `ingredients`, `food_alternatives`, `meal_plan_assignments`, `meal_logs` |

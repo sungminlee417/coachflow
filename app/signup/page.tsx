@@ -41,6 +41,7 @@ function Signup() {
           .single()
 
         if (inviteError || !inviteData) throw new Error('Invalid invite code')
+        if (inviteData.revoked_at) throw new Error('This invite code has been revoked by the coach')
         if (inviteData.status !== 'pending') throw new Error('This invite code has already been used')
         if (inviteData.expires_at && new Date(inviteData.expires_at) < new Date()) throw new Error('This invite code has expired')
         if (inviteData.times_used >= inviteData.max_uses) throw new Error('This invite code has reached its maximum uses')

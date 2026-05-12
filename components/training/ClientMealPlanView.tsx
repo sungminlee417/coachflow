@@ -6,7 +6,7 @@ import { WeekSelector } from '@/components/ui/WeekSelector'
 import { Bell, Flame, Beef, Wheat, Droplet, Trash2, X } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { Skeleton } from '@/components/ui/Skeleton'
+import { AssignmentCardSkeleton } from '@/components/ui/Skeleton'
 import { showToast } from '@/components/ui/Toast'
 import { MealLogToggle } from './MealLogToggle'
 import {
@@ -247,18 +247,7 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
       {loading ? (
         <div className="space-y-4">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-xl border border-slate-200 p-6"
-            >
-              <Skeleton className="h-5 w-1/3 mb-2" />
-              <Skeleton className="h-3 w-2/3 mb-4" />
-              <div className="flex gap-2">
-                <Skeleton className="h-6 w-16 rounded-full" />
-                <Skeleton className="h-6 w-16 rounded-full" />
-                <Skeleton className="h-6 w-16 rounded-full" />
-              </div>
-            </div>
+            <AssignmentCardSkeleton key={i} withChips />
           ))}
         </div>
       ) : assignments.length === 0 ? (

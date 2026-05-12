@@ -5,7 +5,7 @@ import { Trophy, Flame, TrendingUp, Activity } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { formatDate, formatDuration } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { ListSkeleton } from '@/components/ui/Skeleton'
+import { StatRowSkeleton, SummaryTilesSkeleton } from '@/components/ui/Skeleton'
 
 interface WorkoutHistoryProps {
   clientId: string
@@ -169,8 +169,18 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
   if (loading) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-6">Progress</h2>
-        <ListSkeleton count={5} />
+        <h2 className="text-2xl font-bold text-slate-900 mb-1">Progress</h2>
+        <p className="text-sm text-slate-500 mb-6">
+          Personal records and lifetime stats from every set you&rsquo;ve logged.
+        </p>
+        <div className="mb-6">
+          <SummaryTilesSkeleton count={4} />
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <StatRowSkeleton key={i} />
+          ))}
+        </div>
       </div>
     )
   }

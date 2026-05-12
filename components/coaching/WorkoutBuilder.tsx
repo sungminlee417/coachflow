@@ -1116,7 +1116,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
       <div className="h-24" aria-hidden />
 
       {/* Floating action bar — persistent save target on long forms (esp. mobile). */}
-      <div className="sticky bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
+      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
           <span className="tabular-nums">
             <span className="font-semibold text-slate-700">{exercises.length}</span>{' '}

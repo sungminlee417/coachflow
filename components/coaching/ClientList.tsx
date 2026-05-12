@@ -5,7 +5,7 @@ import { useSupabase } from '@/lib/use-supabase'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { ListSkeleton } from '@/components/ui/Skeleton'
+import { ClientGridSkeleton } from '@/components/ui/Skeleton'
 import { UserPlus, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { Client } from '@/lib/types'
@@ -62,7 +62,7 @@ export default function ClientList({ coachId }: ClientListProps) {
             <p className="text-sm text-slate-400 mt-1">Loading clients…</p>
           </div>
         </div>
-        <ListSkeleton count={4} />
+        <ClientGridSkeleton count={6} />
       </div>
     )
   }

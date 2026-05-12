@@ -279,5 +279,6 @@ export interface InviteCode {
   max_uses: number
   times_used: number
   expires_at: string | null
+  revoked_at: string | null
   created_at: string
 }

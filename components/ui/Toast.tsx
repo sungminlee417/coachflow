@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useSyncExternalStore } from 'react'
 import { CheckCircle, XCircle } from 'lucide-react'
+import { subscribeModalStack, getOpenModalCount } from '@/lib/modal-stack'
 
 type ToastType = 'success' | 'error'
 
@@ -37,6 +38,12 @@ export function showToast(text: string, type: ToastType = 'success') {
 
 export default function ToastContainer() {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const modalCount = useSyncExternalStore(
+    subscribeModalStack,
+    getOpenModalCount,
+    () => 0
+  )
+  const modalOpen = modalCount > 0
 
   const addToast = useCallback((text: string, type: ToastType) => {
     const id = ++toastId
@@ -55,11 +62,17 @@ export default function ToastContainer() {
 
   if (toasts.length === 0) return null
 
+  // When a modal is open, the bottom of the screen is taken by the
+  // mobile-sheet dialog — relocate to the top so the user can still see the
+  // success/error message. On sm+ the modal is centered and the toast
+  // already lives in the bottom-right, so this only matters on phones.
+  const positionCls = modalOpen
+    ? 'top-[calc(env(safe-area-inset-top)+1rem)] left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm sm:top-4'
+    : 'bottom-[calc(env(safe-area-inset-bottom)+4rem)] left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm sm:bottom-4'
+
   return (
     <div
-      // `bottom-[max(...)]` keeps the toasts above the iOS home-indicator gesture
-      // zone. Falls back to the original 1rem offset on devices with no inset.
-      className="fixed left-4 right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] sm:left-auto sm:right-4 sm:max-w-sm z-60 flex flex-col gap-2 pointer-events-none"
+      className={`fixed ${positionCls} z-60 flex flex-col gap-2 pointer-events-none`}
       role="status"
       aria-live="polite"
     >
