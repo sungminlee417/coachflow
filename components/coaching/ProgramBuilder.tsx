@@ -349,32 +349,39 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
         </button>
       )}
 
-      <div className="h-24" aria-hidden />
+      {/* Spacer keeps the last card clear of the fixed save bar. Taller on
+          mobile because the bar sits above the ~3.5rem bottom tab nav. */}
+      <div className="h-32 md:h-24" aria-hidden />
 
-      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-          <span className="tabular-nums">
-            <span className="font-semibold text-slate-700">{members.length}</span>{' '}
-            {members.length === 1 ? 'workout' : 'workouts'}
-          </span>
-          <UnsavedBadge visible={isDirty && !saving} />
+      {/* Pinned action bar — fixed to the viewport so it stays visible no
+          matter how short the form is. Respects the desktop sidebar via
+          `md:left-64` and the mobile tab nav via the calc-bottom offset. */}
+      <div className="fixed left-0 right-0 md:left-64 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 z-30 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-8 flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+            <span className="tabular-nums">
+              <span className="font-semibold text-slate-700">{members.length}</span>{' '}
+              {members.length === 1 ? 'workout' : 'workouts'}
+            </span>
+            <UnsavedBadge visible={isDirty && !saving} />
+          </div>
+          <div className="sm:hidden">
+            <UnsavedBadge visible={isDirty && !saving} />
+          </div>
+          <div className="flex-1" />
+          <Button variant="secondary" onClick={requestClose} disabled={saving} size="sm">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            loading={saving}
+            disabled={!isDirty}
+            size="sm"
+          >
+            {!saving && <Save size={14} />}
+            {saving ? 'Saving…' : 'Save Program'}
+          </Button>
         </div>
-        <div className="sm:hidden">
-          <UnsavedBadge visible={isDirty && !saving} />
-        </div>
-        <div className="flex-1" />
-        <Button variant="secondary" onClick={requestClose} disabled={saving} size="sm">
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          loading={saving}
-          disabled={!isDirty}
-          size="sm"
-        >
-          {!saving && <Save size={14} />}
-          {saving ? 'Saving…' : 'Save Program'}
-        </Button>
       </div>
 
       <Modal

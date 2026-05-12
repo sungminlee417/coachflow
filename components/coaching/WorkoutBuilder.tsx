@@ -1112,34 +1112,44 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         </button>
       )}
 
-      {/* Spacer so the sticky bar never covers the last card */}
-      <div className="h-24" aria-hidden />
+      {/* Spacer keeps the last card clear of the fixed save bar at the bottom
+          of the scroll. Mobile is taller because the bar sits above the
+          ~3.5rem bottom tab nav. */}
+      <div className="h-32 md:h-24" aria-hidden />
 
-      {/* Floating action bar — persistent save target on long forms (esp. mobile). */}
-      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 -mx-4 sm:-mx-8 mt-6 z-20 px-4 sm:px-8 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)] flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-          <span className="tabular-nums">
-            <span className="font-semibold text-slate-700">{exercises.length}</span>{' '}
-            {exercises.length === 1 ? 'exercise' : 'exercises'}
-          </span>
-          <UnsavedBadge visible={isDirty && !saving} />
+      {/* Pinned action bar — fixed to the viewport (not sticky to the parent)
+          so it stays visible no matter how short the form is. Respects the
+          desktop sidebar via `md:left-64` and the mobile tab nav via the
+          calc-bottom offset. */}
+      <div className="fixed left-0 right-0 md:left-64 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 z-30 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]">
+        {/* Inner row matches the form's max-w-5xl + padding so the buttons
+            sit under the form content instead of drifting to the screen
+            edge on wide displays. */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-8 flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+            <span className="tabular-nums">
+              <span className="font-semibold text-slate-700">{exercises.length}</span>{' '}
+              {exercises.length === 1 ? 'exercise' : 'exercises'}
+            </span>
+            <UnsavedBadge visible={isDirty && !saving} />
+          </div>
+          <div className="sm:hidden">
+            <UnsavedBadge visible={isDirty && !saving} />
+          </div>
+          <div className="flex-1" />
+          <Button variant="secondary" onClick={requestClose} disabled={saving} size="sm">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            loading={saving}
+            disabled={!isDirty}
+            size="sm"
+          >
+            {!saving && <Save size={14} />}
+            {saving ? 'Saving…' : 'Save Workout'}
+          </Button>
         </div>
-        <div className="sm:hidden">
-          <UnsavedBadge visible={isDirty && !saving} />
-        </div>
-        <div className="flex-1" />
-        <Button variant="secondary" onClick={requestClose} disabled={saving} size="sm">
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          loading={saving}
-          disabled={!isDirty}
-          size="sm"
-        >
-          {!saving && <Save size={14} />}
-          {saving ? 'Saving…' : 'Save Workout'}
-        </Button>
       </div>
 
       <ConfirmDialog

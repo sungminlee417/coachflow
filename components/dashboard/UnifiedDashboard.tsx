@@ -341,7 +341,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                 type="button"
                 onClick={() => setActiveTab(item.key)}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition-colors ${
+                className={`h-14 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
                   isActive ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
@@ -364,7 +364,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                 onClick={() => setMobileMenuOpen(true)}
                 aria-current={moreActive ? 'page' : undefined}
                 aria-haspopup="menu"
-                className={`flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition-colors ${
+                className={`h-14 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
                   moreActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >

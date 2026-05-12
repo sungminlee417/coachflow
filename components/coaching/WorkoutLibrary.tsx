@@ -85,7 +85,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
   if (loading) {
     return (
       <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Workout Library</h2>
             <p className="text-sm text-slate-400 mt-1">Loading workouts…</p>
@@ -118,14 +118,17 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
         onCancel={() => setDeletingId(null)}
       />
 
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Workout Library</h2>
           <p className="text-sm text-slate-500 mt-1">
             {workouts.length} {workouts.length === 1 ? 'workout' : 'workouts'}
           </p>
         </div>
-        <Button onClick={() => { setEditingWorkout(null); setShowBuilder(true) }}>
+        <Button
+          onClick={() => { setEditingWorkout(null); setShowBuilder(true) }}
+          className="w-full sm:w-auto"
+        >
           <Plus size={16} />
           Create Workout
         </Button>
@@ -161,7 +164,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
               {workout.description && (
                 <p className="text-sm text-slate-500 mb-3 line-clamp-2">{workout.description}</p>
               )}
-              <div className="flex items-center gap-2 flex-wrap mb-4">
+              <div className="flex items-center gap-2 flex-wrap mb-3">
                 <p className="text-xs text-slate-400">
                   {workout.exercise_count} {workout.exercise_count === 1 ? 'exercise' : 'exercises'}
                 </p>
@@ -171,9 +174,9 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
                   </span>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
                 <Button onClick={() => setAssigningWorkout(workout)} className="flex-1">
-                  <Send size={14} />
+                  <Send size={16} />
                   Assign
                 </Button>
                 <IconButton
