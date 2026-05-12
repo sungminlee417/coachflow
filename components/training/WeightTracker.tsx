@@ -8,10 +8,11 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/Input'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { Trash2, TrendingUp, TrendingDown, Minus, Scale } from 'lucide-react'
+import { Trash2, TrendingUp, TrendingDown, Minus, Scale, Share2 } from 'lucide-react'
 import { todayISO, formatDate, roundMacro } from '@/lib/utils'
 import type { WeightLog } from '@/lib/types'
 import { WeightChart } from './WeightChart'
+import { WeightShareDialog } from './WeightShareDialog'
 import type { WeightUnit } from '@/lib/types'
 
 interface WeightTrackerProps {
@@ -36,6 +37,7 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
   const [newWeight, setNewWeight] = useState('')
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [showShare, setShowShare] = useState(false)
 
   useEffect(() => {
     fetchLogs()
@@ -118,6 +120,13 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
         onCancel={() => setDeletingId(null)}
       />
 
+      <WeightShareDialog
+        open={showShare}
+        userId={userId}
+        weightUnit={weightUnit}
+        onClose={() => setShowShare(false)}
+      />
+
       <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
           <div className="flex items-center gap-3 min-w-0">
@@ -187,9 +196,19 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
         {/* Recent history */}
         {!loading && logs.length > 0 && (
           <div className="mt-5 pt-4 border-t border-slate-100">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-              Recent
-            </p>
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Recent
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowShare(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2.5 py-1.5 rounded-md transition-colors cursor-pointer"
+              >
+                <Share2 size={14} />
+                Share
+              </button>
+            </div>
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {logs.slice(0, 10).map((log, i) => {
                 const prev = logs[i + 1]
