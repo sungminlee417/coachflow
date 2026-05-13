@@ -10,6 +10,7 @@ import { ChevronDown, ChevronRight, HeartPulse, Trash2 } from 'lucide-react'
 import { AssignmentCardSkeleton } from '@/components/ui/Skeleton'
 import { formatDuration, todayISO, formatLongDate } from '@/lib/utils'
 import { fetchActiveWorkoutAssignments } from '@/lib/queries'
+import { cachedFetch } from '@/lib/cached-query'
 import type { Exercise, WorkoutAssignment } from '@/lib/types'
 import { ExerciseSetLogger } from './ExerciseSetLogger'
 import { SubstitutionPicker } from './SubstitutionPicker'
@@ -96,13 +97,12 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
 
   const fetchAssignments = async () => {
     setLoading(true)
-    try {
-      const data = await fetchActiveWorkoutAssignments(supabase, clientId, selectedDate)
-      setAssignments(data)
-    } catch {
-    } finally {
-      setLoading(false)
-    }
+    const { data } = await cachedFetch<WorkoutAssignment[]>(
+      `workout_assignments:${clientId}:${selectedDate}`,
+      () => fetchActiveWorkoutAssignments(supabase, clientId, selectedDate)
+    )
+    setAssignments(data ?? [])
+    setLoading(false)
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

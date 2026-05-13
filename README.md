@@ -31,6 +31,8 @@ A coaching-and-training platform where every user can both coach and train. One 
 - **Unsaved-changes guard** on every builder — closing or backing out with edits prompts a confirm dialog instead of silently dropping changes.
 - **Loading toolkit**: `Spinner`, `Skeleton`, `LoadingState`, plus skeletons shaped to match the destination (card grids, list rows, tables) so layouts don't shift in.
 - **Toast deduplication** — identical messages within 1.5s collapse, so a flaky save retry doesn't stack two error toasts.
+- **Offline-aware PWA shell** — a hand-written service worker (`public/sw.js`, no framework deps) caches Next.js JS/CSS chunks (cache-first w/ background revalidate) and recent navigations (network-first w/ cached fallback). Supabase REST/Auth requests are passed through untouched so session state never goes stale. A bundled `/offline.html` is the last-resort fallback. An `OfflineBanner` appears the moment `navigator.onLine` flips false.
+- **Offline read cache** — high-value reads (today's workouts/meals, weight log, body measurements) flow through `cachedQuery` / `cachedFetch` ([lib/cached-query.ts](lib/cached-query.ts)) backed by IndexedDB via `idb` ([lib/offline-cache.ts](lib/offline-cache.ts)). When the browser is offline, the wrapper short-circuits the network roundtrip and returns the most recently cached payload instead of hanging. The cache is cleared on signout so a shared device can't leak the previous account's snapshot to the next.
 
 ## Tech stack
 

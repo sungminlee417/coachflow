@@ -10,6 +10,7 @@ import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Trash2, TrendingUp, TrendingDown, Minus, Scale, Share2 } from 'lucide-react'
 import { todayISO, formatDate, roundMacro } from '@/lib/utils'
+import { cachedQuery } from '@/lib/cached-query'
 import type { WeightLog } from '@/lib/types'
 import { WeightChart } from './WeightChart'
 import { WeightShareDialog } from './WeightShareDialog'
@@ -46,20 +47,18 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
 
   const fetchLogs = async () => {
     setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('weight_logs')
-        .select('*')
-        .eq('user_id', userId)
-        .order('recorded_at', { ascending: false })
-        .limit(30)
-
-      if (error) throw error
-      setLogs(data || [])
-    } catch {
-    } finally {
-      setLoading(false)
-    }
+    const { data } = await cachedQuery<WeightLog[]>(
+      `weight_logs:${userId}:recent30`,
+      () =>
+        supabase
+          .from('weight_logs')
+          .select('*')
+          .eq('user_id', userId)
+          .order('recorded_at', { ascending: false })
+          .limit(30)
+    )
+    setLogs(data || [])
+    setLoading(false)
   }
 
   const handleLog = async () => {
@@ -130,7 +129,7 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
       <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
               <Scale size={18} className="text-indigo-600" />
             </div>
             <div className="min-w-0">
@@ -218,7 +217,7 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
                     key={log.id}
                     className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-50 group"
                   >
-                    <span className="text-xs text-slate-500 flex-shrink-0 min-w-0 truncate">
+                    <span className="text-xs text-slate-500 shrink-0 min-w-0 truncate">
                       {formatDate(log.recorded_at)}
                     </span>
                     <span className="text-sm font-medium text-slate-900 tabular-nums ml-auto">
@@ -226,7 +225,7 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
                       <span className="text-xs text-slate-400 font-normal">{weightUnit}</span>
                     </span>
                     {d && (
-                      <span className={`flex items-center gap-0.5 text-xs flex-shrink-0 ${d.color}`}>
+                      <span className={`flex items-center gap-0.5 text-xs shrink-0 ${d.color}`}>
                         <d.Icon size={11} />
                         {d.text}
                       </span>

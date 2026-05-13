@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Plus, Pencil, Trash2, Ruler, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { formatDate, roundMacro, formatLength } from '@/lib/utils'
+import { cachedQuery } from '@/lib/cached-query'
 import type { BodyMeasurement, LengthUnit } from '@/lib/types'
 import MeasurementForm from './MeasurementForm'
 
@@ -70,20 +71,18 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
 
   const fetchEntries = async () => {
     setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('body_measurements')
-        .select('*')
-        .eq('user_id', userId)
-        .order('recorded_at', { ascending: false })
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setEntries(data || [])
-    } catch {
-    } finally {
-      setLoading(false)
-    }
+    const { data } = await cachedQuery<BodyMeasurement[]>(
+      `body_measurements:${userId}`,
+      () =>
+        supabase
+          .from('body_measurements')
+          .select('*')
+          .eq('user_id', userId)
+          .order('recorded_at', { ascending: false })
+          .order('created_at', { ascending: false })
+    )
+    setEntries(data ?? [])
+    setLoading(false)
   }
 
   const handleDelete = async () => {

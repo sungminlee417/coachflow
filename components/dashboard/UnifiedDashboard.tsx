@@ -8,6 +8,7 @@ import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Ute
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { RestTimerProvider } from '@/components/ui/RestTimer'
+import { clearCache } from '@/lib/offline-cache'
 import ClientList from '@/components/coaching/ClientList'
 import WorkoutLibrary from '@/components/coaching/WorkoutLibrary'
 import ProgramLibrary from '@/components/coaching/ProgramLibrary'
@@ -123,6 +124,18 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
   }
 
   const handleLogout = async () => {
+    // Drop the offline cache before navigating away so the next account
+    // logging in on this device doesn't inherit the previous user's
+    // weight / workout / measurement snapshots. The SW's HTML cache also
+    // pins the prior dashboard render — message it to flush so the next
+    // sign-in doesn't briefly flash the old account's bundled HTML.
+    await clearCache()
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.serviceWorker?.controller
+    ) {
+      navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' })
+    }
     await supabase.auth.signOut()
     window.location.href = '/login'
   }

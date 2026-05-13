@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Offline · CoachFlow</title>
+    <meta name="theme-color" content="#4f46e5" />
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+          Arial, sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+      .card {
+        max-width: 22rem;
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        padding: 2rem 1.5rem;
+        text-align: center;
+        box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.1);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: #fef3c7;
+        color: #92400e;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.25rem 0.6rem;
+        border-radius: 999px;
+        margin-bottom: 1rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 0.5rem;
+        font-weight: 700;
+      }
+      p {
+        font-size: 0.9rem;
+        color: #475569;
+        margin: 0 0 1.5rem;
+        line-height: 1.5;
+      }
+      button {
+        font: inherit;
+        background: #4f46e5;
+        color: #ffffff;
+        border: 0;
+        padding: 0.65rem 1.1rem;
+        border-radius: 0.6rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        width: 100%;
+      }
+      button:hover {
+        background: #4338ca;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <span class="badge">Offline</span>
+      <h1>You&rsquo;re offline</h1>
+      <p>
+        CoachFlow can&rsquo;t reach the network right now. The app will reload
+        as soon as you&rsquo;re back online.
+      </p>
+      <button onclick="location.reload()">Try again</button>
+    </main>
+    <script>
+      // Auto-reload when the device comes back online so the user doesn't
+      // have to tap the button manually.
+      window.addEventListener('online', () => location.reload())
+    </script>
+  </body>
+</html>

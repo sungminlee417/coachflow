@@ -18,6 +18,7 @@ import {
   formatTime,
 } from '@/lib/utils'
 import { fetchActiveMealPlanAssignments } from '@/lib/queries'
+import { cachedFetch } from '@/lib/cached-query'
 import type { MealPlanAssignment } from '@/lib/types'
 
 interface ClientMealPlanViewProps {
@@ -65,13 +66,12 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
 
   const fetchAssignments = async () => {
     setLoading(true)
-    try {
-      const data = await fetchActiveMealPlanAssignments(supabase, clientId, selectedDate)
-      setAssignments(data)
-    } catch {
-    } finally {
-      setLoading(false)
-    }
+    const { data } = await cachedFetch(
+      `meal_plan_assignments:${clientId}:${selectedDate}`,
+      () => fetchActiveMealPlanAssignments(supabase, clientId, selectedDate)
+    )
+    setAssignments(data ?? [])
+    setLoading(false)
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
