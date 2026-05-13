@@ -18,7 +18,7 @@ import {
   formatTime,
 } from '@/lib/utils'
 import { fetchActiveMealPlanAssignments } from '@/lib/queries'
-import { cachedFetch } from '@/lib/cached-query'
+import { cachedFetch, cachedQuery } from '@/lib/cached-query'
 import type { MealPlanAssignment } from '@/lib/types'
 
 interface ClientMealPlanViewProps {
@@ -108,19 +108,27 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
 
   // Load meal_logs for the selected date so the toggle reflects what the user
   // already checked off. Independent of fetchAssignments — runs in parallel.
+  // Routed through cachedQuery so a previously-visited day shows the right
+  // "eaten" state offline.
   useEffect(() => {
     let cancelled = false
     setLogsLoaded(false)
     setEatenMealIds(new Set())
     ;(async () => {
-      const { data } = await supabase
-        .from('meal_logs')
-        .select('meal_id, completed')
-        .eq('user_id', clientId)
-        .eq('logged_date', selectedDate)
+      const { data } = await cachedQuery<
+        Array<{ meal_id: string; completed: boolean }>
+      >(
+        `meal_logs:${clientId}:${selectedDate}`,
+        () =>
+          supabase
+            .from('meal_logs')
+            .select('meal_id, completed')
+            .eq('user_id', clientId)
+            .eq('logged_date', selectedDate)
+      )
       if (cancelled) return
       const eaten = new Set<string>()
-      ;(data ?? []).forEach((row: { meal_id: string; completed: boolean }) => {
+      ;(data ?? []).forEach(row => {
         if (row.completed) eaten.add(row.meal_id)
       })
       setEatenMealIds(eaten)

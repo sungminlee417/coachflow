@@ -3,6 +3,7 @@
 import { Check } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
+import { queuedUpsert } from '@/lib/write-queue'
 
 interface MealLogToggleProps {
   assignmentId: string
@@ -38,22 +39,20 @@ export function MealLogToggle({
   const handleClick = async () => {
     const next = !completed
     onToggled(next)
-    try {
-      const { error } = await supabase
-        .from('meal_logs')
-        .upsert(
-          {
-            assignment_id: assignmentId,
-            meal_id: mealId,
-            user_id: userId,
-            logged_date: loggedDate,
-            completed: next,
-          },
-          { onConflict: 'meal_id,user_id,logged_date' }
-        )
-      if (error) throw error
-    } catch {
-      // Roll back the optimistic flip and surface the failure.
+    const { error } = await queuedUpsert(
+      supabase,
+      'meal_logs',
+      {
+        assignment_id: assignmentId,
+        meal_id: mealId,
+        user_id: userId,
+        logged_date: loggedDate,
+        completed: next,
+      },
+      { onConflict: 'meal_id,user_id,logged_date' }
+    )
+    if (error) {
+      // Real error (not "we queued it"). Roll back the optimistic flip.
       onToggled(!next)
       showToast('Failed to update meal', 'error')
     }
