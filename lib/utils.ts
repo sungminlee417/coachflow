@@ -106,8 +106,40 @@ export const getWeekDates = (selectedDateISO: string): string[] => {
 
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
-export const generateInviteCode = () =>
-  Math.random().toString(36).substring(2, 10).toUpperCase()
+// Crockford-style base32 alphabet — omits I, L, O, U to avoid visual
+// confusion (I/1, L/1, O/0, U/V) when a coach reads the code aloud or a
+// trainee transcribes it from a screenshot.
+const INVITE_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ'
+const INVITE_CODE_LENGTH = 10
+
+/**
+ * Generate a random invite code with cryptographic entropy.
+ *
+ * 10 chars × log2(30) ≈ 49 bits of entropy → 5.6 × 10^14 possibilities,
+ * which puts brute-force well out of reach for the existing single-use,
+ * revocable, and (when the coach sets one) time-bounded invite design.
+ * `Math.random()` was the previous implementation; ~40 bits is roughly
+ * brute-forceable in a week at 1k req/sec, hence the swap.
+ */
+export const generateInviteCode = (): string => {
+  // Server-side rendering doesn't normally call this, but if it ever
+  // does we fall back to a Node-style randomness path.
+  const cryptoObj: Crypto | undefined =
+    typeof globalThis !== 'undefined'
+      ? (globalThis as { crypto?: Crypto }).crypto
+      : undefined
+  const buf = new Uint8Array(INVITE_CODE_LENGTH)
+  if (cryptoObj?.getRandomValues) {
+    cryptoObj.getRandomValues(buf)
+  } else {
+    for (let i = 0; i < buf.length; i++) buf[i] = Math.floor(Math.random() * 256)
+  }
+  let out = ''
+  for (let i = 0; i < buf.length; i++) {
+    out += INVITE_CODE_ALPHABET[buf[i] % INVITE_CODE_ALPHABET.length]
+  }
+  return out
+}
 
 export const unwrapJoin = <T>(value: T | T[] | null | undefined): T | null => {
   if (Array.isArray(value)) return value[0] ?? null
