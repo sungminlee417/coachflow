@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { Check, ChevronUp } from 'lucide-react'
+import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
+import { queuedUpsert } from '@/lib/write-queue'
 import { useRestTimer } from '@/components/ui/RestTimer'
 import {
   buildPrescribedSets,
   fetchPriorPerformance,
   formatPriorHint,
+  getRepRangeFeedback,
   isImprovement,
   type PriorPerformance,
 } from '@/lib/training'
@@ -190,28 +192,24 @@ export function SupersetLogger({
   }
 
   const persist = async (row: RowState) => {
-    try {
-      const reps = row.reps_performed === '' ? null : parseFloat(row.reps_performed)
-      const weight = row.weight_performed === '' ? null : parseFloat(row.weight_performed)
-      const { error } = await supabase
-        .from('set_logs')
-        .upsert(
-          {
-            assignment_id: assignmentId,
-            exercise_id: row.exerciseId,
-            set_number: row.set_number,
-            logged_date: loggedDate,
-            reps_performed: Number.isNaN(reps as number) ? null : reps,
-            weight_performed: Number.isNaN(weight as number) ? null : weight,
-            duration_performed_seconds: row.duration_performed_seconds,
-            completed: row.completed,
-          },
-          { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
-        )
-      if (error) throw error
-    } catch {
-      showToast('Failed to save set', 'error')
-    }
+    const reps = row.reps_performed === '' ? null : parseFloat(row.reps_performed)
+    const weight = row.weight_performed === '' ? null : parseFloat(row.weight_performed)
+    const { error } = await queuedUpsert(
+      supabase,
+      'set_logs',
+      {
+        assignment_id: assignmentId,
+        exercise_id: row.exerciseId,
+        set_number: row.set_number,
+        logged_date: loggedDate,
+        reps_performed: Number.isNaN(reps as number) ? null : reps,
+        weight_performed: Number.isNaN(weight as number) ? null : weight,
+        duration_performed_seconds: row.duration_performed_seconds,
+        completed: row.completed,
+      },
+      { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
+    )
+    if (error) showToast('Failed to save set', 'error')
   }
 
   const commitDuration = (exerciseId: string, setNumber: number) => {
@@ -477,6 +475,23 @@ export function SupersetLogger({
                 const prev = loaded ? priorByKey.get(priorKey(ex.id, setNumber)) : undefined
                 const priorText = prev ? formatPriorHint(prev, isCardio) : null
                 const improved = prev ? isImprovement(row, prev, isCardio) : false
+                // Pre-set weight suggestion based on last session's
+                // reps-vs-target outcome. Strength only — cardio has no
+                // load to adjust here.
+                let preSuggestion: { direction: 'up' | 'down'; weight: number } | null = null
+                if (!isCardio && prev) {
+                  const fb = getRepRangeFeedback(
+                    row.target_reps,
+                    prev.reps_performed,
+                    prev.weight_performed
+                  )
+                  if (fb && fb.state !== 'on-target' && prev.weight_performed != null) {
+                    const w = prev.weight_performed + fb.delta
+                    if (w > 0) {
+                      preSuggestion = { direction: fb.delta > 0 ? 'up' : 'down', weight: w }
+                    }
+                  }
+                }
                 return (
                   <div
                     key={`${ex.id}-${setNumber}`}
@@ -484,6 +499,32 @@ export function SupersetLogger({
                       row.completed ? 'bg-emerald-50/40' : ''
                     }`}
                   >
+                    {(priorText || preSuggestion) && (
+                      <div className="flex items-center gap-2 text-[10px] mb-1.5 flex-wrap">
+                        {priorText && (
+                          <span className="text-slate-400 tabular-nums">
+                            Last:{' '}
+                            <span className="font-medium text-slate-500">{priorText}</span>
+                          </span>
+                        )}
+                        {preSuggestion && (
+                          <span
+                            className={`inline-flex items-center gap-1 font-medium border rounded-full px-2 py-0.5 tabular-nums ${
+                              preSuggestion.direction === 'up'
+                                ? 'text-indigo-700 bg-indigo-50 border-indigo-100'
+                                : 'text-amber-700 bg-amber-50 border-amber-100'
+                            }`}
+                          >
+                            {preSuggestion.direction === 'up' ? (
+                              <ArrowUp size={11} />
+                            ) : (
+                              <ArrowDown size={11} />
+                            )}
+                            Try {preSuggestion.weight}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
                       <div className="flex items-baseline gap-2 min-w-0">
                         <span
@@ -609,16 +650,11 @@ export function SupersetLogger({
                         )}
                       </div>
                     )}
-                    {priorText && (
-                      <div className="flex items-center justify-between gap-2 text-[10px]">
-                        <span className="text-slate-400 tabular-nums">
-                          Last: <span className="font-medium text-slate-500">{priorText}</span>
+                    {improved && (
+                      <div className="flex items-center justify-end gap-2 text-[10px]">
+                        <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
+                          ↑ Beat last
                         </span>
-                        {improved && (
-                          <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
-                            ↑ Beat last
-                          </span>
-                        )}
                       </div>
                     )}
                   </div>

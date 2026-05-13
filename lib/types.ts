@@ -75,6 +75,13 @@ export interface Exercise {
   // Null/undefined means the original exercise is in play. Computed per-day in
   // the assignment fetch — not stored on the exercise itself.
   substitution?: string | null
+  // Link to a curated catalog entry (see `lib/exercise-catalog.ts`). NULL
+  // for freeform exercises typed by the coach.
+  catalog_id?: string | null
+  // Cardio machine type — drives which prescription fields the builder
+  // shows ("Speed + Incline" for treadmill, "Resistance" for cycle, etc.).
+  // NULL = generic cardio, behaves like the legacy free-duration cardio.
+  cardio_subtype?: string | null
 }
 
 export interface ExerciseSet {
@@ -85,6 +92,12 @@ export interface ExerciseSet {
   // Only used for cardio exercises. Null for strength.
   target_duration_seconds?: number | null
   notes: string
+  // Cardio prescription. Text (not number) so coaches can write ranges
+  // like "3-4" or "10-15" the same way they write rep ranges. Whichever
+  // of these is relevant depends on `Exercise.cardio_subtype`.
+  target_speed?: string | null
+  target_incline?: string | null
+  target_resistance?: string | null
 }
 
 export interface SetLog {
@@ -101,6 +114,11 @@ export interface SetLog {
   duration_performed_seconds?: number | null
   completed: boolean
   notes: string | null
+  // Cardio actuals — numeric for charting / PR detection. NULL when not
+  // a cardio set or simply not recorded.
+  speed_performed?: number | null
+  incline_performed?: number | null
+  resistance_performed?: number | null
 }
 
 export interface WorkoutAssignment {

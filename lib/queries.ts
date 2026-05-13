@@ -125,8 +125,8 @@ export async function fetchActiveWorkoutAssignments(
       workout:workout_id (
         id, name, description, days_of_week, cycle_length, cycle_position,
         exercises (
-          id, name, exercise_type, sets, reps, weight, rest_seconds, notes, order_index, pair_with_next,
-          exercise_sets ( id, set_number, target_reps, target_duration_seconds, notes ),
+          id, name, exercise_type, sets, reps, weight, rest_seconds, notes, order_index, pair_with_next, cardio_subtype,
+          exercise_sets ( id, set_number, target_reps, target_duration_seconds, notes, target_speed, target_incline, target_resistance ),
           exercise_alternatives ( id, name, order_index )
         )
       )

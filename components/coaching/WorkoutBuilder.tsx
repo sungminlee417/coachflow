@@ -6,6 +6,7 @@ import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Field, Input, Textarea } from '@/components/ui/Input'
+import { ExerciseNameInput } from '@/components/ui/ExerciseNameInput'
 import { Link2, Dumbbell, HeartPulse, ArrowUpFromLine } from 'lucide-react'
 import { ScheduleSection, type ScheduleMode } from './ScheduleSection'
 import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
@@ -33,6 +34,12 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { DragHandle, type DragHandleProps } from '@/components/ui/SortableList'
 import { parseDuration, formatDuration } from '@/lib/utils'
+import {
+  CARDIO_SUBTYPES,
+  CARDIO_LABELS,
+  getCardioFields,
+  type CardioSubtype,
+} from '@/lib/cardio'
 import type { DayOfWeek, Exercise, ExerciseSet, ExerciseType, Workout } from '@/lib/types'
 
 // Internal exercise type carrying a stable client-side id for drag-and-drop.
@@ -82,6 +89,11 @@ const emptySet = (setNumber: number, copyFrom?: ExerciseSet): ExerciseSet => ({
   target_reps: copyFrom?.target_reps ?? '',
   target_duration_seconds: copyFrom?.target_duration_seconds ?? null,
   notes: '',
+  // Cardio extras carry forward when adding a new interval so "add interval"
+  // feels like duplication, not a blank slate.
+  target_speed: copyFrom?.target_speed ?? null,
+  target_incline: copyFrom?.target_incline ?? null,
+  target_resistance: copyFrom?.target_resistance ?? null,
 })
 
 // Build initial exercise_sets when an exercise has none yet — derive from
@@ -169,7 +181,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
       try {
         const { data: setRows } = await supabase
           .from('exercise_sets')
-          .select('id, exercise_id, set_number, target_reps, target_duration_seconds, notes')
+          .select('id, exercise_id, set_number, target_reps, target_duration_seconds, notes, target_speed, target_incline, target_resistance')
           .in('exercise_id', ids)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setsByExercise = (setRows || []).reduce((map: Map<string, ExerciseSet[]>, s: any) => {
@@ -459,6 +471,11 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         order_index: formIndex,
         // Last exercise can't pair with anything.
         pair_with_next: formIndex < exercises.length - 1 ? !!ex.pair_with_next : false,
+        catalog_id: ex.catalog_id ?? null,
+        // Drop the cardio subtype on strength exercises so toggling cardio →
+        // strength doesn't leave a stale machine type on the row.
+        cardio_subtype:
+          ex.exercise_type === 'cardio' ? ex.cardio_subtype ?? null : null,
       })
 
       // 1) Find what the server has now, so we can compute the delta. Also
@@ -694,6 +711,9 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
             target_reps: isCardio ? '' : s.target_reps,
             target_duration_seconds: durationSeconds,
             notes: s.notes,
+            target_speed: isCardio ? s.target_speed ?? null : null,
+            target_incline: isCardio ? s.target_incline ?? null : null,
+            target_resistance: isCardio ? s.target_resistance ?? null : null,
           })
         })
       })
@@ -867,12 +887,63 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                   })}
                 </div>
 
-                <Input
-                  value={exercise.name}
-                  onChange={e => updateExercise(index, 'name', e.target.value)}
-                  placeholder={isCardio ? 'Cardio name (e.g., Treadmill, Cycling)' : 'Exercise name (e.g., Barbell Squat)'}
-                  className="mb-3"
-                />
+                <div className="mb-3">
+                  <ExerciseNameInput
+                    value={exercise.name}
+                    onChange={(name, catalogId) => {
+                      // Both fields in one setState — two sequential
+                      // `updateExercise` calls would race on the same
+                      // `exercises` snapshot and the second would clobber
+                      // the first.
+                      setExercises(prev => {
+                        const updated = [...prev]
+                        updated[index] = {
+                          ...updated[index],
+                          name,
+                          catalog_id: catalogId,
+                        }
+                        return updated
+                      })
+                    }}
+                    placeholder={isCardio ? 'Cardio name (e.g., Treadmill, Cycling)' : 'Exercise name (e.g., Barbell Squat)'}
+                  />
+                </div>
+
+                {/* Cardio machine picker — drives which extra prescription
+                    fields appear under each interval below. */}
+                {isCardio && (
+                  <div className="mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+                      Machine
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CARDIO_SUBTYPES.map(sub => {
+                        const active = exercise.cardio_subtype === sub
+                        return (
+                          <button
+                            key={sub}
+                            type="button"
+                            onClick={() =>
+                              updateExercise(
+                                index,
+                                'cardio_subtype',
+                                active ? null : sub
+                              )
+                            }
+                            aria-pressed={active}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                              active
+                                ? 'bg-amber-500 text-white border-amber-500'
+                                : 'border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50/40'
+                            }`}
+                          >
+                            {CARDIO_LABELS[sub]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Per-set table */}
                 <div className="bg-slate-50 rounded-lg p-3 mb-3">
@@ -902,8 +973,8 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
 
                   <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1 px-1">
                     <div className="col-span-2">{isCardio ? '#' : 'Set'}</div>
-                    <div className="col-span-9">{isCardio ? 'Target time' : 'Reps'}</div>
-                    <div className="col-span-1" />
+                    <div className="col-span-8">{isCardio ? 'Target time' : 'Reps'}</div>
+                    <div className="col-span-2" />
                   </div>
 
                   {sets.length === 0 ? (
@@ -913,7 +984,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                         : 'No sets yet. Click "+ Add set" to add one.'}
                     </p>
                   ) : (
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       {sets.map((s, setIndex) => {
                         const parsedSeconds = isCardio ? parseDuration(s.target_reps) : null
                         const showHint =
@@ -921,41 +992,98 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                           s.target_reps.trim() !== '' &&
                           parsedSeconds != null &&
                           formatDuration(parsedSeconds) !== s.target_reps.trim()
+                        const cardioFields = isCardio
+                          ? getCardioFields(exercise.cardio_subtype as CardioSubtype | null)
+                          : null
+                        const showCardioRow =
+                          !!cardioFields &&
+                          (cardioFields.speed || cardioFields.incline || cardioFields.resistance)
                         return (
-                          <div key={setIndex} className="grid grid-cols-12 gap-2 items-center">
-                            <div className="col-span-2 text-sm font-medium text-slate-500 text-center">
-                              {s.set_number}
-                            </div>
-                            <div className="col-span-9">
-                              <Input
-                                value={s.target_reps}
-                                onChange={e => updateSet(index, setIndex, 'target_reps', e.target.value)}
-                                placeholder={isCardio ? '20:30 or 30 (min)' : '8 or 6-10 or AMRAP'}
-                                className="text-sm"
-                              />
-                              {showHint && (
-                                <p className="text-[10px] text-slate-400 mt-0.5 px-1">
-                                  = {formatDuration(parsedSeconds)}
-                                </p>
-                              )}
-                              {isCardio &&
-                                s.target_reps.trim() !== '' &&
-                                parsedSeconds == null && (
-                                  <p className="text-[10px] text-amber-600 mt-0.5 px-1">
-                                    Couldn&rsquo;t parse — try &ldquo;20&rdquo;, &ldquo;20:30&rdquo;, or &ldquo;1h 20m&rdquo;
+                          <div key={setIndex}>
+                            <div className="grid grid-cols-12 gap-2 items-center">
+                              <div className="col-span-2 text-sm font-medium text-slate-500 text-center">
+                                {s.set_number}
+                              </div>
+                              <div className="col-span-8">
+                                <Input
+                                  value={s.target_reps}
+                                  onChange={e => updateSet(index, setIndex, 'target_reps', e.target.value)}
+                                  placeholder={isCardio ? '20:30 or 30 (min)' : '8 or 6-10 or AMRAP'}
+                                  className="text-sm"
+                                />
+                                {showHint && (
+                                  <p className="text-[10px] text-slate-400 mt-0.5 px-1">
+                                    = {formatDuration(parsedSeconds)}
                                   </p>
                                 )}
+                                {isCardio &&
+                                  s.target_reps.trim() !== '' &&
+                                  parsedSeconds == null && (
+                                    <p className="text-[10px] text-amber-600 mt-0.5 px-1">
+                                      Couldn&rsquo;t parse — try &ldquo;20&rdquo;, &ldquo;20:30&rdquo;, or &ldquo;1h 20m&rdquo;
+                                    </p>
+                                  )}
+                              </div>
+                              <div className="col-span-2 flex justify-end">
+                                <IconButton
+                                  tone="danger"
+                                  onClick={() => removeSet(index, setIndex)}
+                                  aria-label={isCardio ? 'Remove interval' : 'Remove set'}
+                                  disabled={sets.length === 1}
+                                >
+                                  <X size={14} />
+                                </IconButton>
+                              </div>
                             </div>
-                            <div className="col-span-1 flex justify-end">
-                              <IconButton
-                                tone="danger"
-                                onClick={() => removeSet(index, setIndex)}
-                                aria-label={isCardio ? 'Remove interval' : 'Remove set'}
-                                disabled={sets.length === 1}
-                              >
-                                <X size={14} />
-                              </IconButton>
-                            </div>
+                            {showCardioRow && cardioFields && (
+                              <div className="grid grid-cols-12 gap-2 mt-1.5">
+                                {/* Empty leading column lines the cardio fields
+                                    up under the duration input above. */}
+                                <div className="col-span-2" />
+                                <div className="col-span-8 grid grid-cols-3 gap-2">
+                                  {cardioFields.speed && (
+                                    <div>
+                                      <label className="block text-[10px] text-slate-500 mb-0.5">Speed</label>
+                                      <Input
+                                        value={s.target_speed ?? ''}
+                                        onChange={e =>
+                                          updateSet(index, setIndex, 'target_speed', e.target.value)
+                                        }
+                                        placeholder="3-4"
+                                        className="text-sm py-1.5"
+                                      />
+                                    </div>
+                                  )}
+                                  {cardioFields.incline && (
+                                    <div>
+                                      <label className="block text-[10px] text-slate-500 mb-0.5">Incline %</label>
+                                      <Input
+                                        value={s.target_incline ?? ''}
+                                        onChange={e =>
+                                          updateSet(index, setIndex, 'target_incline', e.target.value)
+                                        }
+                                        placeholder="15"
+                                        className="text-sm py-1.5"
+                                      />
+                                    </div>
+                                  )}
+                                  {cardioFields.resistance && (
+                                    <div>
+                                      <label className="block text-[10px] text-slate-500 mb-0.5">Resistance</label>
+                                      <Input
+                                        value={s.target_resistance ?? ''}
+                                        onChange={e =>
+                                          updateSet(index, setIndex, 'target_resistance', e.target.value)
+                                        }
+                                        placeholder="8"
+                                        className="text-sm py-1.5"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="col-span-2" />
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -1079,7 +1207,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                       Superset
                     </span>
                     <span className="text-[10px] text-indigo-700 font-medium">
-                      {group.exercises.length} exercises &middot; performed back-to-back
+                      {`${group.exercises.length} exercises · performed back-to-back`}
                     </span>
                   </div>
                   <div className="space-y-2">

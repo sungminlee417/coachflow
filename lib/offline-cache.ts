@@ -18,8 +18,12 @@
 import { openDB, type IDBPDatabase } from 'idb'
 
 const DB_NAME = 'coachflow-cache'
-const DB_VERSION = 1
+// Bumped to v2 when the write-queue store was added. Bump again whenever
+// another store is introduced — the `upgrade` callback below creates only
+// stores that don't already exist, so re-runs across versions are safe.
+const DB_VERSION = 2
 const STORE_NAME = 'queries'
+export const WRITE_QUEUE_STORE = 'write_queue'
 
 interface CachedEntry<T> {
   key: string
@@ -29,13 +33,21 @@ interface CachedEntry<T> {
 
 let dbPromise: Promise<IDBPDatabase> | null = null
 
-function getDB() {
+export function getDB() {
   if (typeof indexedDB === 'undefined') return null
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'key' })
+        }
+        if (!db.objectStoreNames.contains(WRITE_QUEUE_STORE)) {
+          // `id` is the primary key; we also use a `createdAt` index so the
+          // drain loop can replay in FIFO order across reloads.
+          const store = db.createObjectStore(WRITE_QUEUE_STORE, {
+            keyPath: 'id',
+          })
+          store.createIndex('createdAt', 'createdAt')
         }
       },
     }).catch(err => {
@@ -69,14 +81,19 @@ export async function writeCache<T>(key: string, data: T): Promise<void> {
 }
 
 /**
- * Clear every cached entry. Call this on signout so the next user doesn't
- * inherit the previous user's offline snapshot.
+ * Clear every cached entry and any pending queued writes. Call this on
+ * signout so the next user doesn't inherit the previous user's offline
+ * snapshot OR the previous session's unsynced mutations (which would now
+ * be rejected by the auth context anyway).
  */
 export async function clearCache(): Promise<void> {
   try {
     const db = await getDB()
     if (!db) return
     await db.clear(STORE_NAME)
+    if (db.objectStoreNames.contains(WRITE_QUEUE_STORE)) {
+      await db.clear(WRITE_QUEUE_STORE)
+    }
   } catch {
     // No-op on failure.
   }

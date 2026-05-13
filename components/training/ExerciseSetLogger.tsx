@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { Check, ChevronUp } from 'lucide-react'
+import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
+import { queuedUpsert } from '@/lib/write-queue'
+import { getCardioFields, type CardioSubtype } from '@/lib/cardio'
 import { useRestTimer } from '@/components/ui/RestTimer'
 import {
   buildPrescribedSets,
   fetchPriorPerformance,
   formatPriorHint,
+  getRepRangeFeedback,
   isImprovement,
   type PriorPerformance,
 } from '@/lib/training'
@@ -31,10 +34,18 @@ interface RowState {
   set_number: number
   target_reps: string
   target_duration_seconds: number | null
+  target_speed: string | null
+  target_incline: string | null
+  target_resistance: string | null
   reps_performed: string
   weight_performed: string
   duration_input: string
   duration_performed_seconds: number | null
+  // Cardio actuals are kept as strings while editing (so the user can clear
+  // the field to "" without flipping to NaN), then parsed at persist time.
+  speed_performed: string
+  incline_performed: string
+  resistance_performed: string
   completed: boolean
   saving?: boolean
 }
@@ -44,10 +55,16 @@ const buildInitialRows = (exercise: Exercise): RowState[] =>
     set_number: p.set_number,
     target_reps: p.target_reps ?? '',
     target_duration_seconds: p.target_duration_seconds ?? null,
+    target_speed: p.target_speed ?? null,
+    target_incline: p.target_incline ?? null,
+    target_resistance: p.target_resistance ?? null,
     reps_performed: '',
     weight_performed: '',
     duration_input: '',
     duration_performed_seconds: null,
+    speed_performed: '',
+    incline_performed: '',
+    resistance_performed: '',
     completed: false,
   }))
 
@@ -80,7 +97,9 @@ export function ExerciseSetLogger({
       const [todayResult, prior] = await Promise.all([
         supabase
           .from('set_logs')
-          .select('set_number, reps_performed, weight_performed, duration_performed_seconds, completed')
+          .select(
+            'set_number, reps_performed, weight_performed, duration_performed_seconds, speed_performed, incline_performed, resistance_performed, completed'
+          )
           .eq('assignment_id', assignmentId)
           .eq('exercise_id', exercise.id ?? '')
           .eq('logged_date', loggedDate),
@@ -114,6 +133,9 @@ export function ExerciseSetLogger({
             weight_performed: log.weight_performed != null ? String(log.weight_performed) : '',
             duration_input: performedSeconds != null ? formatDuration(performedSeconds) : '',
             duration_performed_seconds: performedSeconds,
+            speed_performed: log.speed_performed != null ? String(log.speed_performed) : '',
+            incline_performed: log.incline_performed != null ? String(log.incline_performed) : '',
+            resistance_performed: log.resistance_performed != null ? String(log.resistance_performed) : '',
             completed: !!log.completed,
           }
         })
@@ -135,30 +157,32 @@ export function ExerciseSetLogger({
   const persist = async (row: RowState) => {
     if (!exercise.id) return
     updateRow(row.set_number, { saving: true })
-    try {
-      const reps = row.reps_performed === '' ? null : parseFloat(row.reps_performed)
-      const weight = row.weight_performed === '' ? null : parseFloat(row.weight_performed)
-      const { error } = await supabase
-        .from('set_logs')
-        .upsert(
-          {
-            assignment_id: assignmentId,
-            exercise_id: exercise.id,
-            set_number: row.set_number,
-            logged_date: loggedDate,
-            reps_performed: Number.isNaN(reps as number) ? null : reps,
-            weight_performed: Number.isNaN(weight as number) ? null : weight,
-            duration_performed_seconds: row.duration_performed_seconds,
-            completed: row.completed,
-          },
-          { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
-        )
-      if (error) throw error
-    } catch {
-      showToast('Failed to save set', 'error')
-    } finally {
-      updateRow(row.set_number, { saving: false })
-    }
+    const reps = row.reps_performed === '' ? null : parseFloat(row.reps_performed)
+    const weight = row.weight_performed === '' ? null : parseFloat(row.weight_performed)
+    const speed = row.speed_performed === '' ? null : parseFloat(row.speed_performed)
+    const incline = row.incline_performed === '' ? null : parseFloat(row.incline_performed)
+    const resistance =
+      row.resistance_performed === '' ? null : parseFloat(row.resistance_performed)
+    const { error } = await queuedUpsert(
+      supabase,
+      'set_logs',
+      {
+        assignment_id: assignmentId,
+        exercise_id: exercise.id,
+        set_number: row.set_number,
+        logged_date: loggedDate,
+        reps_performed: Number.isNaN(reps as number) ? null : reps,
+        weight_performed: Number.isNaN(weight as number) ? null : weight,
+        duration_performed_seconds: row.duration_performed_seconds,
+        speed_performed: Number.isNaN(speed as number) ? null : speed,
+        incline_performed: Number.isNaN(incline as number) ? null : incline,
+        resistance_performed: Number.isNaN(resistance as number) ? null : resistance,
+        completed: row.completed,
+      },
+      { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
+    )
+    if (error) showToast('Failed to save set', 'error')
+    updateRow(row.set_number, { saving: false })
   }
 
   const commitDuration = (setNumber: number) => {
@@ -225,43 +249,84 @@ export function ExerciseSetLogger({
 
   // Inline component rendering the ghost "Last week" hint, an "improved" pill
   // when the user beats their previous values, and (when applicable) a
-  // "Collapse" link so a manually-re-expanded row can be tidied back up.
-  const PriorHint = ({ row }: { row: RowState }) => {
+  // Pre-set context strip: "Last: 135 × 6  ·  ↓ Try 130 lb". The
+  // suggested-weight chip is the actionable bit — the trainee sees it
+  // BEFORE the set so they can adjust load now, not "remember next time".
+  // Strength only; cardio falls back to a plain "Last: 25:30" line.
+  const PreSetHint = ({ row }: { row: RowState }) => {
     const prev = loaded ? priorBySet.get(row.set_number) : undefined
-    const hint = prev ? formatPriorHint(prev, isCardio) : null
+    if (!prev) return null
+    const last = formatPriorHint(prev, isCardio)
+    let suggestion: { direction: 'up' | 'down'; weight: number } | null = null
+    if (!isCardio) {
+      const fb = getRepRangeFeedback(
+        row.target_reps,
+        prev.reps_performed,
+        prev.weight_performed
+      )
+      if (fb && fb.state !== 'on-target' && prev.weight_performed != null) {
+        const weight = prev.weight_performed + fb.delta
+        if (weight > 0) {
+          suggestion = { direction: fb.delta > 0 ? 'up' : 'down', weight }
+        }
+      }
+    }
+    if (!last && !suggestion) return null
+    return (
+      <div className="flex items-center gap-2 text-[10px] px-3 pt-2 flex-wrap">
+        {last && (
+          <span className="text-slate-400 tabular-nums">
+            Last: <span className="font-medium text-slate-500">{last}</span>
+          </span>
+        )}
+        {suggestion && (
+          <span
+            className={`inline-flex items-center gap-1 font-medium border rounded-full px-2 py-0.5 tabular-nums ${
+              suggestion.direction === 'up'
+                ? 'text-indigo-700 bg-indigo-50 border-indigo-100'
+                : 'text-amber-700 bg-amber-50 border-amber-100'
+            }`}
+          >
+            {suggestion.direction === 'up' ? (
+              <ArrowUp size={11} />
+            ) : (
+              <ArrowDown size={11} />
+            )}
+            Try {suggestion.weight}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  // Post-set strip: "↑ Beat last" celebration + collapse link. Pre-set
+  // context has already shown the trainee what to aim for, so we keep
+  // this row small and reactive — only renders when there's something to
+  // surface.
+  const PostSetHint = ({ row }: { row: RowState }) => {
+    const prev = loaded ? priorBySet.get(row.set_number) : undefined
     const improved = prev ? isImprovement(row, prev, isCardio) : false
     const showCollapse =
       loaded && row.completed && manuallyExpanded.has(row.set_number)
-
-    if (!hint && !showCollapse) return null
-
+    if (!improved && !showCollapse) return null
     return (
-      <div className="flex items-center justify-between gap-2 text-[10px] px-3 pb-1.5">
-        <span className="text-slate-400 tabular-nums">
-          {hint && (
-            <>
-              Last: <span className="font-medium text-slate-500">{hint}</span>
-            </>
-          )}
-        </span>
-        <div className="flex items-center gap-2 shrink-0">
-          {improved && (
-            <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
-              ↑ Beat last
-            </span>
-          )}
-          {showCollapse && (
-            <button
-              type="button"
-              onClick={() => collapseRow(row.set_number)}
-              className="inline-flex items-center gap-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
-              aria-label="Collapse this set"
-            >
-              <ChevronUp size={11} />
-              Collapse
-            </button>
-          )}
-        </div>
+      <div className="flex items-center justify-end gap-2 text-[10px] px-3 pb-1.5 flex-wrap">
+        {improved && (
+          <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
+            ↑ Beat last
+          </span>
+        )}
+        {showCollapse && (
+          <button
+            type="button"
+            onClick={() => collapseRow(row.set_number)}
+            className="inline-flex items-center gap-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+            aria-label="Collapse this set"
+          >
+            <ChevronUp size={11} />
+            Collapse
+          </button>
+        )}
       </div>
     )
   }
@@ -330,6 +395,11 @@ export function ExerciseSetLogger({
   }
 
   if (isCardio) {
+    const cardioFields = getCardioFields(
+      exercise.cardio_subtype as CardioSubtype | null | undefined
+    )
+    const hasMachineFields =
+      cardioFields.speed || cardioFields.incline || cardioFields.resistance
     return (
       <div className="mt-3 bg-white rounded-lg border border-slate-200 overflow-hidden">
         {/* Desktop column header — hidden on phones since the row already labels itself. */}
@@ -346,11 +416,22 @@ export function ExerciseSetLogger({
               row.target_duration_seconds != null && row.target_duration_seconds > 0
                 ? formatDuration(row.target_duration_seconds)
                 : null
+            // Build a "Speed 3-4 · Incline 15" string from the prescription
+            // so the trainee sees what the coach asked for on the row itself.
+            const machineTargetBits: string[] = []
+            if (cardioFields.speed && row.target_speed)
+              machineTargetBits.push(`Speed ${row.target_speed}`)
+            if (cardioFields.incline && row.target_incline)
+              machineTargetBits.push(`Incline ${row.target_incline}%`)
+            if (cardioFields.resistance && row.target_resistance)
+              machineTargetBits.push(`Resistance ${row.target_resistance}`)
+            const machineTargetLabel = machineTargetBits.join(' · ')
             return (
               <div
                 key={row.set_number}
                 className={`transition-colors ${row.completed ? 'bg-emerald-50/40' : ''}`}
               >
+                <PreSetHint row={row} />
                 <div className="px-3 py-2 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center">
                   {/* Mobile metadata row + done button. */}
                   <div className="flex items-center justify-between gap-2 mb-2 sm:hidden">
@@ -404,7 +485,83 @@ export function ExerciseSetLogger({
                     {renderDone(row)}
                   </div>
                 </div>
-                <PriorHint row={row} />
+
+                {/* Machine-specific actuals (speed / incline / resistance).
+                    Only rendered when the exercise has a cardio_subtype set
+                    AND the coach prescribed at least one of those fields. */}
+                {hasMachineFields && (
+                  <div className="px-3 pb-3 -mt-1">
+                    {machineTargetLabel && (
+                      <p className="text-[10px] text-slate-400 mb-1.5">
+                        Target: <span className="text-slate-600">{machineTargetLabel}</span>
+                      </p>
+                    )}
+                    <div className="grid grid-cols-3 gap-2">
+                      {cardioFields.speed && (
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Speed</label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            inputMode="decimal"
+                            value={row.speed_performed}
+                            onChange={e =>
+                              updateRow(row.set_number, { speed_performed: e.target.value })
+                            }
+                            onBlur={() =>
+                              persist(rows.find(r => r.set_number === row.set_number)!)
+                            }
+                            placeholder="0"
+                            className="text-sm py-1.5"
+                          />
+                        </div>
+                      )}
+                      {cardioFields.incline && (
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Incline %</label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            inputMode="decimal"
+                            value={row.incline_performed}
+                            onChange={e =>
+                              updateRow(row.set_number, { incline_performed: e.target.value })
+                            }
+                            onBlur={() =>
+                              persist(rows.find(r => r.set_number === row.set_number)!)
+                            }
+                            placeholder="0"
+                            className="text-sm py-1.5"
+                          />
+                        </div>
+                      )}
+                      {cardioFields.resistance && (
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Resistance</label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            inputMode="decimal"
+                            value={row.resistance_performed}
+                            onChange={e =>
+                              updateRow(row.set_number, { resistance_performed: e.target.value })
+                            }
+                            onBlur={() =>
+                              persist(rows.find(r => r.set_number === row.set_number)!)
+                            }
+                            placeholder="0"
+                            className="text-sm py-1.5"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <PostSetHint row={row} />
               </div>
             )
           })}
@@ -432,6 +589,7 @@ export function ExerciseSetLogger({
             key={row.set_number}
             className={`transition-colors ${row.completed ? 'bg-emerald-50/40' : ''}`}
           >
+            <PreSetHint row={row} />
             <div className="px-3 py-2 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center">
               {/* Mobile-only metadata row: set # + target + done. */}
               <div className="flex items-center justify-between gap-2 mb-2 sm:hidden">
@@ -497,7 +655,7 @@ export function ExerciseSetLogger({
                 {renderDone(row)}
               </div>
             </div>
-            <PriorHint row={row} />
+            <PostSetHint row={row} />
           </div>
           )
         })}

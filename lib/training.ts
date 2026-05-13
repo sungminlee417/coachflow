@@ -23,6 +23,114 @@ export const buildPrescribedSets = (exercise: Exercise): ExerciseSet[] => {
   }))
 }
 
+/**
+ * Parse a target_reps string into a numeric range so the logger can tell
+ * whether the trainee hit it. Supports:
+ *   "8"      → { min: 8, max: 8 }    (exact)
+ *   "8-10"   → { min: 8, max: 10 }   (range)
+ *   "8+"     → { min: 8, max: ∞ }    (at least)
+ *   "AMRAP"  → null                  (no quantitative target)
+ *   ""       → null
+ *   garbage  → null
+ */
+export function parseRepRange(target: string): { min: number; max: number } | null {
+  const trimmed = target.trim().toLowerCase()
+  if (!trimmed) return null
+  if (trimmed.includes('amrap') || trimmed.includes('max')) return null
+
+  const plus = trimmed.match(/^(\d+(?:\.\d+)?)\s*\+$/)
+  if (plus) {
+    const n = parseFloat(plus[1])
+    return Number.isFinite(n) ? { min: n, max: Infinity } : null
+  }
+
+  const range = trimmed.match(/^(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)$/)
+  if (range) {
+    const a = parseFloat(range[1])
+    const b = parseFloat(range[2])
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      return { min: Math.min(a, b), max: Math.max(a, b) }
+    }
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    const n = parseFloat(trimmed)
+    return Number.isFinite(n) ? { min: n, max: n } : null
+  }
+  return null
+}
+
+/**
+ * Suggested weight delta in the trainee's current load unit. Tuned for
+ * common gym jumps: micro-loaded accessories get 2.5, mid-range lifts
+ * get 5, heavy compound lifts get 10. Bias toward "smaller delta when
+ * uncertain" — overshoot is harder to recover from than undershoot.
+ */
+export function suggestedDelta(weight: number | null | undefined): number {
+  if (weight == null || !Number.isFinite(weight) || weight <= 0) return 5
+  if (weight < 50) return 2.5
+  if (weight < 200) return 5
+  return 10
+}
+
+export type RepRangeState = 'undershot' | 'on-target' | 'exceeded'
+
+export interface RepRangeFeedback {
+  state: RepRangeState
+  /** Suggested change in load. Positive = add weight, negative = drop. */
+  delta: number
+  /** Lower bound of the parsed target, for display. */
+  min: number
+  /** Upper bound (Infinity for "8+" style prescriptions). */
+  max: number
+}
+
+/**
+ * Comparison of a logged set against its prescription. Returns null when
+ * there's no quantitative target (AMRAP, blank) or no reps were entered
+ * yet — the logger uses that to skip rendering the hint.
+ */
+export function getRepRangeFeedback(
+  target: string | null | undefined,
+  repsPerformed: number | string | null | undefined,
+  weightPerformed: number | string | null | undefined
+): RepRangeFeedback | null {
+  if (target == null) return null
+  const range = parseRepRange(target)
+  if (!range) return null
+  const reps =
+    typeof repsPerformed === 'number'
+      ? repsPerformed
+      : repsPerformed === '' || repsPerformed == null
+        ? NaN
+        : parseFloat(repsPerformed)
+  if (!Number.isFinite(reps) || reps <= 0) return null
+  const weight =
+    typeof weightPerformed === 'number'
+      ? weightPerformed
+      : weightPerformed === '' || weightPerformed == null
+        ? null
+        : parseFloat(weightPerformed)
+  const safeWeight = weight != null && Number.isFinite(weight) ? weight : null
+  const delta = suggestedDelta(safeWeight)
+  // Range prescriptions ("8-10") graduate at the *top* of the range — the
+  // conventional progressive-overload rule is "hit the max cleanly → add
+  // weight next time". Single-value prescriptions ("8") and open-ended
+  // ones ("8+") still require strictly exceeding to suggest going up.
+  const isClosedRange =
+    range.min < range.max && Number.isFinite(range.max)
+  let state: RepRangeState
+  if (reps < range.min) state = 'undershot'
+  else if (isClosedRange ? reps >= range.max : reps > range.max) state = 'exceeded'
+  else state = 'on-target'
+  return {
+    state,
+    delta: state === 'undershot' ? -delta : state === 'exceeded' ? delta : 0,
+    min: range.min,
+    max: range.max,
+  }
+}
+
 // Compact representation of "what the client did last time on this set."
 // Sourced from set_logs; one entry per set_number, the most recent before today.
 export interface PriorPerformance {
