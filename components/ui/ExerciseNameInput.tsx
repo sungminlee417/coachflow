@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type InputHTMLAttributes,
@@ -36,14 +35,26 @@ export function ExerciseNameInput({
 }: ExerciseNameInputProps) {
   const [open, setOpen] = useState(false)
   const [rawActiveIndex, setActiveIndex] = useState(0)
+  const [matches, setMatches] = useState<CatalogEntry[]>([])
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  // Recompute matches only when the typed value changes. 12 entries is
-  // plenty to scan visually without scrolling the dropdown.
-  const matches: CatalogEntry[] = useMemo(
-    () => searchCatalog(value, 12),
-    [value]
-  )
+  // Catalog is dynamically imported on first focus — the JSON is ~200 KB
+  // and we don't want it in the dashboard's initial chunk. Subsequent
+  // searches are sync-fast (module-scoped cache). The race guard discards
+  // results from stale queries when the user types faster than the
+  // catalog's first load. `searchCatalog` already returns `[]` for empty
+  // input, so we just await unconditionally — no sync setState on the
+  // effect body, which the eslint plugin (rightly) flags as a re-render
+  // hazard.
+  useEffect(() => {
+    let cancelled = false
+    searchCatalog(value, 12).then(result => {
+      if (!cancelled) setMatches(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [value])
 
   // Clamp the highlighted row at usage time rather than resetting via an
   // effect — keeps the keyboard-nav state purely derived from current

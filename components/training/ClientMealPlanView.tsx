@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { WeekSelector } from '@/components/ui/WeekSelector'
 import { Bell, Flame, Beef, Wheat, Droplet, Trash2, X } from 'lucide-react'
@@ -38,8 +38,10 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
   // without it nagging them again on the same day.
   const [missedBannerDismissed, setMissedBannerDismissed] = useState(false)
   // Tick every minute so the missed-meal banner updates as scheduled times
-  // come and go without requiring a route change.
-  const [, setMinuteTick] = useState(0)
+  // come and go without requiring a route change. `minuteTick` is read so
+  // it can serve as a useMemo dependency below — without binding it the
+  // missed-meal computation would never recompute as the clock advances.
+  const [minuteTick, setMinuteTick] = useState(0)
   useEffect(() => {
     const handle = window.setInterval(() => setMinuteTick(n => n + 1), 60_000)
     return () => window.clearInterval(handle)
@@ -87,8 +89,12 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
   // as "missed". Avoids nagging the user the moment the clock ticks past.
   const MISSED_GRACE_MS = 30 * 60 * 1000
 
-  const missedMeals = (() => {
-    if (selectedDate !== todayISO()) return [] as { id: string; name: string; time: string }[]
+  // Memoized so the nested loops only re-run when the inputs actually
+  // change. `minuteTick` is intentionally in the deps so the banner
+  // updates as the clock crosses each scheduled meal time.
+  const missedMeals = useMemo(() => {
+    if (selectedDate !== todayISO())
+      return [] as { id: string; name: string; time: string }[]
     const now = Date.now()
     const out: { id: string; name: string; time: string }[] = []
     for (const a of assignments) {
@@ -104,7 +110,8 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
       }
     }
     return out
-  })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- MISSED_GRACE_MS is a constant
+  }, [selectedDate, assignments, eatenMealIds, minuteTick])
 
   // Load meal_logs for the selected date so the toggle reflects what the user
   // already checked off. Independent of fetchAssignments — runs in parallel.
@@ -148,30 +155,30 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
     })
   }
 
-  // Total scheduled meals across all assignments for today, for the progress chip.
-  const totalMealsToday = assignments.reduce(
-    (sum, a) => sum + a.meal_plan.meals.length,
-    0
-  )
-  const eatenCountToday = assignments.reduce(
-    (sum, a) => sum + a.meal_plan.meals.filter(m => m.id && eatenMealIds.has(m.id)).length,
-    0
-  )
-
-  // Compute daily totals from all meal plan assignments → meals → foods
-  const dailyTotals = assignments.reduce(
-    (acc, a) => {
-      a.meal_plan.meals.forEach(m => {
+  // Per-day aggregates. Memoized so a re-render from an unrelated state
+  // change (modal open, missed-banner dismissed) doesn't recompute over
+  // every meal + food + ingredient just to render the same totals.
+  const { totalMealsToday, eatenCountToday, dailyTotals } = useMemo(() => {
+    let totalMeals = 0
+    let eatenCount = 0
+    const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    for (const a of assignments) {
+      for (const m of a.meal_plan.meals) {
+        totalMeals += 1
+        if (m.id && eatenMealIds.has(m.id)) eatenCount += 1
         const mm = computeMealMacros(m)
-        acc.calories += mm.calories
-        acc.protein += mm.protein_grams
-        acc.carbs += mm.carbs_grams
-        acc.fat += mm.fat_grams
-      })
-      return acc
-    },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  )
+        totals.calories += mm.calories
+        totals.protein += mm.protein_grams
+        totals.carbs += mm.carbs_grams
+        totals.fat += mm.fat_grams
+      }
+    }
+    return {
+      totalMealsToday: totalMeals,
+      eatenCountToday: eatenCount,
+      dailyTotals: totals,
+    }
+  }, [assignments, eatenMealIds])
 
   const macroCards = [
     { icon: Flame, label: 'Calories', value: dailyTotals.calories, suffix: '' },

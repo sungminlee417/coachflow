@@ -10,7 +10,11 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Plus, Send, Pencil, Trash2, Dumbbell } from 'lucide-react'
 import type { Workout } from '@/lib/types'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
-import WorkoutBuilder from './WorkoutBuilder'
+import dynamic from 'next/dynamic'
+// The builder is ~1100 LOC + drag/drop + form state — only mounted when
+// the coach taps "Create / Edit", so lazy-loading keeps the dashboard's
+// initial JS chunk lean. `ssr: false` because the builder is fully client.
+const WorkoutBuilder = dynamic(() => import('./WorkoutBuilder'), { ssr: false })
 import WorkoutAssignmentModal from './WorkoutAssignmentModal'
 
 interface WorkoutLibraryProps {

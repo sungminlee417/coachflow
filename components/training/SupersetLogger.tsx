@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
@@ -11,7 +11,7 @@ import { cachedQuery, cachedFetch } from '@/lib/cached-query'
 import { useRestTimer } from '@/components/ui/RestTimer'
 import {
   buildPrescribedSets,
-  fetchPriorPerformance,
+  fetchPriorPerformanceBatch,
   formatPriorHint,
   getRepRangeFeedback,
   isImprovement,
@@ -109,15 +109,25 @@ export function SupersetLogger({
       const exerciseIds = exercises.map(e => e.id).filter(Boolean) as string[]
       if (exerciseIds.length === 0) return
 
-      // Stable cache key for the combined set_logs query — sort the ids so
-      // a reorder of the same exercise set doesn't bust the cache.
+      // Stable cache keys — sort the ids so a reorder of the same set of
+      // exercises doesn't bust the cache. The variant fingerprint is part
+      // of the key so swapping an exercise gets its own cached priors.
       const sortedIds = [...exerciseIds].sort()
       const todayCacheKey = `superset_set_logs:${assignmentId}:${sortedIds.join(',')}:${loggedDate}`
+      const variantMap = new Map<string, string | null>()
+      for (const id of exerciseIds) {
+        variantMap.set(id, variantByExerciseId?.get(id) ?? null)
+      }
+      const variantSignature = sortedIds
+        .map(id => `${id}=${variantMap.get(id) ?? ''}`)
+        .join(',')
+      const priorCacheKey = `superset_prior:${assignmentId}:${variantSignature}:${loggedDate}`
 
-      // Today's logs + each exercise's most-recent-prior performance, in parallel.
-      // Every fetch flows through the offline cache so re-opening a previously-
-      // visited superset round shows logged values + prior hints even offline.
-      const [todayResult, ...priorMaps] = await Promise.all([
+      // Today's logs + ALL exercises' prior performance, in parallel. The
+      // prior fetch used to fan out N round trips (one per exercise);
+      // `fetchPriorPerformanceBatch` collapses them into 2 queries total
+      // (one for set_logs, one for substitutions) regardless of N.
+      const [todayResult, priorResult] = await Promise.all([
         cachedQuery<
           Array<{
             exercise_id: string
@@ -139,19 +149,26 @@ export function SupersetLogger({
               .in('exercise_id', exerciseIds)
               .eq('logged_date', loggedDate)
         ),
-        ...exerciseIds.map(exId => {
-          const variant = variantByExerciseId?.get(exId) ?? null
-          return cachedFetch<Map<number, PriorPerformance>>(
-            `prior:${assignmentId}:${exId}:${loggedDate}:${variant ?? ''}`,
-            () => fetchPriorPerformance(supabase, assignmentId, exId, loggedDate, variant)
-          ).then(result => ({
-            exId,
-            map: result.data ?? new Map<number, PriorPerformance>(),
-          }))
-        }),
+        cachedFetch<Map<string, Map<number, PriorPerformance>>>(
+          priorCacheKey,
+          () =>
+            fetchPriorPerformanceBatch(
+              supabase,
+              assignmentId,
+              exerciseIds,
+              loggedDate,
+              variantMap
+            )
+        ),
       ])
 
       if (cancelled) return
+
+      const priorByExercise = priorResult.data ?? new Map<string, Map<number, PriorPerformance>>()
+      const priorMaps = exerciseIds.map(exId => ({
+        exId,
+        map: priorByExercise.get(exId) ?? new Map<number, PriorPerformance>(),
+      }))
 
       const logIndex = new Map(
         (todayResult.data ?? []).map(l => [`${l.exercise_id}-${l.set_number}`, l])
@@ -304,24 +321,40 @@ export function SupersetLogger({
     })
   }
 
-  const maxRounds = exercises.reduce((max, ex) => {
-    const rows = ex.id ? rowsByExercise.get(ex.id) : undefined
-    return Math.max(max, rows?.length ?? buildPrescribedSets(ex).length)
-  }, 0)
+  const maxRounds = useMemo(
+    () =>
+      exercises.reduce((max, ex) => {
+        const rows = ex.id ? rowsByExercise.get(ex.id) : undefined
+        return Math.max(max, rows?.length ?? buildPrescribedSets(ex).length)
+      }, 0),
+    [exercises, rowsByExercise]
+  )
+
+  // Precompute per-round completion once instead of recomputing inside the
+  // render loop, where each iteration would re-scan every exercise. On a
+  // 5-round superset with 4 exercises that drops 20 lookups to 5.
+  const roundsComplete = useMemo(() => {
+    const out = new Array<boolean>(maxRounds)
+    for (let i = 0; i < maxRounds; i++) {
+      const setNumber = i + 1
+      let touched = false
+      let allDone = true
+      for (const ex of exercises) {
+        if (!ex.id) continue
+        const row = rowsByExercise.get(ex.id)?.find(r => r.set_number === setNumber)
+        if (!row) continue
+        touched = true
+        if (!row.completed) {
+          allDone = false
+          break
+        }
+      }
+      out[i] = touched && allDone
+    }
+    return out
+  }, [maxRounds, exercises, rowsByExercise])
 
   if (maxRounds === 0) return null
-
-  const isRoundComplete = (setNumber: number): boolean => {
-    let touched = false
-    for (const ex of exercises) {
-      if (!ex.id) continue
-      const row = rowsByExercise.get(ex.id)?.find(r => r.set_number === setNumber)
-      if (!row) continue
-      touched = true
-      if (!row.completed) return false
-    }
-    return touched
-  }
 
   const restBetweenRounds = exercises[exercises.length - 1]?.rest_seconds ?? null
 
@@ -357,7 +390,7 @@ export function SupersetLogger({
     <div className="space-y-2">
       {Array.from({ length: maxRounds }, (_, roundIdx) => {
         const setNumber = roundIdx + 1
-        const complete = isRoundComplete(setNumber)
+        const complete = roundsComplete[roundIdx] ?? false
         const isLastRound = setNumber === maxRounds
         const isAutoCollapsed =
           loaded && complete && !manuallyExpandedRounds.has(setNumber)

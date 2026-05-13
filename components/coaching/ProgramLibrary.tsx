@@ -10,7 +10,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import { Plus, Send, Pencil, Trash2, ListChecks } from 'lucide-react'
 import type { WorkoutProgram } from '@/lib/types'
-import ProgramBuilder from './ProgramBuilder'
+import dynamic from 'next/dynamic'
+// Lazy-loaded — only mounted after the coach taps "Create / Edit", so
+// keeping it out of the dashboard's initial JS chunk is a free win.
+const ProgramBuilder = dynamic(() => import('./ProgramBuilder'), { ssr: false })
 import ProgramAssignmentModal from './ProgramAssignmentModal'
 
 interface ProgramLibraryProps {

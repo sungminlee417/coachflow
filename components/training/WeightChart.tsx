@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import {
   Area,
   AreaChart,
@@ -50,7 +51,7 @@ function ChartTooltip({ active, payload, unit }: TooltipProps) {
   )
 }
 
-export function WeightChart({ logs, weightUnit = 'lbs' }: WeightChartProps) {
+function WeightChartInner({ logs, weightUnit = 'lbs' }: WeightChartProps) {
   const sorted = [...logs].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
   if (sorted.length < 2) return null
 
@@ -172,3 +173,8 @@ export function WeightChart({ logs, weightUnit = 'lbs' }: WeightChartProps) {
     </div>
   )
 }
+
+// Recharts is expensive to re-render — wrap in memo so parent state changes
+// (e.g. switching dashboard tabs, opening modals) don't trigger a chart
+// rebuild when the props haven't actually moved.
+export const WeightChart = memo(WeightChartInner)

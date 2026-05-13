@@ -7,8 +7,11 @@
 // names freeform. Picking a catalog entry just stamps `catalog_id` on the
 // `exercises` row so we can dereference muscles/equipment/difficulty later
 // (e.g. "find me chest exercises with a barbell").
-
-import rawCatalog from './exercise-catalog.json'
+//
+// Bundle note: the JSON is ~200 KB and we don't want it in the dashboard's
+// initial chunk. Everything below is lazy — the JSON only loads on the
+// first call to `searchCatalog`/`getCatalogEntry`, which happens the first
+// time a coach focuses an exercise name input.
 
 export type ExerciseCategory =
   | 'strength'
@@ -31,30 +34,56 @@ export interface CatalogEntry {
   secondaryMuscles: string[]
 }
 
-export const exerciseCatalog: CatalogEntry[] = rawCatalog as CatalogEntry[]
+interface CatalogIndex {
+  list: CatalogEntry[]
+  byId: Map<string, CatalogEntry>
+}
 
-// Build a `id → entry` map up front so lookups stay O(1) regardless of how
-// many times components dereference catalog ids.
-const byId = new Map<string, CatalogEntry>(
-  exerciseCatalog.map(e => [e.id, e])
-)
+let cachedIndex: CatalogIndex | null = null
+let inflight: Promise<CatalogIndex> | null = null
 
-export function getCatalogEntry(id: string | null | undefined): CatalogEntry | null {
+/**
+ * Load (or return the already-loaded) catalog index. The dynamic import
+ * keeps the 200 KB JSON out of the initial JS chunk; once it resolves
+ * we build an `id → entry` lookup map and keep both around for the
+ * lifetime of the tab.
+ */
+export async function loadCatalog(): Promise<CatalogIndex> {
+  if (cachedIndex) return cachedIndex
+  if (!inflight) {
+    inflight = import('./exercise-catalog.json').then(mod => {
+      const list = mod.default as CatalogEntry[]
+      const byId = new Map<string, CatalogEntry>(list.map(e => [e.id, e]))
+      cachedIndex = { list, byId }
+      inflight = null
+      return cachedIndex
+    })
+  }
+  return inflight
+}
+
+export async function getCatalogEntry(
+  id: string | null | undefined
+): Promise<CatalogEntry | null> {
   if (!id) return null
-  return byId.get(id) ?? null
+  const idx = await loadCatalog()
+  return idx.byId.get(id) ?? null
 }
 
 /**
  * Substring search across the catalog. Case-insensitive, ranks exact
  * prefix matches above mid-string matches. Returns at most `limit` entries
- * so the dropdown stays snappy on long-typing.
+ * so the dropdown stays snappy on long-typing. Async because the catalog
+ * is dynamically imported on first call — subsequent calls are sync-fast
+ * (the JSON stays in module-scoped cache).
  */
-export function searchCatalog(query: string, limit = 12): CatalogEntry[] {
+export async function searchCatalog(query: string, limit = 12): Promise<CatalogEntry[]> {
   const q = query.trim().toLowerCase()
   if (!q) return []
+  const { list } = await loadCatalog()
   const prefix: CatalogEntry[] = []
   const contains: CatalogEntry[] = []
-  for (const e of exerciseCatalog) {
+  for (const e of list) {
     const name = e.name.toLowerCase()
     if (name.startsWith(q)) prefix.push(e)
     else if (name.includes(q)) contains.push(e)

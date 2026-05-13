@@ -222,38 +222,89 @@ export async function fetchPriorPerformance(
   beforeDate: string,
   currentVariant: string | null = null
 ): Promise<Map<number, PriorPerformance>> {
-  // Substitutions for this slot on prior dates; absence = original was active.
-  const subByDate = new Map<string, string>()
-  try {
-    const { data: subs } = await supabase
-      .from('exercise_substitutions')
-      .select('logged_date, substituted_name')
+  const all = await fetchPriorPerformanceBatch(
+    supabase,
+    assignmentId,
+    [exerciseId],
+    beforeDate,
+    new Map([[exerciseId, currentVariant]])
+  )
+  return all.get(exerciseId) ?? new Map<number, PriorPerformance>()
+}
+
+/**
+ * Batched version of `fetchPriorPerformance` — one round trip for ALL
+ * exercises in a superset (or a whole workout day) instead of N. On a
+ * 10-exercise day this drops latency from "N × 100ms" to a single trip.
+ *
+ * `variantByExerciseId` is consulted per-row so each exercise can have its
+ * own current variant (a substituted exercise compares against its own
+ * substitution history, not the original's).
+ */
+export async function fetchPriorPerformanceBatch(
+  supabase: SupabaseClient,
+  assignmentId: string,
+  exerciseIds: string[],
+  beforeDate: string,
+  variantByExerciseId: Map<string, string | null>
+): Promise<Map<string, Map<number, PriorPerformance>>> {
+  const result = new Map<string, Map<number, PriorPerformance>>()
+  for (const id of exerciseIds) result.set(id, new Map())
+  if (exerciseIds.length === 0) return result
+
+  // One combined query for substitutions + one for set_logs, both
+  // covering every exercise. We partition client-side after the fetch.
+  const [subsResult, logsResult] = await Promise.all([
+    (async () => {
+      try {
+        return await supabase
+          .from('exercise_substitutions')
+          .select('exercise_id, logged_date, substituted_name')
+          .eq('assignment_id', assignmentId)
+          .in('exercise_id', exerciseIds)
+          .lt('logged_date', beforeDate)
+      } catch {
+        // Table may be missing on older deploys — fall back to "no subs".
+        return { data: [] }
+      }
+    })(),
+    supabase
+      .from('set_logs')
+      .select('exercise_id, set_number, reps_performed, weight_performed, duration_performed_seconds, logged_date')
       .eq('assignment_id', assignmentId)
-      .eq('exercise_id', exerciseId)
+      .in('exercise_id', exerciseIds)
       .lt('logged_date', beforeDate)
-    for (const s of (subs ?? []) as { logged_date: string; substituted_name: string }[]) {
-      subByDate.set(s.logged_date, s.substituted_name)
-    }
-  } catch {
-    // If the substitutions table doesn't exist yet (migration not run) or
-    // RLS blocks it, treat every prior date as the original variant.
+      .order('logged_date', { ascending: false }),
+  ])
+
+  // (exerciseId, logged_date) → substituted_name
+  const subKey = (exId: string, date: string) => `${exId}|${date}`
+  const subByKey = new Map<string, string>()
+  for (const s of (subsResult.data ?? []) as {
+    exercise_id: string
+    logged_date: string
+    substituted_name: string
+  }[]) {
+    subByKey.set(subKey(s.exercise_id, s.logged_date), s.substituted_name)
   }
 
-  const { data } = await supabase
-    .from('set_logs')
-    .select('set_number, reps_performed, weight_performed, duration_performed_seconds, logged_date')
-    .eq('assignment_id', assignmentId)
-    .eq('exercise_id', exerciseId)
-    .lt('logged_date', beforeDate)
-    .order('logged_date', { ascending: false })
-
-  const map = new Map<number, PriorPerformance>()
-  for (const row of (data ?? []) as PriorPerformance[]) {
+  for (const row of (logsResult.data ?? []) as Array<
+    PriorPerformance & { exercise_id: string }
+  >) {
+    const map = result.get(row.exercise_id)
+    if (!map) continue
     if (map.has(row.set_number)) continue
-    const variant = subByDate.get(row.logged_date) ?? null
+    const variant = subByKey.get(subKey(row.exercise_id, row.logged_date)) ?? null
+    const currentVariant = variantByExerciseId.get(row.exercise_id) ?? null
     if (variant === currentVariant) {
-      map.set(row.set_number, row)
+      map.set(row.set_number, {
+        set_number: row.set_number,
+        reps_performed: row.reps_performed,
+        weight_performed: row.weight_performed,
+        duration_performed_seconds: row.duration_performed_seconds,
+        logged_date: row.logged_date,
+      })
     }
   }
-  return map
+  return result
 }

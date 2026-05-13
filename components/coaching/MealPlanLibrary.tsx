@@ -10,7 +10,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import { Plus, Send, Pencil, Trash2, Apple } from 'lucide-react'
 import type { MealPlan } from '@/lib/types'
-import MealPlanBuilder from './MealPlanBuilder'
+import dynamic from 'next/dynamic'
+// Lazy-loaded — the builder is the heaviest screen in the app (~1400 LOC
+// + drag/drop) and is only mounted after the coach taps "Create / Edit".
+const MealPlanBuilder = dynamic(() => import('./MealPlanBuilder'), { ssr: false })
 import MealPlanAssignmentModal from './MealPlanAssignmentModal'
 
 interface MealPlanLibraryProps {

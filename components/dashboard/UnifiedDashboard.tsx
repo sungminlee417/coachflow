@@ -63,6 +63,13 @@ const TAB_KEY_SET = new Set<string>(TABS.map(t => t.key))
 const DEFAULT_TAB: Tab = 'my-clients'
 const isValidTab = (k: string | null): k is Tab => k != null && TAB_KEY_SET.has(k)
 
+// TABS partitioned once at module load — both sidebar nav (desktop) and
+// the drawer (mobile) render these on every state change, and filter-on-
+// render produces a fresh array reference each time which would defeat
+// child memoization down the line.
+const COACHING_TABS = TABS.filter(t => t.section === 'coaching')
+const TRAINING_TABS = TABS.filter(t => t.section === 'training')
+
 export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProps) {
   const supabase = useSupabase()
   const router = useRouter()
@@ -86,6 +93,17 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
   const [coach, setCoach] = useState<Profile | null>(null)
   const [loadingCoach, setLoadingCoach] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  // Once a tab has been visited it stays mounted (hidden via CSS when not
+  // active) so switching back is instant — no remount, no re-fetch, no
+  // skeleton flash. Pays a one-time mount cost the first visit; from then
+  // on tab nav is free. The biggest felt win is bouncing between Workouts
+  // and Meals on the trainee side, which were each re-fetching every tap.
+  const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(
+    () => new Set([activeTab])
+  )
+  useEffect(() => {
+    setMountedTabs(prev => (prev.has(activeTab) ? prev : new Set(prev).add(activeTab)))
+  }, [activeTab])
 
   // Close the drawer on Escape and lock background scroll while open.
   useEffect(() => {
@@ -163,8 +181,8 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
 
   const activeTabLabel = TABS.find(t => t.key === activeTab)?.label ?? ''
 
-  const coachingTabs = TABS.filter(t => t.section === 'coaching')
-  const trainingTabs = TABS.filter(t => t.section === 'training')
+  const coachingTabs = COACHING_TABS
+  const trainingTabs = TRAINING_TABS
 
   return (
     <RestTimerProvider>
@@ -282,55 +300,80 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           </aside>
         </>
 
-        {/* Main content. Bottom padding leaves room for the mobile tab bar. */}
+        {/* Main content. Bottom padding leaves room for the mobile tab bar.
+            Each tab renders inside a `TabPanel` that mounts on first visit
+            and stays in the DOM thereafter (hidden via `display: none` when
+            inactive). State and any in-flight fetches survive tab switches,
+            so going Workouts → Meals → Workouts is instant. */}
         <main className="flex-1 min-w-0 md:ml-64 pt-14 md:pt-0 pb-20 md:pb-0">
-          <div key={activeTab} className="tab-content max-w-5xl mx-auto px-4 sm:px-8 py-8">
-            {activeTab === 'my-clients' && <ClientList coachId={user.id} />}
-            {activeTab === 'my-workouts' && <WorkoutLibrary coachId={user.id} />}
-            {activeTab === 'my-programs' && <ProgramLibrary coachId={user.id} />}
-            {activeTab === 'my-meal-plans' && <MealPlanLibrary coachId={user.id} />}
+          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+            <TabPanel active={activeTab === 'my-clients'} mounted={mountedTabs.has('my-clients')}>
+              <ClientList coachId={user.id} />
+            </TabPanel>
+            <TabPanel active={activeTab === 'my-workouts'} mounted={mountedTabs.has('my-workouts')}>
+              <WorkoutLibrary coachId={user.id} />
+            </TabPanel>
+            <TabPanel active={activeTab === 'my-programs'} mounted={mountedTabs.has('my-programs')}>
+              <ProgramLibrary coachId={user.id} />
+            </TabPanel>
+            <TabPanel active={activeTab === 'my-meal-plans'} mounted={mountedTabs.has('my-meal-plans')}>
+              <MealPlanLibrary coachId={user.id} />
+            </TabPanel>
 
-            {activeTab === 'assigned-workouts' && (
-              <>
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-8">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
-                    Coached by
-                  </p>
-                  {loadingCoach ? (
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-slate-200/70 animate-pulse" />
-                      <div className="space-y-2">
-                        <div className="h-3 w-32 rounded bg-slate-200/70 animate-pulse" />
-                        <div className="h-3 w-44 rounded bg-slate-200/70 animate-pulse" />
-                      </div>
+            <TabPanel
+              active={activeTab === 'assigned-workouts'}
+              mounted={mountedTabs.has('assigned-workouts')}
+            >
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+                  Coached by
+                </p>
+                {loadingCoach ? (
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-slate-200/70 animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-3 w-32 rounded bg-slate-200/70 animate-pulse" />
+                      <div className="h-3 w-44 rounded bg-slate-200/70 animate-pulse" />
                     </div>
-                  ) : coach ? (
-                    <div className="flex items-center gap-3">
-                      <Avatar name={coach.full_name} tone="success" />
-                      <div>
-                        <p className="font-medium text-slate-900 text-sm">{coach.full_name}</p>
-                        <p className="text-xs text-slate-500">{coach.email}</p>
-                      </div>
+                  </div>
+                ) : coach ? (
+                  <div className="flex items-center gap-3">
+                    <Avatar name={coach.full_name} tone="success" />
+                    <div>
+                      <p className="font-medium text-slate-900 text-sm">{coach.full_name}</p>
+                      <p className="text-xs text-slate-500">{coach.email}</p>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <Avatar name={profile.full_name} tone="success" />
-                      <div>
-                        <p className="font-medium text-slate-900 text-sm">Self-coached</p>
-                        <p className="text-xs text-slate-500">
-                          You can assign workouts and meal plans to yourself, or use an invite link to connect with a coach.
-                        </p>
-                      </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <Avatar name={profile.full_name} tone="success" />
+                    <div>
+                      <p className="font-medium text-slate-900 text-sm">Self-coached</p>
+                      <p className="text-xs text-slate-500">
+                        You can assign workouts and meal plans to yourself, or use an invite link to connect with a coach.
+                      </p>
                     </div>
-                  )}
-                </div>
-                <ClientWorkoutView clientId={user.id} />
-              </>
-            )}
+                  </div>
+                )}
+              </div>
+              <ClientWorkoutView clientId={user.id} />
+            </TabPanel>
 
-            {activeTab === 'assigned-meals' && <ClientMealPlanView clientId={user.id} />}
-            {activeTab === 'measurements' && <BodyTracker profile={profile} />}
-            {activeTab === 'history' && <WorkoutHistory clientId={user.id} />}
+            <TabPanel
+              active={activeTab === 'assigned-meals'}
+              mounted={mountedTabs.has('assigned-meals')}
+            >
+              <ClientMealPlanView clientId={user.id} />
+            </TabPanel>
+            <TabPanel
+              active={activeTab === 'measurements'}
+              mounted={mountedTabs.has('measurements')}
+            >
+              <BodyTracker profile={profile} />
+            </TabPanel>
+            <TabPanel active={activeTab === 'history'} mounted={mountedTabs.has('history')}>
+              <WorkoutHistory clientId={user.id} />
+            </TabPanel>
           </div>
         </main>
 
@@ -392,5 +435,35 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
       </div>
     </div>
     </RestTimerProvider>
+  )
+}
+
+/**
+ * Renders its children only after the tab has been visited at least once,
+ * and keeps them in the DOM thereafter (toggling `display: none`). Lets the
+ * dashboard pay each tab's mount + fetch cost exactly one time and serve
+ * subsequent switches instantly. Inactive tabs hold their state but don't
+ * paint, so they're cheap.
+ */
+function TabPanel({
+  active,
+  mounted,
+  children,
+}: {
+  active: boolean
+  mounted: boolean
+  children: React.ReactNode
+}) {
+  if (!mounted) return null
+  // `tab-content` on the active panel keeps the existing fadeIn animation
+  // on first appearance. Subsequent visibility flips don't restart it,
+  // which is the right call — instant feels better than animated here.
+  return (
+    <div
+      className={active ? 'tab-content' : 'hidden'}
+      aria-hidden={!active}
+    >
+      {children}
+    </div>
   )
 }

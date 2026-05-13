@@ -15,12 +15,15 @@ export default async function Dashboard() {
 
   if (!user) redirect('/login')
 
-  // Get profile, or create one if missing (defensive: signup should have created it)
+  // Get profile, or create one if missing (defensive: signup should have created it).
+  // `.maybeSingle()` returns null cleanly when the profile doesn't exist yet —
+  // `.single()` would throw, which is wasted work on a happy-path code branch
+  // that already handles the null case explicitly below.
   let { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   if (!profile) {
     const { data: created } = await supabase
