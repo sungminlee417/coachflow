@@ -75,7 +75,15 @@ html {
   }
 }
 
-/* Inputs on iOS auto-zoom when font-size < 16px. Force >= 16px on small screens. */
+/* iOS Safari auto-zooms when a focused input's computed font-size is
+   below 16px. Force >= 16px on small screens. `!important` is required
+   because Tailwind v4 puts utility classes like `text-sm` in the
+   utilities layer, and even though this rule is unlayered (which should
+   beat layered rules), specific inputs with explicit `text-sm py-1.5`
+   classes were still ending up at 14px in practice — the iOS zoom-on-
+   focus behavior triggered. `!important` here is purely a visual /
+   keyboard concern, not a real cascade hazard: callers can't reasonably
+   want a sub-16px input on mobile anyway. */
 @media (max-width: 640px) {
   input[type="text"],
   input[type="email"],
@@ -88,7 +96,7 @@ html {
   input[type="date"],
   textarea,
   select {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
 
