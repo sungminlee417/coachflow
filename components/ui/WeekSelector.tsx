@@ -78,7 +78,12 @@ export function WeekSelector({ selectedDate, onSelect, tone = 'brand' }: WeekSel
           <ChevronRight size={16} />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-2">
+      {/* Tighter gap + horizontal padding on mobile so 3-letter day names
+          like "Wed" aren't pressed against the cell edges. Vertical padding
+          and font sizes stay roughly the same so the tap target doesn't
+          shrink — Apple's 44pt recommendation is preserved on desktop and
+          the mobile cell still clears ~44pt with `py-2.5`. */}
+      <div className="grid grid-cols-7 gap-1 sm:gap-2">
         {weekDates.map((date, index) => {
           const isSelected = date === selectedDate
           const isToday = date === today
@@ -88,7 +93,7 @@ export function WeekSelector({ selectedDate, onSelect, tone = 'brand' }: WeekSel
             <button
               key={date}
               onClick={() => onSelect(date)}
-              className={`p-3 rounded-lg text-center transition-colors cursor-pointer ${
+              className={`px-1 py-2.5 sm:p-3 rounded-lg text-center transition-colors cursor-pointer ${
                 isSelected
                   ? tones.selected
                   : isToday
@@ -96,8 +101,8 @@ export function WeekSelector({ selectedDate, onSelect, tone = 'brand' }: WeekSel
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              <div className="text-xs font-medium">{DAY_NAMES[index]}</div>
-              <div className="text-lg font-bold">{day}</div>
+              <div className="text-[10px] sm:text-xs font-medium">{DAY_NAMES[index]}</div>
+              <div className="text-base sm:text-lg font-bold tabular-nums">{day}</div>
             </button>
           )
         })}

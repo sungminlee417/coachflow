@@ -149,22 +149,46 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
             return (
             <div
               key={assignment.id}
-              className="bg-white rounded-xl border border-slate-200 overflow-hidden"
+              className="bg-white rounded-xl border border-slate-200"
             >
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4 gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="text-xl font-bold text-slate-900">
-                        {assignment.workout.name}
-                      </h3>
-                      {assignment.workout.cycle_length &&
-                        assignment.workout.cycle_position && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5 tabular-nums">
-                            Day {assignment.workout.cycle_position} / {assignment.workout.cycle_length}
-                          </span>
-                        )}
-                    </div>
+              {/* Sticky workout-name bar — keeps "Push Day" / "Pull Day" /
+                  whatever visible while the trainee scrolls through the
+                  exercises so they always know which workout they're in
+                  the middle of. `top-14 md:top-0` clears the mobile top
+                  nav; the card no longer uses `overflow-hidden` so sticky
+                  can actually pin against the viewport instead of the
+                  card's own box. */}
+              <div className="sticky top-14 md:top-0 z-10 bg-white rounded-t-xl px-6 pt-6 pb-3 flex items-start justify-between gap-3 border-b border-slate-100">
+                <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+                  <h3 className="text-xl font-bold text-slate-900 truncate min-w-0">
+                    {assignment.workout.name}
+                  </h3>
+                  {assignment.workout.cycle_length &&
+                    assignment.workout.cycle_position && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5 tabular-nums shrink-0">
+                        Day {assignment.workout.cycle_position} / {assignment.workout.cycle_length}
+                      </span>
+                    )}
+                </div>
+                {isOwnAssignment && (
+                  <IconButton
+                    tone="danger"
+                    onClick={() =>
+                      setPendingUnassign({
+                        id: assignment.id,
+                        name: assignment.workout.name,
+                      })
+                    }
+                    aria-label="Unassign workout"
+                  >
+                    <Trash2 size={14} />
+                  </IconButton>
+                )}
+              </div>
+
+              <div className="px-6 pt-3 pb-6">
+                {(assignment.workout.description || assignment.notes) && (
+                  <div className="mb-4">
                     {assignment.workout.description && (
                       <p className="text-slate-600 text-sm">{assignment.workout.description}</p>
                     )}
@@ -174,21 +198,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                       </p>
                     )}
                   </div>
-                  {isOwnAssignment && (
-                    <IconButton
-                      tone="danger"
-                      onClick={() =>
-                        setPendingUnassign({
-                          id: assignment.id,
-                          name: assignment.workout.name,
-                        })
-                      }
-                      aria-label="Unassign workout"
-                    >
-                      <Trash2 size={14} />
-                    </IconButton>
-                  )}
-                </div>
+                )}
 
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <button
@@ -275,44 +285,55 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                               type="button"
                               onClick={() => toggleCollapsed(soloKey)}
                               aria-expanded={!isCollapsed}
-                              className="w-full p-4 flex items-baseline justify-between gap-3 flex-wrap text-left cursor-pointer"
+                              className="w-full p-4 text-left cursor-pointer"
                             >
-                              <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
-                                <span className="text-slate-400 shrink-0">
-                                  {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                                </span>
-                                <span className="text-slate-500 text-sm font-medium">
-                                  {group.startIndex + 1}.
-                                </span>
-                                <span className="font-semibold text-slate-900">
-                                  {displayName}
-                                </span>
-                                {activeSub && (
-                                  <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-px">
-                                    Swapped
+                              {/* On mobile, stack name and metadata vertically
+                                  so a long exercise name can't push the Rest /
+                                  Target chips onto a half-wrapped line. At
+                                  sm+ the original side-by-side layout returns. */}
+                              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3 sm:flex-wrap">
+                                <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
+                                  <span className="text-slate-400 shrink-0">
+                                    {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                                   </span>
-                                )}
-                                {isCardio && (
-                                  <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-px">
-                                    <HeartPulse size={10} />
-                                    Cardio
+                                  <span className="text-slate-500 text-sm font-medium shrink-0">
+                                    {group.startIndex + 1}.
                                   </span>
-                                )}
-                              </div>
-                              <div className="flex items-baseline gap-3 shrink-0">
-                                {cardioSummary && (
-                                  <span className="text-xs text-amber-700">
-                                    Target:{' '}
-                                    <span className="font-semibold tabular-nums">
-                                      {cardioSummary}
+                                  <span
+                                    className="font-semibold text-slate-900 wrap-break-word"
+                                    title={displayName}
+                                  >
+                                    {displayName}
+                                  </span>
+                                  {activeSub && (
+                                    <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-px shrink-0">
+                                      Swapped
                                     </span>
-                                  </span>
-                                )}
-                                {exercise.rest_seconds != null && exercise.rest_seconds > 0 && (
-                                  <span className="text-xs text-slate-500">
-                                    Rest:{' '}
-                                    <span className="font-medium">{exercise.rest_seconds}s</span>
-                                  </span>
+                                  )}
+                                  {isCardio && (
+                                    <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-px shrink-0">
+                                      <HeartPulse size={10} />
+                                      Cardio
+                                    </span>
+                                  )}
+                                </div>
+                                {(cardioSummary || (exercise.rest_seconds != null && exercise.rest_seconds > 0)) && (
+                                  <div className="flex items-baseline gap-3 flex-wrap pl-6 sm:pl-0 sm:shrink-0">
+                                    {cardioSummary && (
+                                      <span className="text-xs text-amber-700 whitespace-nowrap">
+                                        Target:{' '}
+                                        <span className="font-semibold tabular-nums">
+                                          {cardioSummary}
+                                        </span>
+                                      </span>
+                                    )}
+                                    {exercise.rest_seconds != null && exercise.rest_seconds > 0 && (
+                                      <span className="text-xs text-slate-500 whitespace-nowrap">
+                                        Rest:{' '}
+                                        <span className="font-medium">{exercise.rest_seconds}s</span>
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </button>
@@ -403,29 +424,36 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   const displayName = activeSub ?? ex.name
                                   return (
                                     <div key={ex.id ?? j} className="text-xs">
-                                      <div className="flex items-baseline gap-2 flex-wrap">
+                                      {/* min-w-0 on the row + the name span
+                                          lets truncate actually kick in so a
+                                          long "A" name doesn't push "B" down
+                                          to its own line. */}
+                                      <div className="flex items-baseline gap-2 min-w-0">
                                         <span
-                                          className={`font-bold tabular-nums ${
+                                          className={`font-bold tabular-nums shrink-0 ${
                                             isCardio ? 'text-amber-600' : 'text-indigo-700'
                                           }`}
                                         >
                                           {String.fromCharCode(65 + j)}
                                         </span>
-                                        <span className="font-medium text-slate-900 truncate">
+                                        <span
+                                          className="font-medium text-slate-900 truncate min-w-0"
+                                          title={displayName}
+                                        >
                                           {displayName}
                                         </span>
                                         {activeSub && (
-                                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px">
+                                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px shrink-0">
                                             Swapped
                                           </span>
                                         )}
                                         {isCardio && firstDuration != null && (
-                                          <span className="text-amber-700 font-medium tabular-nums">
+                                          <span className="text-amber-700 font-medium tabular-nums shrink-0">
                                             {formatDuration(firstDuration)}
                                           </span>
                                         )}
                                         {ex.notes && (
-                                          <span className="text-slate-500 italic truncate">
+                                          <span className="text-slate-500 italic truncate hidden sm:inline">
                                             &middot; {ex.notes}
                                           </span>
                                         )}

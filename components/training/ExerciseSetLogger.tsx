@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
 import { queuedUpsert } from '@/lib/write-queue'
+import { cachedQuery, cachedFetch } from '@/lib/cached-query'
 import { getCardioFields, type CardioSubtype } from '@/lib/cardio'
 import { useRestTimer } from '@/components/ui/RestTimer'
 import {
@@ -94,32 +95,57 @@ export function ExerciseSetLogger({
     const load = async () => {
       // Today's logs (the values to populate the inputs) and prior performance
       // (the ghost hint) can fly in parallel — they don't depend on each other.
-      const [todayResult, prior] = await Promise.all([
-        supabase
-          .from('set_logs')
-          .select(
-            'set_number, reps_performed, weight_performed, duration_performed_seconds, speed_performed, incline_performed, resistance_performed, completed'
-          )
-          .eq('assignment_id', assignmentId)
-          .eq('exercise_id', exercise.id ?? '')
-          .eq('logged_date', loggedDate),
+      // Both fetches go through the offline cache layer so a previously-
+      // visited day's set values + "Last: 135 × 6" hint reload when offline.
+      const [todayResult, priorResult] = await Promise.all([
+        cachedQuery<
+          Array<{
+            set_number: number
+            reps_performed: number | null
+            weight_performed: number | null
+            duration_performed_seconds: number | null
+            speed_performed: number | null
+            incline_performed: number | null
+            resistance_performed: number | null
+            completed: boolean
+          }>
+        >(
+          `set_logs:${assignmentId}:${exercise.id ?? ''}:${loggedDate}`,
+          () =>
+            supabase
+              .from('set_logs')
+              .select(
+                'set_number, reps_performed, weight_performed, duration_performed_seconds, speed_performed, incline_performed, resistance_performed, completed'
+              )
+              .eq('assignment_id', assignmentId)
+              .eq('exercise_id', exercise.id ?? '')
+              .eq('logged_date', loggedDate)
+        ),
         exercise.id
-          ? fetchPriorPerformance(
-              supabase,
-              assignmentId,
-              exercise.id,
-              loggedDate,
-              currentVariant
+          ? cachedFetch<Map<number, PriorPerformance>>(
+              `prior:${assignmentId}:${exercise.id}:${loggedDate}:${currentVariant ?? ''}`,
+              () =>
+                fetchPriorPerformance(
+                  supabase,
+                  assignmentId,
+                  exercise.id!,
+                  loggedDate,
+                  currentVariant
+                )
             )
-          : Promise.resolve(new Map<number, PriorPerformance>()),
+          : Promise.resolve({
+              data: new Map<number, PriorPerformance>(),
+              error: null,
+              fromCache: false,
+            }),
       ])
 
       if (cancelled) return
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const logBySet = new Map<number, any>(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (todayResult.data ?? []).map((l: any) => [l.set_number, l])
+      const prior: Map<number, PriorPerformance> =
+        priorResult.data ?? new Map<number, PriorPerformance>()
+      const logBySet = new Map(
+        (todayResult.data ?? []).map(l => [l.set_number, l])
       )
 
       setRows(prev =>
@@ -380,16 +406,21 @@ export function ExerciseSetLogger({
         aria-expanded={false}
         aria-label={`Expand set ${row.set_number}`}
       >
-        <span className="text-sm font-semibold text-slate-700 tabular-nums">
+        <span className="text-sm font-semibold text-slate-700 tabular-nums shrink-0">
           {isCardio && rows.length === 1 ? '' : `Set ${row.set_number}`}
         </span>
         <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-emerald-500 text-white shrink-0">
           <Check size={11} />
         </span>
-        <span className="text-sm text-slate-600 tabular-nums truncate flex-1">
+        <span className="text-sm text-slate-600 tabular-nums truncate flex-1 min-w-0">
           {summary}
         </span>
-        <span className="text-[10px] text-slate-400 shrink-0">Tap to edit</span>
+        {/* "Tap to edit" hint is desktop-only — on phones the whole row is
+            already an obvious tap target and the label was eating the room
+            a long summary (e.g. 1234 × 100) needs. */}
+        <span className="hidden sm:inline text-[10px] text-slate-400 shrink-0">
+          Tap to edit
+        </span>
       </button>
     )
   }

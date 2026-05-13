@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
 import { queuedUpsert } from '@/lib/write-queue'
+import { cachedQuery, cachedFetch } from '@/lib/cached-query'
 import { useRestTimer } from '@/components/ui/RestTimer'
 import {
   buildPrescribedSets,
@@ -108,31 +109,52 @@ export function SupersetLogger({
       const exerciseIds = exercises.map(e => e.id).filter(Boolean) as string[]
       if (exerciseIds.length === 0) return
 
+      // Stable cache key for the combined set_logs query — sort the ids so
+      // a reorder of the same exercise set doesn't bust the cache.
+      const sortedIds = [...exerciseIds].sort()
+      const todayCacheKey = `superset_set_logs:${assignmentId}:${sortedIds.join(',')}:${loggedDate}`
+
       // Today's logs + each exercise's most-recent-prior performance, in parallel.
+      // Every fetch flows through the offline cache so re-opening a previously-
+      // visited superset round shows logged values + prior hints even offline.
       const [todayResult, ...priorMaps] = await Promise.all([
-        supabase
-          .from('set_logs')
-          .select('exercise_id, set_number, reps_performed, weight_performed, duration_performed_seconds, completed')
-          .eq('assignment_id', assignmentId)
-          .in('exercise_id', exerciseIds)
-          .eq('logged_date', loggedDate),
-        ...exerciseIds.map(exId =>
-          fetchPriorPerformance(
-            supabase,
-            assignmentId,
-            exId,
-            loggedDate,
-            variantByExerciseId?.get(exId) ?? null
-          ).then(map => ({ exId, map }))
+        cachedQuery<
+          Array<{
+            exercise_id: string
+            set_number: number
+            reps_performed: number | null
+            weight_performed: number | null
+            duration_performed_seconds: number | null
+            completed: boolean
+          }>
+        >(
+          todayCacheKey,
+          () =>
+            supabase
+              .from('set_logs')
+              .select(
+                'exercise_id, set_number, reps_performed, weight_performed, duration_performed_seconds, completed'
+              )
+              .eq('assignment_id', assignmentId)
+              .in('exercise_id', exerciseIds)
+              .eq('logged_date', loggedDate)
         ),
+        ...exerciseIds.map(exId => {
+          const variant = variantByExerciseId?.get(exId) ?? null
+          return cachedFetch<Map<number, PriorPerformance>>(
+            `prior:${assignmentId}:${exId}:${loggedDate}:${variant ?? ''}`,
+            () => fetchPriorPerformance(supabase, assignmentId, exId, loggedDate, variant)
+          ).then(result => ({
+            exId,
+            map: result.data ?? new Map<number, PriorPerformance>(),
+          }))
+        }),
       ])
 
       if (cancelled) return
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const logIndex = new Map<string, any>(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (todayResult.data ?? []).map((l: any) => [`${l.exercise_id}-${l.set_number}`, l])
+      const logIndex = new Map(
+        (todayResult.data ?? []).map(l => [`${l.exercise_id}-${l.set_number}`, l])
       )
 
       setRowsByExercise(prev => {
@@ -163,7 +185,7 @@ export function SupersetLogger({
 
       // Flatten the per-exercise prior maps into a single (exId, setNum) → prior.
       const flat: PriorMap = new Map()
-      for (const { exId, map } of priorMaps as { exId: string; map: Map<number, PriorPerformance> }[]) {
+      for (const { exId, map } of priorMaps) {
         for (const [setNum, prev] of map) {
           flat.set(priorKey(exId, setNum), prev)
         }
@@ -379,7 +401,12 @@ export function SupersetLogger({
                       </span>
                     ))}
                   </div>
-                  <span className="text-[10px] text-slate-400 shrink-0">Tap to edit</span>
+                  {/* Hide the hint on phones — the cluster of per-exercise
+                      summaries already crowds the row, and the whole card is
+                      a tap target. */}
+                  <span className="hidden sm:inline text-[10px] text-slate-400 shrink-0">
+                    Tap to edit
+                  </span>
                 </div>
               </button>
               {!isLastRound && restBetweenRounds != null && restBetweenRounds > 0 && (
@@ -526,24 +553,36 @@ export function SupersetLogger({
                       </div>
                     )}
                     <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
-                      <div className="flex items-baseline gap-2 min-w-0">
+                      {/* min-w-0 on the inner cluster + min-w-0 on the name
+                          itself lets `truncate` actually kick in — without it,
+                          a long name pushes the badges down and shows up as
+                          "A name… / B name…" on two lines. */}
+                      <div className="flex items-baseline gap-2 min-w-0 flex-1">
                         <span
-                          className={`text-[10px] font-bold tabular-nums ${
+                          className={`text-[10px] font-bold tabular-nums shrink-0 ${
                             isCardio ? 'text-amber-600' : 'text-indigo-600'
                           }`}
                         >
                           {positionLetter}
                         </span>
-                        <span className="text-sm font-medium text-slate-900 truncate">
+                        {/* No `truncate` here — once you've expanded the round
+                            you're actively lifting, so we'd rather show the
+                            full exercise name (wrapping to a second line if
+                            needed) than hide it behind ellipses. `title=` is
+                            a fallback for desktop hover. */}
+                        <span
+                          className="text-sm font-medium text-slate-900 min-w-0 wrap-break-word"
+                          title={displayName}
+                        >
                           {displayName}
                         </span>
                         {activeVariant && (
-                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px">
+                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px shrink-0">
                             Swapped
                           </span>
                         )}
                         {isCardio && (
-                          <span className="text-[9px] uppercase tracking-widest font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-px">
+                          <span className="text-[9px] uppercase tracking-widest font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-px shrink-0">
                             Cardio
                           </span>
                         )}
