@@ -1,10 +1,9 @@
 'use client'
 
-import { useCallback, useState, useEffect } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { User } from '@supabase/supabase-js'
-import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Utensils, Ruler, Menu, X } from 'lucide-react'
+import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Utensils, Ruler, Menu, X, Home } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { RestTimerProvider } from '@/components/ui/RestTimer'
@@ -18,10 +17,13 @@ import ClientWorkoutView from '@/components/training/ClientWorkoutView'
 import ClientMealPlanView from '@/components/training/ClientMealPlanView'
 import WorkoutHistory from '@/components/training/WorkoutHistory'
 import BodyTracker from '@/components/training/BodyTracker'
+import TodayDashboard, { type TodayNavTarget } from '@/components/training/TodayDashboard'
 import type { Profile } from '@/lib/types'
 
-type Tab = 'my-clients' | 'my-workouts' | 'my-programs' | 'my-meal-plans' | 'assigned-workouts' | 'assigned-meals' | 'measurements' | 'history'
-type Section = 'coaching' | 'training'
+type Tab = 'today' | 'my-clients' | 'my-workouts' | 'my-programs' | 'my-meal-plans' | 'assigned-workouts' | 'assigned-meals' | 'measurements' | 'history'
+// `home` is its own section so the Today hub renders above the coaching /
+// training groups in the nav, without an "everything else" section header.
+type Section = 'home' | 'coaching' | 'training'
 
 interface TabDef {
   key: Tab
@@ -31,6 +33,7 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
+  { key: 'today', label: 'Today', icon: <Home size={16} />, section: 'home' },
   { key: 'my-clients', label: 'My Clients', icon: <Users size={16} />, section: 'coaching' },
   { key: 'my-workouts', label: 'My Workouts', icon: <Dumbbell size={16} />, section: 'coaching' },
   { key: 'my-programs', label: 'My Programs', icon: <ListChecks size={16} />, section: 'coaching' },
@@ -42,6 +45,13 @@ const TABS: TabDef[] = [
 ]
 
 const sectionTone: Record<Section, { active: string; activeIcon: string; mobileActive: string }> = {
+  home: {
+    // Slate keeps Today visually neutral — it's the hub, not a side of
+    // the coach/trainee duality, so it doesn't borrow either color.
+    active: 'bg-slate-100 text-slate-900',
+    activeIcon: 'text-slate-700',
+    mobileActive: 'bg-slate-100 text-slate-900',
+  },
   coaching: {
     active: 'bg-indigo-50 text-indigo-700',
     activeIcon: 'text-indigo-500',
@@ -59,36 +69,29 @@ interface UnifiedDashboardProps {
   profile: Profile
 }
 
-const TAB_KEY_SET = new Set<string>(TABS.map(t => t.key))
-const DEFAULT_TAB: Tab = 'my-clients'
-const isValidTab = (k: string | null): k is Tab => k != null && TAB_KEY_SET.has(k)
+// Default landing tab — the Today hub. A reload always brings the user
+// back here. Bookmark `/app` and it's the same experience as a fresh
+// sign-in.
+const DEFAULT_TAB: Tab = 'today'
 
 // TABS partitioned once at module load — both sidebar nav (desktop) and
 // the drawer (mobile) render these on every state change, and filter-on-
 // render produces a fresh array reference each time which would defeat
 // child memoization down the line.
+const HOME_TABS = TABS.filter(t => t.section === 'home')
 const COACHING_TABS = TABS.filter(t => t.section === 'coaching')
 const TRAINING_TABS = TABS.filter(t => t.section === 'training')
 
 export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProps) {
   const supabase = useSupabase()
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
 
-  // Active tab is derived from `?tab=...` so reloads, deep links, and
-  // back/forward all preserve which section the user was on.
-  const tabParam = searchParams.get('tab')
-  const activeTab: Tab = isValidTab(tabParam) ? tabParam : DEFAULT_TAB
-
-  const setActiveTab = useCallback(
-    (next: Tab) => {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set('tab', next)
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-    },
-    [pathname, router, searchParams]
-  )
+  // Pure React state — every fresh session / reload lands on Today, and
+  // tab navigation is invisible in the URL. The previous URL-driven
+  // approach made sense when there was no home page, but Today is now
+  // the canonical landing surface and the URL noise was hurting more
+  // than it helped (per the user's UX feedback). Bookmark `/app` and
+  // you'll always come back to the hub.
+  const [activeTab, setActiveTab] = useState<Tab>(DEFAULT_TAB)
 
   const [coach, setCoach] = useState<Profile | null>(null)
   const [loadingCoach, setLoadingCoach] = useState(true)
@@ -199,6 +202,9 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           </div>
 
           <nav className="flex-1 px-3 py-6 space-y-6 overflow-y-auto">
+            <div className="space-y-1">
+              {HOME_TABS.map(t => renderNavButton(t))}
+            </div>
             <div>
               <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
                 Coaching
@@ -273,6 +279,9 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
               </div>
 
               <nav className="flex-1 px-3 py-6 space-y-6 overflow-y-auto">
+                <div className="space-y-1">
+                  {HOME_TABS.map(t => renderNavButton(t))}
+                </div>
                 <div>
                   <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
                     Coaching
@@ -307,6 +316,13 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
             so going Workouts → Meals → Workouts is instant. */}
         <main className="flex-1 min-w-0 md:ml-64 pt-14 md:pt-0 pb-20 md:pb-0">
           <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+            <TabPanel active={activeTab === 'today'} mounted={mountedTabs.has('today')}>
+              <TodayDashboard
+                user={user}
+                profile={profile}
+                onNavigate={(target: TodayNavTarget) => setActiveTab(target)}
+              />
+            </TabPanel>
             <TabPanel active={activeTab === 'my-clients'} mounted={mountedTabs.has('my-clients')}>
               <ClientList coachId={user.id} />
             </TabPanel>
@@ -387,9 +403,9 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
         >
           {(
             [
+              { key: 'today' as Tab, label: 'Today', icon: <Home size={20} /> },
               { key: 'assigned-workouts' as Tab, label: 'Workouts', icon: <ClipboardList size={20} /> },
               { key: 'assigned-meals' as Tab, label: 'Meals', icon: <Utensils size={20} /> },
-              { key: 'measurements' as Tab, label: 'Body', icon: <Ruler size={20} /> },
             ]
           ).map(item => {
             const isActive = activeTab === item.key
@@ -410,11 +426,13 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           })}
           {(() => {
             // "More" is active when activeTab isn't one of the three primary
-            // mobile destinations above.
+            // mobile destinations above. Body/measurements lives in the
+            // drawer now (Today displaces it from the bottom bar), so
+            // Measurements lights up More too.
             const moreActive = !(
+              activeTab === 'today' ||
               activeTab === 'assigned-workouts' ||
-              activeTab === 'assigned-meals' ||
-              activeTab === 'measurements'
+              activeTab === 'assigned-meals'
             )
             return (
               <button

@@ -91,7 +91,7 @@ function Signup() {
           }
         }
 
-        router.push('/dashboard')
+        router.push('/app')
         router.refresh()
       }
     } catch (err) {

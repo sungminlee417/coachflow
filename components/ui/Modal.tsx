@@ -52,7 +52,12 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
             <X size={18} />
           </IconButton>
         </div>
-        <div className="overflow-y-auto px-5 sm:px-6 pb-5 sm:pb-6 flex-1">
+        {/* `pt-1` gives the body's overflow box a sliver of room above
+            its first child so a focused input's 2px outset focus ring
+            isn't clipped at the top by the scroll container. The
+            horizontal `px-5` is already much wider than the 2px ring,
+            so left/right edges are safe without extra padding. */}
+        <div className="overflow-y-auto px-5 sm:px-6 pt-1 pb-5 sm:pb-6 flex-1">
           {children}
         </div>
       </div>

@@ -16,6 +16,8 @@ import {
   computeMealMacros,
   roundMacro,
   formatTime,
+  mealDisplayName,
+  numberMealsForDay,
 } from '@/lib/utils'
 import { fetchActiveMealPlanAssignments } from '@/lib/queries'
 import { cachedFetch, cachedQuery } from '@/lib/cached-query'
@@ -88,6 +90,18 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
   // 30-minute grace period after the scheduled time before we count a meal
   // as "missed". Avoids nagging the user the moment the clock ticks past.
   const MISSED_GRACE_MS = 30 * 60 * 1000
+
+  // Stable "Meal N of the day" numbering shared across the missed-meal
+  // banner and the per-meal cards below. Flattens every active meal-plan
+  // assignment for `selectedDate` into one chronological list so the same
+  // meal always gets the same number wherever it shows up.
+  const mealNumberById = useMemo(() => {
+    const flat: { id?: string | null; time?: string | null }[] = []
+    for (const a of assignments) {
+      for (const m of a.meal_plan.meals) flat.push({ id: m.id, time: m.time })
+    }
+    return numberMealsForDay(flat)
+  }, [assignments])
 
   // Memoized so the nested loops only re-run when the inputs actually
   // change. `minuteTick` is intentionally in the deps so the banner
@@ -241,7 +255,9 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
               <ul className="text-xs text-amber-700 mt-1 space-y-0.5">
                 {missedMeals.map(m => (
                   <li key={m.id}>
-                    <span className="font-medium">{m.name || 'Untitled meal'}</span>
+                    <span className="font-medium">
+                      {mealDisplayName(m.name, mealNumberById.get(m.id))}
+                    </span>
                     {' · '}
                     <span className="tabular-nums">{formatTime(m.time)}</span>
                   </li>
@@ -355,7 +371,9 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                               />
                             )}
                           </div>
-                          <p className="font-semibold text-slate-900">{meal.name}</p>
+                          <p className="font-semibold text-slate-900">
+                            {mealDisplayName(meal.name, mealNumberById.get(meal.id ?? ''))}
+                          </p>
                           {meal.description && (
                             <p className="text-sm text-slate-600 mb-2">{meal.description}</p>
                           )}

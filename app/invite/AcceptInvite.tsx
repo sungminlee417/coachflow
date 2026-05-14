@@ -38,7 +38,7 @@ export default function AcceptInvite({ status, message }: AcceptInviteProps) {
           <p className="text-slate-500 text-sm mb-6">{message}</p>
 
           <Link
-            href="/dashboard"
+            href="/app"
             className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors cursor-pointer"
           >
             Go to Dashboard

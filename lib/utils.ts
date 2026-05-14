@@ -106,6 +106,50 @@ export const getWeekDates = (selectedDateISO: string): string[] => {
 
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
+/**
+ * Assign each meal in a day's schedule a 1-based "meal number of the
+ * day" so unnamed meals can render as "Meal 1", "Meal 2", etc., and the
+ * number stays consistent across the Today hub, the meal logger, and
+ * the missed-meal banner.
+ *
+ * Order follows the existing convention (CLAUDE.md): timed meals first
+ * chronologically, then untimed meals in the order they were passed in.
+ * Caller flattens across however many meal-plan assignments are active
+ * for the day before calling.
+ */
+export function numberMealsForDay<
+  M extends { id?: string | null; time?: string | null },
+>(meals: M[]): Map<string, number> {
+  const indexed = meals.map((m, originalIndex) => ({ m, originalIndex }))
+  indexed.sort((a, b) => {
+    const at = a.m.time
+    const bt = b.m.time
+    if (at && bt) return at.localeCompare(bt)
+    if (at) return -1
+    if (bt) return 1
+    return a.originalIndex - b.originalIndex
+  })
+  const map = new Map<string, number>()
+  indexed.forEach(({ m }, i) => {
+    if (m.id) map.set(m.id, i + 1)
+  })
+  return map
+}
+
+/**
+ * "Meal 3" when the coach left the name blank, otherwise the typed
+ * name. Pair with `numberMealsForDay` so the same meal looks the same
+ * everywhere.
+ */
+export function mealDisplayName(
+  name: string | null | undefined,
+  numberOfDay: number | undefined
+): string {
+  const trimmed = (name ?? '').trim()
+  if (trimmed) return trimmed
+  return numberOfDay != null ? `Meal ${numberOfDay}` : 'Meal'
+}
+
 // Crockford-style base32 alphabet — omits I, L, O, U to avoid visual
 // confusion (I/1, L/1, O/0, U/V) when a coach reads the code aloud or a
 // trainee transcribes it from a screenshot.

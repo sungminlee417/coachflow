@@ -1,0 +1,32 @@
+<!--
+  CoachFlow favicon / app icon. Matches the in-app brand mark used in
+  the dashboard header: white Dumbbell on an indigo rounded square.
+  Next.js auto-discovers `app/icon.svg` and emits the correct <link>
+  tags + Open Graph metadata.
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  width="64"
+  height="64"
+>
+  <rect width="64" height="64" rx="14" fill="#4f46e5" />
+  <!-- Stylized dumbbell. Two end-weights and a connecting bar, sized to
+       match the lucide Dumbbell glyph that the in-app header uses. -->
+  <g
+    stroke="#ffffff"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  >
+    <!-- Left weight -->
+    <path d="M14 22 L14 42" />
+    <path d="M20 18 L20 46" />
+    <!-- Right weight -->
+    <path d="M44 18 L44 46" />
+    <path d="M50 22 L50 42" />
+    <!-- Bar -->
+    <path d="M20 32 L44 32" />
+  </g>
+</svg>

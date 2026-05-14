@@ -37,7 +37,7 @@ function Login() {
 
       if (error) throw error
 
-      window.location.href = inviteCode ? `/invite?code=${inviteCode}` : '/dashboard'
+      window.location.href = inviteCode ? `/invite?code=${inviteCode}` : '/app'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
