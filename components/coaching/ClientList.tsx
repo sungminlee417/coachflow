@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ClientGridSkeleton } from '@/components/ui/Skeleton'
+import { LibrarySearch } from '@/components/ui/LibrarySearch'
 import { UserPlus, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { Client } from '@/lib/types'
@@ -22,6 +23,17 @@ export default function ClientList({ coachId }: ClientListProps) {
   const [loading, setLoading] = useState(true)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [showInvites, setShowInvites] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const visibleClients = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return clients
+    return clients.filter(
+      c =>
+        (c.full_name ?? '').toLowerCase().includes(q) ||
+        (c.email ?? '').toLowerCase().includes(q)
+    )
+  }, [clients, query])
 
   useEffect(() => {
     fetchClients()
@@ -119,8 +131,23 @@ export default function ClientList({ coachId }: ClientListProps) {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clients.map(client => (
+        <>
+          {clients.length > 4 && (
+            <div className="mb-4">
+              <LibrarySearch
+                value={query}
+                onChange={setQuery}
+                placeholder="Search clients by name or email…"
+              />
+            </div>
+          )}
+          {visibleClients.length === 0 ? (
+            <p className="text-sm text-slate-500 italic py-6 text-center">
+              No clients match &ldquo;{query}&rdquo;.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visibleClients.map(client => (
             <button
               key={client.id}
               onClick={() => setSelectedClient(client)}
@@ -144,7 +171,9 @@ export default function ClientList({ coachId }: ClientListProps) {
               </div>
             </button>
           ))}
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

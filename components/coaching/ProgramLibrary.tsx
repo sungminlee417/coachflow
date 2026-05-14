@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -8,7 +8,8 @@ import { IconButton } from '@/components/ui/IconButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
-import { Plus, Send, Pencil, Trash2, ListChecks } from 'lucide-react'
+import { LibrarySearch } from '@/components/ui/LibrarySearch'
+import { Plus, Send, Pencil, Trash2, ListChecks, Copy } from 'lucide-react'
 import type { WorkoutProgram } from '@/lib/types'
 import dynamic from 'next/dynamic'
 // Lazy-loaded — only mounted after the coach taps "Create / Edit", so
@@ -28,6 +29,13 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
   const [editing, setEditing] = useState<WorkoutProgram | null>(null)
   const [assigning, setAssigning] = useState<WorkoutProgram | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+
+  const visiblePrograms = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return programs
+    return programs.filter(p => p.name.toLowerCase().includes(q))
+  }, [programs, query])
 
   useEffect(() => {
     fetchPrograms()
@@ -77,6 +85,70 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
       showToast('Failed to delete program', 'error')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  // Deep-copy a program (header + child workout_program_workouts join
+  // rows) into a new template owned by the same coach. The new row is
+  // `name + " (copy)"`. Member workouts themselves are NOT cloned —
+  // both the original and the copy reference the same workout templates.
+  const handleDuplicate = async (programId: string) => {
+    try {
+      const { data: src } = await supabase
+        .from('workout_programs')
+        .select('*')
+        .eq('id', programId)
+        .maybeSingle()
+      if (!src) throw new Error('Program not found')
+
+      const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = src as {
+        id: string
+        created_at?: string
+        updated_at?: string
+        name: string
+      } & Record<string, unknown>
+      void _id; void _ca; void _ua
+      const newPayload = {
+        ...rest,
+        name: `${src.name} (copy)`,
+        coach_id: coachId,
+      }
+      const { data: created, error: insertErr } = await supabase
+        .from('workout_programs')
+        .insert(newPayload)
+        .select('id')
+        .single()
+      if (insertErr || !created) throw insertErr ?? new Error('Insert failed')
+      const newProgramId = created.id as string
+
+      // Copy the join rows (workout_id + order_index). Member workouts
+      // are shared — editing one in the original also changes it in the
+      // copy. That's expected: the copy gives the coach a different
+      // *grouping*, not a duplicate of every workout.
+      const { data: joinRows } = await supabase
+        .from('workout_program_workouts')
+        .select('workout_id, order_index')
+        .eq('program_id', programId)
+        .order('order_index')
+
+      if (joinRows && joinRows.length > 0) {
+        const joinsPayload = (joinRows as Array<{ workout_id: string; order_index: number }>).map(
+          r => ({
+            program_id: newProgramId,
+            workout_id: r.workout_id,
+            order_index: r.order_index,
+          })
+        )
+        const { error: joinErr } = await supabase
+          .from('workout_program_workouts')
+          .insert(joinsPayload)
+        if (joinErr) throw joinErr
+      }
+
+      await fetchPrograms()
+      showToast('Program duplicated')
+    } catch {
+      showToast('Failed to duplicate program', 'error')
     }
   }
 
@@ -164,8 +236,23 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {programs.map(p => (
+        <>
+          {programs.length > 4 && (
+            <div className="mb-4">
+              <LibrarySearch
+                value={query}
+                onChange={setQuery}
+                placeholder="Search programs…"
+              />
+            </div>
+          )}
+          {visiblePrograms.length === 0 ? (
+            <p className="text-sm text-slate-500 italic py-6 text-center">
+              No programs match &ldquo;{query}&rdquo;.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visiblePrograms.map(p => (
             <div
               key={p.id}
               className="bg-white rounded-xl border border-slate-200 p-5 transition-all hover:border-indigo-200 hover:shadow-md hover:-translate-y-0.5"
@@ -199,6 +286,12 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
                   <Pencil size={16} />
                 </IconButton>
                 <IconButton
+                  onClick={() => handleDuplicate(p.id)}
+                  aria-label="Duplicate program"
+                >
+                  <Copy size={16} />
+                </IconButton>
+                <IconButton
                   tone="danger"
                   onClick={() => setDeletingId(p.id)}
                   aria-label="Delete program"
@@ -208,7 +301,9 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
               </div>
             </div>
           ))}
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

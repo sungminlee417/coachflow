@@ -106,6 +106,8 @@ export default function TodayDashboard({
         </h2>
       </header>
 
+      <WelcomeBanner userId={user.id} onNavigate={onNavigate} />
+
       <section className="space-y-3">
         <SectionHeader title="Training" />
         <WorkoutCard
@@ -127,6 +129,10 @@ export default function TodayDashboard({
           clientId={user.id}
           onOpen={() => onNavigate('history')}
         />
+        <BodyMeasurementCard
+          userId={user.id}
+          onOpen={() => onNavigate('measurements')}
+        />
       </section>
 
       <CoachSection coachId={user.id} onNavigate={onNavigate} />
@@ -139,6 +145,100 @@ function SectionHeader({ title }: { title: string }) {
     <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">
       {title}
     </h3>
+  )
+}
+
+/**
+ * Welcome / first-run banner. Visible only when the user appears to have
+ * nothing yet — no workouts they own AND no workout assignments to do.
+ * Renders below the greeting and steers them at the two most useful
+ * starting actions: build a template (self-coach or coach others) or
+ * accept an invite code (be coached). Disappears as soon as they have
+ * any content; query is cached so reloads after onboarding don't
+ * re-fetch.
+ */
+function WelcomeBanner({
+  userId,
+  onNavigate,
+}: {
+  userId: string
+  onNavigate: (tab: TodayNavTarget) => void
+}) {
+  const supabase = useSupabase()
+  const [show, setShow] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      // Fast existence checks — only need to know "is there at least one
+      // row?". `limit(1)` keeps the response tiny, `head: true` would
+      // require `count:` which is a heavier read on the server.
+      const [workoutsRes, assignmentsRes] = await Promise.all([
+        cachedQuery<Array<{ id: string }>>(
+          `first_run_workouts:${userId}`,
+          () =>
+            supabase.from('workouts').select('id').eq('coach_id', userId).limit(1)
+        ),
+        cachedQuery<Array<{ id: string }>>(
+          `first_run_assignments:${userId}`,
+          () =>
+            supabase
+              .from('workout_assignments')
+              .select('id')
+              .eq('client_id', userId)
+              .limit(1)
+        ),
+      ])
+      if (cancelled) return
+      const hasWorkouts = (workoutsRes.data ?? []).length > 0
+      const hasAssignments = (assignmentsRes.data ?? []).length > 0
+      setShow(!hasWorkouts && !hasAssignments)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase, userId])
+
+  if (!show) return null
+
+  return (
+    <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">
+        Welcome
+      </p>
+      <h3 className="text-lg font-bold text-slate-900 mt-1">
+        Let&rsquo;s get you set up
+      </h3>
+      <p className="text-sm text-slate-600 mt-1">
+        Every CoachFlow account can coach and train. Pick where to start:
+      </p>
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onNavigate('my-workouts')}
+          className="text-left rounded-xl border border-slate-200 bg-white p-3 hover:border-indigo-300 transition-colors cursor-pointer"
+        >
+          <p className="text-sm font-semibold text-slate-900">
+            Build a workout
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Make a template you can assign to yourself or a client.
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate('my-clients')}
+          className="text-left rounded-xl border border-slate-200 bg-white p-3 hover:border-indigo-300 transition-colors cursor-pointer"
+        >
+          <p className="text-sm font-semibold text-slate-900">
+            Invite a client
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Generate a code to bring someone you coach onto the app.
+          </p>
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -932,6 +1032,75 @@ function WeightWeekStrip({
         )
       })}
     </div>
+  )
+}
+
+// ── Body measurement card ───────────────────────────────────────────────
+
+// Compact "when did I last measure" card — measurements are weekly-ish,
+// not daily, so this stays a single-row tile. Tap to jump to the full
+// Body view for logging a new entry.
+function BodyMeasurementCard({
+  userId,
+  onOpen,
+}: {
+  userId: string
+  onOpen: () => void
+}) {
+  const supabase = useSupabase()
+  const [latest, setLatest] = useState<{ recorded_at: string } | null>(null)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await cachedQuery<Array<{ recorded_at: string }>>(
+        `body_measurements_latest:${userId}`,
+        () =>
+          supabase
+            .from('body_measurements')
+            .select('recorded_at')
+            .eq('user_id', userId)
+            .order('recorded_at', { ascending: false })
+            .limit(1)
+      )
+      if (cancelled) return
+      setLatest((data ?? [])[0] ?? null)
+      setLoaded(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase, userId])
+
+  const today = todayISO()
+  const daysSince = latest ? Math.max(0, daysBetween(latest.recorded_at, today)) : null
+
+  return (
+    <Card onClick={onOpen} accent="purple" icon={Ruler} label="Measurements">
+      {!loaded ? (
+        <CardSkeletonBody lines={1} />
+      ) : !latest ? (
+        <p className="text-sm text-slate-500">
+          No measurements yet. Tap to record neck / waist / arms / legs.
+        </p>
+      ) : (
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="font-semibold text-slate-900">
+            Last measured
+          </p>
+          <p className="text-xs text-slate-500 shrink-0">
+            {daysSince === 0
+              ? 'Today'
+              : daysSince === 1
+                ? 'Yesterday'
+                : daysSince != null
+                  ? `${daysSince} days ago`
+                  : formatDate(latest.recorded_at)}
+          </p>
+        </div>
+      )}
+    </Card>
   )
 }
 
