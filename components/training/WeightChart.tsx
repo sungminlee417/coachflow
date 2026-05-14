@@ -5,6 +5,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,6 +17,9 @@ import type { WeightLog, WeightUnit } from '@/lib/types'
 interface WeightChartProps {
   logs: WeightLog[]
   weightUnit?: WeightUnit
+  /** Optional body-weight goal. Renders as a dashed horizontal line
+   *  across the chart so the trainee can see how close they are. */
+  goal?: number | null
 }
 
 interface ChartPoint {
@@ -51,7 +55,7 @@ function ChartTooltip({ active, payload, unit }: TooltipProps) {
   )
 }
 
-function WeightChartInner({ logs, weightUnit = 'lbs' }: WeightChartProps) {
+function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) {
   const sorted = [...logs].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
   if (sorted.length < 2) return null
 
@@ -149,6 +153,21 @@ function WeightChartInner({ logs, weightUnit = 'lbs' }: WeightChartProps) {
               activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2, fill: '#4f46e5' }}
               isAnimationActive={false}
             />
+            {goal != null && Number.isFinite(goal) && goal > 0 && (
+              <ReferenceLine
+                y={goal}
+                stroke="#10b981"
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+                label={{
+                  value: `Goal · ${roundMacro(goal)} ${weightUnit}`,
+                  position: 'insideTopRight',
+                  fill: '#047857',
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+              />
+            )}
           </AreaChart>
         </ResponsiveContainer>
       </div>

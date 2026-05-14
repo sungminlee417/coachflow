@@ -28,7 +28,11 @@ export default function BodyTracker({ profile: initialProfile }: BodyTrackerProp
       </div>
 
       <div className="space-y-6">
-        <WeightTracker userId={profile.id} weightUnit={profile.weight_unit ?? 'lbs'} />
+        <WeightTracker
+          userId={profile.id}
+          weightUnit={profile.weight_unit ?? 'lbs'}
+          weightGoal={profile.weight_goal ?? null}
+        />
         <MeasurementsTracker
           userId={profile.id}
           lengthUnit={profile.length_unit ?? 'in'}

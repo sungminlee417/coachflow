@@ -163,7 +163,7 @@ export default async function Home() {
               },
             ].map((item) => (
               <div key={item.step} className="flex gap-4 sm:gap-6 items-start bg-white rounded-2xl border border-slate-200 p-5 sm:p-8">
-                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                <div className="shrink-0 w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
                   {item.icon}
                 </div>
                 <div>

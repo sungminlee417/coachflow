@@ -304,7 +304,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
               className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
                   <Apple size={16} className="text-emerald-600" />
                 </div>
                 <div className="min-w-0">
@@ -363,7 +363,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
               className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
                   <Dumbbell size={16} className="text-indigo-600" />
                 </div>
                 <div className="min-w-0">

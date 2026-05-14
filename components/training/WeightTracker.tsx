@@ -19,6 +19,10 @@ import type { WeightUnit } from '@/lib/types'
 interface WeightTrackerProps {
   userId: string
   weightUnit: WeightUnit
+  /** Initial value of the user's optional weight goal. The editor below
+   *  the chart upserts changes back to `profiles.weight_goal`; we keep a
+   *  local copy so the dashed reference line moves immediately on save. */
+  weightGoal?: number | null
 }
 
 function deltaIndicator(current: number, previous: number) {
@@ -30,7 +34,11 @@ function deltaIndicator(current: number, previous: number) {
   return { Icon: TrendingDown, text: `${roundMacro(diff)}`, color: 'text-red-600' }
 }
 
-export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps) {
+export default function WeightTracker({
+  userId,
+  weightUnit,
+  weightGoal,
+}: WeightTrackerProps) {
   const supabase = useSupabase()
   const [logs, setLogs] = useState<WeightLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,6 +47,12 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showShare, setShowShare] = useState(false)
+  // Local mirror so the dashed line moves immediately when the user
+  // saves a new goal. Initial value comes from the parent (server).
+  const [goal, setGoal] = useState<number | null>(weightGoal ?? null)
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalDraft, setGoalDraft] = useState('')
+  const [savingGoal, setSavingGoal] = useState(false)
 
   useEffect(() => {
     fetchLogs()
@@ -160,9 +174,112 @@ export default function WeightTracker({ userId, weightUnit }: WeightTrackerProps
 
         {logs.length >= 2 && (
           <div className="mb-5">
-            <WeightChart logs={logs} weightUnit={weightUnit} />
+            <WeightChart logs={logs} weightUnit={weightUnit} goal={goal} />
           </div>
         )}
+
+        {/* Goal editor — collapsed by default. Tap the "Set goal" text
+            to expand. Saving writes to `profiles.weight_goal` and the
+            dashed reference line on the chart updates immediately. */}
+        <div className="mb-5 flex items-center gap-2 text-xs flex-wrap">
+          {!editingGoal ? (
+            <>
+              {goal != null ? (
+                <p className="text-slate-500">
+                  Goal:{' '}
+                  <span className="font-semibold text-slate-700 tabular-nums">
+                    {roundMacro(goal)} {weightUnit}
+                  </span>
+                </p>
+              ) : (
+                <p className="text-slate-400 italic">No goal set</p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setGoalDraft(goal != null ? String(goal) : '')
+                  setEditingGoal(true)
+                }}
+                className="text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
+              >
+                {goal != null ? 'Edit' : 'Set goal'}
+              </button>
+              {goal != null && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setSavingGoal(true)
+                    const { error } = await supabase
+                      .from('profiles')
+                      .update({ weight_goal: null })
+                      .eq('id', userId)
+                    setSavingGoal(false)
+                    if (error) {
+                      showToast('Failed to clear goal', 'error')
+                    } else {
+                      setGoal(null)
+                      showToast('Goal cleared')
+                    }
+                  }}
+                  disabled={savingGoal}
+                  className="text-slate-400 hover:text-red-600 font-medium cursor-pointer disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              )}
+            </>
+          ) : (
+            <form
+              onSubmit={async e => {
+                e.preventDefault()
+                const next = goalDraft === '' ? null : parseFloat(goalDraft)
+                if (next != null && (!Number.isFinite(next) || next <= 0)) {
+                  showToast('Enter a positive number', 'error')
+                  return
+                }
+                setSavingGoal(true)
+                const { error } = await supabase
+                  .from('profiles')
+                  .update({ weight_goal: next })
+                  .eq('id', userId)
+                setSavingGoal(false)
+                if (error) {
+                  showToast('Failed to save goal', 'error')
+                  return
+                }
+                setGoal(next)
+                setEditingGoal(false)
+                showToast(next != null ? 'Goal saved' : 'Goal cleared')
+              }}
+              className="flex items-center gap-2 flex-wrap"
+            >
+              <label className="text-slate-500">
+                Goal weight ({weightUnit})
+              </label>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                inputMode="decimal"
+                value={goalDraft}
+                onChange={e => setGoalDraft(e.target.value)}
+                placeholder="e.g. 180"
+                className="text-sm py-1 w-24"
+                autoFocus
+              />
+              <Button type="submit" size="sm" loading={savingGoal}>
+                Save
+              </Button>
+              <button
+                type="button"
+                onClick={() => setEditingGoal(false)}
+                className="text-slate-400 hover:text-slate-700 font-medium cursor-pointer"
+              >
+                Cancel
+              </button>
+            </form>
+          )}
+        </div>
 
         {/* Quick log form */}
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">

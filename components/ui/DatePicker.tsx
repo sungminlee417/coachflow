@@ -79,7 +79,7 @@ export function DatePicker({
           value ? 'text-slate-900' : 'text-slate-400'
         }`}
       >
-        <Calendar size={16} className="text-slate-400 flex-shrink-0" />
+        <Calendar size={16} className="text-slate-400 shrink-0" />
         <span className="flex-1 text-left truncate">
           {value ? formatPretty(value) : placeholder}
         </span>

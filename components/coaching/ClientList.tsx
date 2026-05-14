@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ClientGridSkeleton } from '@/components/ui/Skeleton'
 import { LibrarySearch } from '@/components/ui/LibrarySearch'
+import { LibrarySort, type LibrarySortMode } from '@/components/ui/LibrarySort'
 import { UserPlus, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { Client } from '@/lib/types'
@@ -24,16 +25,33 @@ export default function ClientList({ coachId }: ClientListProps) {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [showInvites, setShowInvites] = useState(false)
   const [query, setQuery] = useState('')
+  // Templates don't apply here, so we expose only Recent + A→Z.
+  const [sortMode, setSortMode] = useState<LibrarySortMode>('recent')
 
   const visibleClients = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return clients
-    return clients.filter(
-      c =>
-        (c.full_name ?? '').toLowerCase().includes(q) ||
-        (c.email ?? '').toLowerCase().includes(q)
-    )
-  }, [clients, query])
+    const filtered = q
+      ? clients.filter(
+          c =>
+            (c.full_name ?? '').toLowerCase().includes(q) ||
+            (c.email ?? '').toLowerCase().includes(q)
+        )
+      : clients
+    // Inline sort: clients use `started_at` (when the relationship began),
+    // not `created_at`, so the generic `sortLibrary` helper doesn't fit.
+    const sorted = [...filtered]
+    if (sortMode === 'alpha') {
+      sorted.sort((a, b) =>
+        (a.full_name ?? '').localeCompare(b.full_name ?? '', undefined, {
+          sensitivity: 'base',
+        })
+      )
+    } else {
+      // 'recent' / 'template' both fall back to most-recent here.
+      sorted.sort((a, b) => (b.started_at ?? '').localeCompare(a.started_at ?? ''))
+    }
+    return sorted
+  }, [clients, query, sortMode])
 
   useEffect(() => {
     fetchClients()
@@ -133,11 +151,21 @@ export default function ClientList({ coachId }: ClientListProps) {
       ) : (
         <>
           {clients.length > 4 && (
-            <div className="mb-4">
+            <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
               <LibrarySearch
                 value={query}
                 onChange={setQuery}
                 placeholder="Search clients by name or email…"
+              />
+              <LibrarySort
+                value={sortMode}
+                onChange={setSortMode}
+                // Templates aren't a concept for a relationship list.
+                options={[
+                  { value: 'recent', label: 'Most recent' },
+                  { value: 'alpha', label: 'A → Z' },
+                ]}
+                className="sm:w-48"
               />
             </div>
           )}
@@ -166,7 +194,7 @@ export default function ClientList({ coachId }: ClientListProps) {
                 </div>
                 <ChevronRight
                   size={16}
-                  className="text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0"
+                  className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0"
                 />
               </div>
             </button>

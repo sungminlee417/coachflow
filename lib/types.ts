@@ -8,6 +8,9 @@ export interface Profile {
   avatar_url?: string | null
   length_unit?: LengthUnit
   weight_unit?: WeightUnit
+  /** Optional body-weight goal; rendered as a dashed line on the weight
+   *  chart. NULL = no goal set. */
+  weight_goal?: number | null
   created_at?: string
   updated_at?: string
 }

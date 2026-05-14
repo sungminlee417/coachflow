@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import { LibrarySearch } from '@/components/ui/LibrarySearch'
+import { LibrarySort, sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
 import { Plus, Send, Pencil, Trash2, Apple, Copy } from 'lucide-react'
 import type { MealPlan } from '@/lib/types'
 import dynamic from 'next/dynamic'
@@ -30,12 +31,15 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
   const [assigningPlan, setAssigningPlan] = useState<MealPlan | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [sortMode, setSortMode] = useState<LibrarySortMode>('recent')
 
   const visiblePlans = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return plans
-    return plans.filter(p => p.name.toLowerCase().includes(q))
-  }, [plans, query])
+    const filtered = q
+      ? plans.filter(p => p.name.toLowerCase().includes(q))
+      : plans
+    return sortLibrary(filtered, sortMode)
+  }, [plans, query, sortMode])
 
   useEffect(() => {
     fetchPlans()
@@ -324,11 +328,16 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
       ) : (
         <>
           {plans.length > 4 && (
-            <div className="mb-4">
+            <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
               <LibrarySearch
                 value={query}
                 onChange={setQuery}
                 placeholder="Search meal plans…"
+              />
+              <LibrarySort
+                value={sortMode}
+                onChange={setSortMode}
+                className="sm:w-48"
               />
             </div>
           )}

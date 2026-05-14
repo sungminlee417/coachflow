@@ -20,7 +20,7 @@ const sizeClasses = {
 export function Avatar({ name, tone = 'brand', size = 'md' }: AvatarProps) {
   return (
     <div
-      className={`${sizeClasses[size]} ${toneClasses[tone]} rounded-full flex items-center justify-center font-bold flex-shrink-0`}
+      className={`${sizeClasses[size]} ${toneClasses[tone]} rounded-full flex items-center justify-center font-bold shrink-0`}
     >
       {name?.charAt(0).toUpperCase() || '?'}
     </div>

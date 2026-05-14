@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import { LibrarySearch } from '@/components/ui/LibrarySearch'
+import { LibrarySort, sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
 import { Plus, Send, Pencil, Trash2, ListChecks, Copy } from 'lucide-react'
 import type { WorkoutProgram } from '@/lib/types'
 import dynamic from 'next/dynamic'
@@ -30,12 +31,15 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
   const [assigning, setAssigning] = useState<WorkoutProgram | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [sortMode, setSortMode] = useState<LibrarySortMode>('recent')
 
   const visiblePrograms = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return programs
-    return programs.filter(p => p.name.toLowerCase().includes(q))
-  }, [programs, query])
+    const filtered = q
+      ? programs.filter(p => p.name.toLowerCase().includes(q))
+      : programs
+    return sortLibrary(filtered, sortMode)
+  }, [programs, query, sortMode])
 
   useEffect(() => {
     fetchPrograms()
@@ -238,11 +242,16 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
       ) : (
         <>
           {programs.length > 4 && (
-            <div className="mb-4">
+            <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
               <LibrarySearch
                 value={query}
                 onChange={setQuery}
                 placeholder="Search programs…"
+              />
+              <LibrarySort
+                value={sortMode}
+                onChange={setSortMode}
+                className="sm:w-48"
               />
             </div>
           )}
