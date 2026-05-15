@@ -25,13 +25,24 @@ interface WeightTrackerProps {
   weightGoal?: number | null
 }
 
-function deltaIndicator(current: number, previous: number) {
+// Delta color is goal-aware. Without a goal we stay neutral — increase
+// could be a bulk or a regression depending on what the user wants. With
+// a goal, emerald = moving toward it, red = moving away.
+function deltaIndicator(current: number, previous: number, goal?: number | null) {
   const diff = current - previous
   if (diff === 0) return { Icon: Minus, text: '0', color: 'text-slate-400' }
-  if (diff > 0) {
-    return { Icon: TrendingUp, text: `+${roundMacro(diff)}`, color: 'text-emerald-600' }
+  const increasing = diff > 0
+  const Icon = increasing ? TrendingUp : TrendingDown
+  const text = increasing ? `+${roundMacro(diff)}` : `${roundMacro(diff)}`
+  let color = 'text-slate-500'
+  if (goal != null && Number.isFinite(goal)) {
+    const wantsDown = previous > goal
+    const wantsUp = previous < goal
+    const towardGoal =
+      (wantsDown && !increasing) || (wantsUp && increasing)
+    color = towardGoal ? 'text-emerald-600' : 'text-red-600'
   }
-  return { Icon: TrendingDown, text: `${roundMacro(diff)}`, color: 'text-red-600' }
+  return { Icon, text, color }
 }
 
 export default function WeightTracker({
@@ -119,7 +130,7 @@ export default function WeightTracker({
 
   const latest = logs[0]
   const previous = logs[1]
-  const delta = latest && previous ? deltaIndicator(latest.weight, previous.weight) : null
+  const delta = latest && previous ? deltaIndicator(latest.weight, previous.weight, goal) : null
 
   return (
     <div>
@@ -328,7 +339,7 @@ export default function WeightTracker({
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {logs.slice(0, 10).map((log, i) => {
                 const prev = logs[i + 1]
-                const d = prev ? deltaIndicator(log.weight, prev.weight) : null
+                const d = prev ? deltaIndicator(log.weight, prev.weight, goal) : null
                 return (
                   <div
                     key={log.id}

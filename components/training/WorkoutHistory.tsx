@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Trophy, Flame, TrendingUp, Activity } from 'lucide-react'
+import { Trophy, Flame, TrendingUp, Activity, HeartPulse } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { formatDate, formatDuration, shiftDateISO, todayISO } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -244,67 +244,92 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
         />
       ) : (
         <div className="space-y-2">
-          {stats.map(s => (
-            <div
-              key={s.key}
-              className="bg-white rounded-xl border border-slate-200 p-4 hover:border-indigo-200 transition-colors"
-            >
-              <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-slate-900 truncate">{s.name}</h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Last performed {formatDate(s.lastLoggedDate)}
-                    {' · '}
-                    {s.totalSets} {s.totalSets === 1 ? 'set' : 'sets'} all-time
-                    {s.type === 'cardio' && (
-                      <span className="ml-1 text-amber-600">· cardio</span>
-                    )}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  {s.type === 'cardio' ? (
-                    s.longestDurationSeconds != null ? (
+          {stats.map(s => {
+            const isCardio = s.type === 'cardio'
+            const hasStat = isCardio
+              ? s.longestDurationSeconds != null
+              : s.bestWeight != null
+            return (
+              <div
+                key={s.key}
+                className="bg-white rounded-xl border border-slate-200 p-4 hover:border-indigo-200 transition-colors"
+              >
+                {/* Grid (not flex-wrap) so the right-side stat keeps its
+                    column even when the exercise name is long — flex-wrap
+                    used to push the stat below the name on narrow widths,
+                    which broke the visual alignment across the list. */}
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 items-start">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <h3 className="font-semibold text-slate-900 truncate min-w-0">
+                        {s.name}
+                      </h3>
+                      {isCardio && (
+                        <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-px shrink-0">
+                          <HeartPulse size={10} />
+                          Cardio
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
+                      Last {formatDate(s.lastLoggedDate)}
+                      <span className="text-slate-300"> · </span>
+                      {s.totalSets} {s.totalSets === 1 ? 'set' : 'sets'}
+                    </p>
+                  </div>
+                  {/* Right column reserves the same vertical footprint
+                      whether or not we have a stat — keeps the row of
+                      cards visually consistent down the page. */}
+                  <div className="text-right shrink-0 min-w-22">
+                    {hasStat ? (
+                      isCardio ? (
+                        <>
+                          <p className="text-lg font-bold text-slate-900 tabular-nums leading-tight">
+                            {formatDuration(s.longestDurationSeconds!)}
+                          </p>
+                          <p className="text-[10px] uppercase tracking-widest font-semibold text-amber-600 mt-0.5">
+                            Longest
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-lg font-bold text-slate-900 tabular-nums leading-tight">
+                            {s.bestWeight}
+                            {s.bestWeightReps != null && (
+                              <span className="text-sm font-medium text-slate-500">
+                                {' × '}
+                                {s.bestWeightReps}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[10px] uppercase tracking-widest font-semibold text-emerald-600 mt-0.5">
+                            Heaviest
+                          </p>
+                        </>
+                      )
+                    ) : (
                       <>
-                        <p className="text-lg font-bold text-slate-900 tabular-nums">
-                          {formatDuration(s.longestDurationSeconds)}
+                        <p className="text-lg font-bold text-slate-300 tabular-nums leading-tight">
+                          —
                         </p>
-                        <p className="text-[10px] uppercase tracking-widest font-semibold text-amber-600">
-                          Longest
+                        <p className="text-[10px] uppercase tracking-widest font-semibold text-slate-400 mt-0.5">
+                          No PR yet
                         </p>
                       </>
-                    ) : (
-                      <p className="text-xs text-slate-400 italic">No duration logged</p>
-                    )
-                  ) : s.bestWeight != null ? (
-                    <>
-                      <p className="text-lg font-bold text-slate-900 tabular-nums">
-                        {s.bestWeight}
-                        {s.bestWeightReps != null && (
-                          <span className="text-sm font-medium text-slate-500">
-                            {' × '}
-                            {s.bestWeightReps}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-[10px] uppercase tracking-widest font-semibold text-emerald-600">
-                        Heaviest
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic">No weight logged</p>
+                    )}
+                  </div>
+                  {!isCardio && s.totalVolume > 0 && (
+                    <p className="col-span-2 text-[11px] text-slate-500 tabular-nums pt-2 border-t border-slate-100">
+                      Total volume{' '}
+                      <span className="font-semibold text-slate-700">
+                        {Math.round(s.totalVolume).toLocaleString()}
+                      </span>
+                    </p>
                   )}
                 </div>
               </div>
-              {s.type === 'strength' && s.totalVolume > 0 && (
-                <p className="text-[11px] text-slate-500 mt-2 tabular-nums">
-                  Total volume:{' '}
-                  <span className="font-semibold text-slate-700">
-                    {Math.round(s.totalVolume).toLocaleString()}
-                  </span>
-                </p>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

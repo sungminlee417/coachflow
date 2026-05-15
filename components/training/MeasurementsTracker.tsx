@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -39,6 +39,10 @@ const FIELDS: FieldDef[] = [
   { key: 'calf_right', label: 'Right calf', flexedKey: 'calf_right_flexed' },
 ]
 
+// Body-measurement deltas are intentionally neutral — for arms/chest a
+// gain is good, for waist/hips a loss is good, and for a recomp neither
+// is universally "right". Colorizing red/green either way picks a side.
+// The arrow + sign communicate direction; slate keeps the value-neutral.
 function deltaIndicator(current: number, previous: number) {
   const diff = current - previous
   if (diff === 0) return { icon: Minus, text: '0', color: 'text-slate-400' }
@@ -46,13 +50,13 @@ function deltaIndicator(current: number, previous: number) {
     return {
       icon: TrendingUp,
       text: `+${roundMacro(diff)}`,
-      color: 'text-emerald-600',
+      color: 'text-slate-500',
     }
   }
   return {
     icon: TrendingDown,
     text: `${roundMacro(diff)}`,
-    color: 'text-red-600',
+    color: 'text-slate-500',
   }
 }
 
@@ -101,6 +105,33 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
       setDeletingId(null)
     }
   }
+
+  // Pre-compute the history row metadata once per entry change. The previous
+  // pass walked FIELDS twice per row (once for the summary string, once for
+  // the filled count) — this collapses to a single walk and removes the
+  // per-render work entirely. Declared above the loading early-return so
+  // hook order stays stable across renders.
+  const historyRows = useMemo(
+    () =>
+      entries.map(entry => {
+        let filledCount = 0
+        const previewParts: string[] = []
+        for (const f of FIELDS) {
+          const v = entry[f.key]
+          if (v == null) continue
+          filledCount += 1
+          if (previewParts.length < 3) {
+            previewParts.push(`${f.label} ${formatLength(v as number, lengthUnit)}`)
+          }
+        }
+        return {
+          entry,
+          filledCount,
+          summary: previewParts.join(' · '),
+        }
+      }),
+    [entries, lengthUnit]
+  )
 
   if (loading) {
     return (
@@ -208,8 +239,11 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
                 return (
                   <div
                     key={key}
-                    className="bg-white rounded-lg border border-slate-200 px-3 py-2 min-w-0"
+                    className="bg-white rounded-lg border border-slate-200 px-3 py-2.5 min-w-0"
                   >
+                    {/* Label row — truncates cleanly on narrow phones.
+                        The (flexed/relaxed) tag is its own span so it doesn't
+                        eat the label's available width when it's not there. */}
                     <p className="text-[11px] text-slate-500 truncate">
                       {label}
                       {flexedKey && (
@@ -218,8 +252,12 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
                         </span>
                       )}
                     </p>
-                    <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
-                      <p className="text-lg sm:text-xl font-semibold text-slate-900 tabular-nums">
+                    {/* Grid (not flex justify-between) so the right-side
+                        delta keeps its own slot even when the value column
+                        is forced narrow on small screens — value never gets
+                        pushed onto a second line, delta never wraps. */}
+                    <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-baseline">
+                      <p className="text-lg sm:text-xl font-semibold text-slate-900 tabular-nums whitespace-nowrap min-w-0 truncate">
                         {formatLength(value, lengthUnit)}
                         <span className="text-[10px] sm:text-xs font-normal text-slate-400 ml-1">
                           {lengthUnit}
@@ -227,7 +265,7 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
                       </p>
                       {delta && (
                         <span
-                          className={`flex items-center gap-0.5 text-[11px] font-medium ${delta.color}`}
+                          className={`inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums shrink-0 ${delta.color}`}
                         >
                           <delta.icon size={11} />
                           {delta.text}
@@ -245,59 +283,60 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
             )}
           </div>
 
-          {/* History list */}
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-            History
-          </p>
+          {/* History list — uses `bg-white border` (not the snapshot's
+              filled `bg-slate-50` block) so the hero "Latest" card and the
+              list of past entries read as visually distinct tiers, not the
+              same surface stacked twice. */}
+          <div className="flex items-baseline justify-between mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              History
+            </p>
+            <p className="text-[10px] tabular-nums text-slate-400">
+              {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+            </p>
+          </div>
           <div className="space-y-1.5">
-            {entries.map(entry => {
-              const summary = FIELDS.filter(f => entry[f.key] != null)
-                .slice(0, 3)
-                .map(f => `${f.label} ${formatLength(entry[f.key] as number, lengthUnit)}`)
-                .join(' · ')
-              const filledCount = FIELDS.filter(f => entry[f.key] != null).length
-              return (
-                <div
-                  key={entry.id}
-                  className="bg-slate-50 hover:bg-slate-100 transition-colors rounded-lg flex items-center gap-1 group"
+            {historyRows.map(({ entry, filledCount, summary }) => (
+              <div
+                key={entry.id}
+                className="bg-white border border-slate-200 hover:border-indigo-200 transition-colors rounded-lg flex items-center gap-1 group"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(entry)
+                    setShowForm(true)
+                  }}
+                  className="flex-1 min-w-0 text-left px-3 py-3 cursor-pointer"
+                  aria-label={`Edit measurement for ${formatDate(entry.recorded_at)}`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditing(entry)
-                      setShowForm(true)
-                    }}
-                    className="flex-1 min-w-0 text-left px-3 py-3 cursor-pointer"
-                    aria-label={`Edit measurement for ${formatDate(entry.recorded_at)}`}
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-slate-900 text-sm">
-                        {formatDate(entry.recorded_at)}
-                      </p>
-                      <span className="text-[10px] font-semibold text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-px tabular-nums">
-                        {filledCount} {filledCount === 1 ? 'measurement' : 'measurements'}
-                      </span>
-                      <Pencil
-                        size={11}
-                        className="text-slate-300 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                      />
-                    </div>
-                    {summary && (
-                      <p className="text-xs text-slate-500 mt-1 truncate">{summary}</p>
-                    )}
-                  </button>
-                  <div className="pr-2 shrink-0">
-                    <IconButton
-                      tone="danger"
-                      onClick={() => entry.id && setDeletingId(entry.id)}
-                      aria-label="Delete measurement"
-                    >
-                      <Trash2 size={14} />
-                    </IconButton>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-slate-900 text-sm tabular-nums">
+                      {formatDate(entry.recorded_at)}
+                    </p>
+                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-full px-2 py-px tabular-nums">
+                      {filledCount} {filledCount === 1 ? 'measurement' : 'measurements'}
+                    </span>
+                    <Pencil
+                      size={11}
+                      className="text-slate-300 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                    />
                   </div>
+                  {summary && (
+                    <p className="text-xs text-slate-500 mt-1 truncate">{summary}</p>
+                  )}
+                </button>
+                <div className="pr-2 shrink-0">
+                  <IconButton
+                    tone="danger"
+                    onClick={() => entry.id && setDeletingId(entry.id)}
+                    aria-label="Delete measurement"
+                  >
+                    <Trash2 size={14} />
+                  </IconButton>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         </>
       )}
