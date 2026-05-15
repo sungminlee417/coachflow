@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -137,6 +137,22 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
   const [saving, setSaving] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [snapshotReady, setSnapshotReady] = useState(!workout?.id)
+
+  // Pre-compute superset groupings off the exercise list. Recomputed only
+  // when exercises change — otherwise unrelated re-renders (saving toggle,
+  // form field edits) would rebuild the array on every keystroke.
+  const exerciseGroups = useMemo(() => {
+    type ExerciseGroup = { startIndex: number; exercises: DraftExercise[] }
+    const groups: ExerciseGroup[] = []
+    exercises.forEach((ex, i) => {
+      const prev = exercises[i - 1]
+      const continueGroup = !!prev?.pair_with_next
+      const last = groups[groups.length - 1]
+      if (continueGroup && last) last.exercises.push(ex)
+      else groups.push({ startIndex: i, exercises: [ex] })
+    })
+    return groups
+  }, [exercises])
 
   const isDirty = useDirtyState(
     {
@@ -824,16 +840,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
           >
         <div className="space-y-3">
           {(() => {
-            // Group consecutive paired exercises so the visual frame matches the data.
-            type ExerciseGroup = { startIndex: number; exercises: DraftExercise[] }
-            const groups: ExerciseGroup[] = []
-            exercises.forEach((ex, i) => {
-              const prev = exercises[i - 1]
-              const continueGroup = !!prev?.pair_with_next
-              const last = groups[groups.length - 1]
-              if (continueGroup && last) last.exercises.push(ex)
-              else groups.push({ startIndex: i, exercises: [ex] })
-            })
+            const groups = exerciseGroups
 
             const renderCard = (
               exercise: DraftExercise,

@@ -125,6 +125,7 @@ export default function TodayDashboard({
         <WeightCard
           userId={user.id}
           weightUnit={profile.weight_unit ?? 'lbs'}
+          weightGoal={profile.weight_goal ?? null}
           onOpen={() => onNavigate('measurements')}
         />
         <StreakCard
@@ -930,10 +931,12 @@ function StatusDot({ status }: { status: 'eaten' | 'missed' | 'upcoming' }) {
 function WeightCard({
   userId,
   weightUnit,
+  weightGoal,
   onOpen,
 }: {
   userId: string
   weightUnit: WeightUnit
+  weightGoal: number | null
   onOpen: () => void
 }) {
   const supabase = useSupabase()
@@ -976,6 +979,14 @@ function WeightCard({
     ? Math.max(0, daysBetween(latest.recorded_at, today))
     : null
 
+  // "X to go" stamp — only shown when both a goal and a latest weight
+  // exist. Doesn't try to infer direction (cut vs bulk); just shows the
+  // absolute distance so the trainee sees progress at a glance.
+  const goalDiff =
+    latest && weightGoal != null && Number.isFinite(weightGoal) && weightGoal > 0
+      ? latest.weight - weightGoal
+      : null
+
   const handleLog = async () => {
     const weight = parseFloat(draft)
     if (!draft || Number.isNaN(weight) || weight <= 0) {
@@ -1008,13 +1019,28 @@ function WeightCard({
       ) : (
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-semibold text-slate-900">
+            <p className="font-semibold text-slate-900 flex items-baseline gap-2 flex-wrap">
               {latest ? (
                 <>
-                  {roundMacro(latest.weight)}{' '}
-                  <span className="text-xs font-normal text-slate-400">
-                    {weightUnit}
+                  <span>
+                    {roundMacro(latest.weight)}{' '}
+                    <span className="text-xs font-normal text-slate-400">
+                      {weightUnit}
+                    </span>
                   </span>
+                  {goalDiff != null && (
+                    <span
+                      className={`text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 border ${
+                        Math.abs(goalDiff) < 0.5
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                      }`}
+                    >
+                      {Math.abs(goalDiff) < 0.5
+                        ? 'At goal'
+                        : `${roundMacro(Math.abs(goalDiff))} ${weightUnit} to goal`}
+                    </span>
+                  )}
                 </>
               ) : (
                 <span className="text-slate-400 italic font-normal">

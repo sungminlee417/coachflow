@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -259,6 +259,44 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
     snapshotReady
   )
   const [expandedFoods, setExpandedFoods] = useState<Set<string>>(new Set())
+
+  // Per-day macro rollup. A meal with no `days_of_week` set is treated as
+  // "every day". For each weekday we sum the applicable meals; if every day
+  // matches we show a single number, otherwise we surface min–max so the
+  // coach sees the lightest/heaviest day at a glance.
+  const dailyTotals = useMemo(() => {
+    const days: DayOfWeek[] = [0, 1, 2, 3, 4, 5, 6]
+    const perDay = days.map(d => {
+      const applicable = meals.filter(m => {
+        const dow = m.days_of_week ?? []
+        return dow.length === 0 || dow.includes(d)
+      })
+      return applicable.reduce(
+        (acc, m) => {
+          const macros = computeMealMacros(m)
+          return {
+            calories: acc.calories + macros.calories,
+            protein_grams: acc.protein_grams + macros.protein_grams,
+            carbs_grams: acc.carbs_grams + macros.carbs_grams,
+            fat_grams: acc.fat_grams + macros.fat_grams,
+          }
+        },
+        { calories: 0, protein_grams: 0, carbs_grams: 0, fat_grams: 0 }
+      )
+    })
+    const cals = perDay.map(t => t.calories)
+    const minCals = Math.min(...cals)
+    const maxCals = Math.max(...cals)
+    // "Same every day" if the kcal spread is under 1 — protein/carbs/fat
+    // will follow when kcal does, so we don't need a multi-axis check.
+    const uniform = maxCals - minCals < 1
+    // Pick the heaviest day's macros for the displayed P/C/F.
+    const heaviest = perDay.reduce(
+      (best, t) => (t.calories > best.calories ? t : best),
+      perDay[0]
+    )
+    return { uniform, minCals, maxCals, heaviest }
+  }, [meals])
 
   const foodKey = (mealIndex: number, foodIndex: number) => `${mealIndex}-${foodIndex}`
 
@@ -839,7 +877,7 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
     return { meal_type: mt, time: t === '__notime' ? null : t }
   }
 
-  const mealSlots: MealSlot[] = (() => {
+  const mealSlots: MealSlot[] = useMemo(() => {
     const map = new Map<string, MealSlot>()
     for (const m of meals) {
       // Pinned slot wins while the meal is being edited, so it doesn't jump
@@ -865,7 +903,10 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
       if (b.time) return 1
       return MEAL_TYPE_ORDER[a.meal_type] - MEAL_TYPE_ORDER[b.meal_type]
     })
-  })()
+    // slotKeyOf / decodeSlotKey are stable in-render helpers; meals +
+    // pinnedSlotKey are the real inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meals, pinnedSlotKey])
 
   return (
     <div>
@@ -917,6 +958,50 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
         </Button>
       </div>
 
+      {/* Sticky daily-totals strip. On mobile it pins below the 3.5rem app
+          bar so the running total stays visible while scrolling through long
+          meal lists — coaches almost always plan against a calorie/protein
+          target, and the previous design made you scroll back up to check. */}
+      {meals.length > 0 && (
+        <div className="sticky top-14 md:top-0 z-20 -mx-4 px-4 sm:mx-0 sm:px-0 mb-3 bg-slate-50/95 backdrop-blur-sm">
+          <div className="bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
+            <div className="flex items-baseline justify-between gap-2 flex-wrap">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {dailyTotals.uniform ? 'Daily' : 'Daily range'}
+                </span>
+                <span className="text-base font-bold text-slate-900 tabular-nums">
+                  {dailyTotals.uniform
+                    ? Math.round(dailyTotals.maxCals)
+                    : `${Math.round(dailyTotals.minCals)}–${Math.round(dailyTotals.maxCals)}`}
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">cal</span>
+              </div>
+              <div className="flex items-baseline gap-2.5 text-[11px] tabular-nums">
+                <span className="text-slate-600">
+                  P{' '}
+                  <span className="font-semibold text-slate-900">
+                    {roundMacro(dailyTotals.heaviest.protein_grams)}
+                  </span>
+                </span>
+                <span className="text-slate-600">
+                  C{' '}
+                  <span className="font-semibold text-slate-900">
+                    {roundMacro(dailyTotals.heaviest.carbs_grams)}
+                  </span>
+                </span>
+                <span className="text-slate-600">
+                  F{' '}
+                  <span className="font-semibold text-slate-900">
+                    {roundMacro(dailyTotals.heaviest.fat_grams)}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {meals.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center">
           <p className="text-slate-400 text-sm">No meals yet. Add your first meal above.</p>
@@ -961,17 +1046,14 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                   const index = meals.indexOf(meal)
                   const mealMacros = computeMealMacros(meal)
                   const isExpanded = expandedMeals.has(index)
-                  // Day pills on the collapsed header — main differentiator
-                  // between two meals in the same slot.
-                  const dayLabels = (meal.days_of_week ?? [])
-                    .slice()
-                    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
-                    .map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d])
                   return (
             <SortableMealShell key={meal._dndKey} id={meal._dndKey}>
               {drag => (
               <div className="bg-white rounded-xl border border-slate-200 p-4">
-                {/* Collapsible header — click anywhere except the action buttons to toggle */}
+                {/* Collapsible header — click anywhere except the action buttons to toggle.
+                    Day chips intentionally live in the metadata row below (and the
+                    DayOfWeekSelector when expanded) so they wrap freely instead of
+                    fighting the meal name + kcal for the same horizontal strip. */}
                 <div className="flex justify-between items-center gap-2">
                   <DragHandle {...drag} />
                   <button
@@ -980,28 +1062,19 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                     className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer group"
                     aria-expanded={isExpanded}
                   >
-                    <span className="text-slate-400 group-hover:text-slate-700 transition-transform">
+                    <span className="text-slate-400 group-hover:text-slate-700 transition-transform shrink-0">
                       {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </span>
-                    {meal.name && (
-                      <span className="text-sm font-medium text-slate-900 truncate">
+                    {meal.name ? (
+                      <span className="text-sm font-medium text-slate-900 truncate min-w-0">
                         {meal.name}
                       </span>
-                    )}
-                    {dayLabels.length > 0 ? (
-                      <div className="flex gap-1.5 flex-wrap shrink-0">
-                        {dayLabels.map(d => (
-                          <span
-                            key={d}
-                            className="text-[9px] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-1.5 py-px"
-                          >
-                            {d}
-                          </span>
-                        ))}
-                      </div>
                     ) : (
-                      <span className="text-[9px] uppercase tracking-widest text-slate-400 shrink-0">
-                        Every day
+                      // No `truncate` here — the italic glyph slants past
+                      // its box, and overflow:hidden would clip the tail.
+                      // The placeholder is short, so no need to truncate.
+                      <span className="text-sm text-slate-400 italic shrink-0 pr-0.5">
+                        Untitled meal
                       </span>
                     )}
                     {!isExpanded && (
@@ -1381,6 +1454,22 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
       {/* Spacer keeps the last card clear of the fixed save bar. Taller on
           mobile because the bar sits above the ~3.5rem bottom tab nav. */}
       <div className="h-32 md:h-24" aria-hidden />
+
+      {/* Mobile-only floating "+ Add meal" FAB. Sits above the save bar so
+          when the coach is deep in a long plan they don't have to scroll
+          all the way down to add another meal. Hidden when there are no
+          meals yet (the empty-state card already has the prompt). */}
+      {meals.length > 0 && (
+        <button
+          type="button"
+          onClick={addMeal}
+          aria-label="Add meal"
+          className="md:hidden fixed right-4 z-40 h-12 w-12 rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 7.5rem)' }}
+        >
+          <Plus size={22} />
+        </button>
+      )}
 
       {/* Pinned action bar — fixed to the viewport so it stays visible no
           matter how short the form is. Respects the desktop sidebar via

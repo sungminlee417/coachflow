@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { IconButton } from './IconButton'
 import { pushModal, popModal } from '@/lib/modal-stack'
@@ -13,14 +13,22 @@ interface ModalProps {
 }
 
 export function Modal({ open, title, onClose, children }: ModalProps) {
+  // Stash the latest onClose in a ref so the escape-key effect only depends
+  // on `open` — callers that pass an inline arrow (most of them) would
+  // otherwise re-add/remove the keydown listener on every render.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [open, onClose])
+  }, [open])
 
   // Tell the toast layer to relocate while a modal is on screen so a fresh
   // toast doesn't appear under the mobile bottom sheet.

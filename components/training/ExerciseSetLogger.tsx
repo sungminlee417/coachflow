@@ -69,6 +69,107 @@ const buildInitialRows = (exercise: Exercise): RowState[] =>
     completed: false,
   }))
 
+// Pre-set "Last: X · Try Y" hint strip. Pulled out of ExerciseSetLogger so
+// it doesn't get re-declared as a new component type on every parent render
+// (which would unmount/remount inputs and steal focus mid-edit).
+function PreSetHint({
+  row,
+  prior,
+  loaded,
+  isCardio,
+}: {
+  row: RowState
+  prior: PriorPerformance | undefined
+  loaded: boolean
+  isCardio: boolean
+}) {
+  const prev = loaded ? prior : undefined
+  if (!prev) return null
+  const last = formatPriorHint(prev, isCardio)
+  let suggestion: { direction: 'up' | 'down'; weight: number } | null = null
+  if (!isCardio) {
+    const fb = getRepRangeFeedback(
+      row.target_reps,
+      prev.reps_performed,
+      prev.weight_performed
+    )
+    if (fb && fb.state !== 'on-target' && prev.weight_performed != null) {
+      const weight = prev.weight_performed + fb.delta
+      if (weight > 0) {
+        suggestion = { direction: fb.delta > 0 ? 'up' : 'down', weight }
+      }
+    }
+  }
+  if (!last && !suggestion) return null
+  return (
+    <div className="flex items-center gap-2 text-[10px] px-3 pt-2 flex-wrap">
+      {last && (
+        <span className="text-slate-400 tabular-nums">
+          Last: <span className="font-medium text-slate-500">{last}</span>
+        </span>
+      )}
+      {suggestion && (
+        <span
+          className={`inline-flex items-center gap-1 font-medium border rounded-full px-2 py-0.5 tabular-nums ${
+            suggestion.direction === 'up'
+              ? 'text-indigo-700 bg-indigo-50 border-indigo-100'
+              : 'text-amber-700 bg-amber-50 border-amber-100'
+          }`}
+        >
+          {suggestion.direction === 'up' ? (
+            <ArrowUp size={11} />
+          ) : (
+            <ArrowDown size={11} />
+          )}
+          Try {suggestion.weight}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function PostSetHint({
+  row,
+  prior,
+  loaded,
+  isCardio,
+  manuallyExpanded,
+  onCollapse,
+}: {
+  row: RowState
+  prior: PriorPerformance | undefined
+  loaded: boolean
+  isCardio: boolean
+  manuallyExpanded: Set<number>
+  onCollapse: (setNumber: number) => void
+}) {
+  const prev = loaded ? prior : undefined
+  const improved = prev ? isImprovement(row, prev, isCardio) : false
+  const showCollapse =
+    loaded && row.completed && manuallyExpanded.has(row.set_number)
+  if (!improved && !showCollapse) return null
+  return (
+    <div className="flex items-center justify-end gap-2 text-[10px] px-3 pb-1.5 flex-wrap">
+      {improved && (
+        <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
+          ↑ Beat last
+        </span>
+      )}
+      {showCollapse && (
+        <button
+          type="button"
+          onClick={() => onCollapse(row.set_number)}
+          className="inline-flex items-center gap-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+          aria-label="Collapse this set"
+        >
+          <ChevronUp size={11} />
+          Collapse
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function ExerciseSetLogger({
   assignmentId,
   exercise,
@@ -279,84 +380,6 @@ export function ExerciseSetLogger({
   // suggested-weight chip is the actionable bit — the trainee sees it
   // BEFORE the set so they can adjust load now, not "remember next time".
   // Strength only; cardio falls back to a plain "Last: 25:30" line.
-  const PreSetHint = ({ row }: { row: RowState }) => {
-    const prev = loaded ? priorBySet.get(row.set_number) : undefined
-    if (!prev) return null
-    const last = formatPriorHint(prev, isCardio)
-    let suggestion: { direction: 'up' | 'down'; weight: number } | null = null
-    if (!isCardio) {
-      const fb = getRepRangeFeedback(
-        row.target_reps,
-        prev.reps_performed,
-        prev.weight_performed
-      )
-      if (fb && fb.state !== 'on-target' && prev.weight_performed != null) {
-        const weight = prev.weight_performed + fb.delta
-        if (weight > 0) {
-          suggestion = { direction: fb.delta > 0 ? 'up' : 'down', weight }
-        }
-      }
-    }
-    if (!last && !suggestion) return null
-    return (
-      <div className="flex items-center gap-2 text-[10px] px-3 pt-2 flex-wrap">
-        {last && (
-          <span className="text-slate-400 tabular-nums">
-            Last: <span className="font-medium text-slate-500">{last}</span>
-          </span>
-        )}
-        {suggestion && (
-          <span
-            className={`inline-flex items-center gap-1 font-medium border rounded-full px-2 py-0.5 tabular-nums ${
-              suggestion.direction === 'up'
-                ? 'text-indigo-700 bg-indigo-50 border-indigo-100'
-                : 'text-amber-700 bg-amber-50 border-amber-100'
-            }`}
-          >
-            {suggestion.direction === 'up' ? (
-              <ArrowUp size={11} />
-            ) : (
-              <ArrowDown size={11} />
-            )}
-            Try {suggestion.weight}
-          </span>
-        )}
-      </div>
-    )
-  }
-
-  // Post-set strip: "↑ Beat last" celebration + collapse link. Pre-set
-  // context has already shown the trainee what to aim for, so we keep
-  // this row small and reactive — only renders when there's something to
-  // surface.
-  const PostSetHint = ({ row }: { row: RowState }) => {
-    const prev = loaded ? priorBySet.get(row.set_number) : undefined
-    const improved = prev ? isImprovement(row, prev, isCardio) : false
-    const showCollapse =
-      loaded && row.completed && manuallyExpanded.has(row.set_number)
-    if (!improved && !showCollapse) return null
-    return (
-      <div className="flex items-center justify-end gap-2 text-[10px] px-3 pb-1.5 flex-wrap">
-        {improved && (
-          <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
-            ↑ Beat last
-          </span>
-        )}
-        {showCollapse && (
-          <button
-            type="button"
-            onClick={() => collapseRow(row.set_number)}
-            className="inline-flex items-center gap-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
-            aria-label="Collapse this set"
-          >
-            <ChevronUp size={11} />
-            Collapse
-          </button>
-        )}
-      </div>
-    )
-  }
-
   // Renders the toggle in the same h-6 footprint whether loaded or skeleton.
   const renderDone = (row: RowState) =>
     loaded ? (
@@ -462,7 +485,12 @@ export function ExerciseSetLogger({
                 key={row.set_number}
                 className={`transition-colors ${row.completed ? 'bg-emerald-50/40' : ''}`}
               >
-                <PreSetHint row={row} />
+                <PreSetHint
+                  row={row}
+                  prior={priorBySet.get(row.set_number)}
+                  loaded={loaded}
+                  isCardio={isCardio}
+                />
                 <div className="px-3 py-2 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center">
                   {/* Mobile metadata row + done button. */}
                   <div className="flex items-center justify-between gap-2 mb-2 sm:hidden">
@@ -592,7 +620,14 @@ export function ExerciseSetLogger({
                   </div>
                 )}
 
-                <PostSetHint row={row} />
+                <PostSetHint
+                  row={row}
+                  prior={priorBySet.get(row.set_number)}
+                  loaded={loaded}
+                  isCardio={isCardio}
+                  manuallyExpanded={manuallyExpanded}
+                  onCollapse={collapseRow}
+                />
               </div>
             )
           })}
@@ -620,7 +655,12 @@ export function ExerciseSetLogger({
             key={row.set_number}
             className={`transition-colors ${row.completed ? 'bg-emerald-50/40' : ''}`}
           >
-            <PreSetHint row={row} />
+            <PreSetHint
+                  row={row}
+                  prior={priorBySet.get(row.set_number)}
+                  loaded={loaded}
+                  isCardio={isCardio}
+                />
             <div className="px-3 py-2 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center">
               {/* Mobile-only metadata row: set # + target + done. */}
               <div className="flex items-center justify-between gap-2 mb-2 sm:hidden">
@@ -686,7 +726,14 @@ export function ExerciseSetLogger({
                 {renderDone(row)}
               </div>
             </div>
-            <PostSetHint row={row} />
+            <PostSetHint
+                  row={row}
+                  prior={priorBySet.get(row.set_number)}
+                  loaded={loaded}
+                  isCardio={isCardio}
+                  manuallyExpanded={manuallyExpanded}
+                  onCollapse={collapseRow}
+                />
           </div>
           )
         })}

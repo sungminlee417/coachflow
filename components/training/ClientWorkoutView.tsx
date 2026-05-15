@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { WeekSelector } from '@/components/ui/WeekSelector'
 import { IconButton } from '@/components/ui/IconButton'
@@ -42,6 +42,39 @@ function groupExercises(exercises: Exercise[]): ExerciseGroup[] {
   return groups
 }
 
+// Rough wall-clock estimate so the trainee can budget time before committing
+// to the workout. Heuristics: 45s of work per strength set, the exercise's
+// own target duration for cardio (falling back to 60s), and the exercise's
+// rest_seconds between sets within an exercise (falling back to 60s).
+// Intentionally not exact — the "~Xmin" label below sets the expectation.
+function estimateWorkoutSeconds(exercises: Exercise[]): number {
+  const STRENGTH_WORK_PER_SET = 45
+  const CARDIO_WORK_DEFAULT = 60
+  const REST_DEFAULT = 60
+  let total = 0
+  for (const ex of exercises) {
+    const sets = ex.exercise_sets ?? []
+    if (sets.length === 0) continue
+    const isCardio = ex.exercise_type === 'cardio'
+    for (const s of sets) {
+      total += isCardio
+        ? s.target_duration_seconds ?? CARDIO_WORK_DEFAULT
+        : STRENGTH_WORK_PER_SET
+    }
+    total += (sets.length - 1) * (ex.rest_seconds ?? REST_DEFAULT)
+  }
+  return total
+}
+
+function formatEstimate(seconds: number): string {
+  if (seconds < 60) return '<1 min'
+  const mins = Math.round(seconds / 60)
+  if (mins < 60) return `~${mins} min`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m === 0 ? `~${h}h` : `~${h}h ${m}m`
+}
+
 export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) {
   const supabase = useSupabase()
   const [assignments, setAssignments] = useState<WorkoutAssignment[]>([])
@@ -77,6 +110,17 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
       return next
     })
   }
+
+  // Group exercises once per assignment instead of on every render of every
+  // toggle (collapse, sub-swap, etc.). The visible assignment list re-renders
+  // a lot; the per-assignment exercise array rarely changes between fetches.
+  const groupsByAssignment = useMemo(() => {
+    const map = new Map<string, ExerciseGroup[]>()
+    for (const a of assignments) {
+      map.set(a.id, groupExercises(a.workout.exercises ?? []))
+    }
+    return map
+  }, [assignments])
 
   const handleUnassign = async () => {
     if (!pendingUnassign) return
@@ -200,6 +244,43 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                   </div>
                 )}
 
+                {/* At-a-glance summary so trainees can budget time before
+                    expanding the exercise list. Exercise + set counts come
+                    from the embed; the duration is a rough estimate (see
+                    estimateWorkoutSeconds for the heuristics). */}
+                {(() => {
+                  const exList = assignment.workout.exercises ?? []
+                  if (exList.length === 0) return null
+                  const setCount = exList.reduce(
+                    (n, ex) => n + (ex.exercise_sets?.length ?? 0),
+                    0
+                  )
+                  const est = estimateWorkoutSeconds(exList)
+                  return (
+                    <div className="mb-3 flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-slate-500 tabular-nums">
+                      <span>
+                        <span className="font-semibold text-slate-700">
+                          {exList.length}
+                        </span>{' '}
+                        {exList.length === 1 ? 'exercise' : 'exercises'}
+                      </span>
+                      <span className="text-slate-300">·</span>
+                      <span>
+                        <span className="font-semibold text-slate-700">{setCount}</span>{' '}
+                        {setCount === 1 ? 'set' : 'sets'}
+                      </span>
+                      {est > 0 && (
+                        <>
+                          <span className="text-slate-300">·</span>
+                          <span className="font-medium text-slate-600">
+                            {formatEstimate(est)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
+
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <button
                     onClick={() =>
@@ -213,7 +294,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                   {expanded === assignment.id && (() => {
                     // Determine if any exercise is currently collapsed so the
                     // bulk button can pick the more useful next action.
-                    const groups = groupExercises(assignment.workout.exercises ?? [])
+                    const groups = groupsByAssignment.get(assignment.id) ?? []
                     const allKeys = groups.map((g, gi) =>
                       g.exercises.length === 1
                         ? `${assignment.id}::solo::${g.exercises[0].id ?? g.startIndex}`
@@ -246,7 +327,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
 
                 {expanded === assignment.id && (
                   <div className="mt-4 space-y-3">
-                    {groupExercises(assignment.workout.exercises ?? []).map((group, gi) => {
+                    {(groupsByAssignment.get(assignment.id) ?? []).map((group, gi) => {
                       // Solo exercise → keep the per-exercise vertical-table logger.
                       if (group.exercises.length === 1) {
                         const exercise = group.exercises[0]
@@ -306,8 +387,15 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                     {displayName}
                                   </span>
                                   {activeSub && (
-                                    <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-px shrink-0">
-                                      Swapped
+                                    <span
+                                      className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5 shrink-0"
+                                      title={`Swapped from ${exercise.name}`}
+                                    >
+                                      <span className="text-indigo-500">↺</span>
+                                      <span className="text-indigo-500">from</span>
+                                      <span className="font-semibold truncate max-w-[10rem]">
+                                        {exercise.name}
+                                      </span>
                                     </span>
                                   )}
                                   {isCardio && (
@@ -443,7 +531,10 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                           {displayName}
                                         </span>
                                         {activeSub && (
-                                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px shrink-0">
+                                          <span
+                                            className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px shrink-0"
+                                            title={`Swapped from ${ex.name}`}
+                                          >
                                             Swapped
                                           </span>
                                         )}

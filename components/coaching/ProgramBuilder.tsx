@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -230,14 +230,20 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
     }
   }
 
-  const memberIds = new Set(members.map(m => m.id))
-  const pickerCandidates = allWorkouts
-    .filter(w => !memberIds.has(w.id))
-    .filter(w => {
-      if (!pickerQuery.trim()) return true
-      const q = pickerQuery.toLowerCase()
-      return w.name.toLowerCase().includes(q) || w.description.toLowerCase().includes(q)
-    })
+  // Filter + search are both cheap individually, but the picker re-renders
+  // on every keystroke in the search box; memoizing on (allWorkouts, members,
+  // pickerQuery) skips the work when unrelated state churns (saving toggle,
+  // dirty-state recompute, etc.).
+  const pickerCandidates = useMemo(() => {
+    const memberIds = new Set(members.map(m => m.id))
+    const q = pickerQuery.trim().toLowerCase()
+    return allWorkouts
+      .filter(w => !memberIds.has(w.id))
+      .filter(w => {
+        if (!q) return true
+        return w.name.toLowerCase().includes(q) || w.description.toLowerCase().includes(q)
+      })
+  }, [allWorkouts, members, pickerQuery])
 
   return (
     <div>
