@@ -649,7 +649,9 @@ function NextSetMiniLogger({
           type="submit"
           size="sm"
           loading={saving}
-          disabled={saving || !reps}
+          // Cardio uses `duration`; strength uses `reps`. Without this
+          // branch the button stays disabled forever in the cardio flow.
+          disabled={saving || (isCardio ? !duration : !reps)}
           aria-label="Log set"
         >
           <Check size={14} />
