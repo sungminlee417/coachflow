@@ -8,6 +8,7 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { RestTimerProvider } from '@/components/ui/RestTimer'
 import { WriteQueueDrainer } from '@/components/ui/WriteQueueDrainer'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 import { clearCache } from '@/lib/offline-cache'
 import ClientList from '@/components/coaching/ClientList'
 import WorkoutLibrary from '@/components/coaching/WorkoutLibrary'
@@ -190,6 +191,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
   return (
     <RestTimerProvider>
     <WriteQueueDrainer />
+    <AuthGuard />
     <div className="min-h-screen bg-slate-50">
       <div className="flex">
         {/* Sidebar (desktop) */}
