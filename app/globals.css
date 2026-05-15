@@ -85,15 +85,12 @@ html {
    keyboard concern, not a real cascade hazard: callers can't reasonably
    want a sub-16px input on mobile anyway. */
 @media (max-width: 640px) {
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="number"],
-  input[type="search"],
-  input[type="tel"],
-  input[type="url"],
-  input[type="time"],
-  input[type="date"],
+  /* Blanket-catch every input/textarea/select on mobile. We used to list
+     specific `type` values, but any input the rule missed (typeless,
+     unusual types, future additions) would zoom on focus in iOS Safari.
+     font-size on checkbox/radio/file is harmless — their box size is
+     independent of font-size, so over-matching doesn't break anything. */
+  input,
   textarea,
   select {
     font-size: 16px !important;
