@@ -19,6 +19,7 @@ import {
 import { useSupabase } from '@/lib/use-supabase'
 import { cachedFetch, cachedQuery } from '@/lib/cached-query'
 import { queuedUpsert } from '@/lib/write-queue'
+import { notifyDataChanged, subscribeDataChanged } from '@/lib/data-bus'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -271,6 +272,14 @@ function WorkoutCard({
   // Bumping this re-runs the load effect after a successful inline log
   // so the progress bar + "next set" pointer advance to the next set.
   const [refreshTick, setRefreshTick] = useState(0)
+
+  // Also bump the tick when set_logs are written from *anywhere* else
+  // (deep logger, superset logger). Without this the card stays stale
+  // when the user logs sets from the Workouts tab and switches back.
+  useEffect(
+    () => subscribeDataChanged('set_logs', () => setRefreshTick(t => t + 1)),
+    []
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -527,6 +536,7 @@ function NextSetMiniLogger({
         showToast('Failed to log set', 'error')
         return
       }
+      notifyDataChanged('set_logs')
       onLogged()
       return
     }
@@ -559,6 +569,7 @@ function NextSetMiniLogger({
       showToast('Failed to log set', 'error')
       return
     }
+    notifyDataChanged('set_logs')
     onLogged()
   }
 
@@ -680,6 +691,13 @@ function MealsCard({
   const [assignmentByMealId, setAssignmentByMealId] = useState<Map<string, string>>(
     new Map()
   )
+  // Re-fetch when meal_logs change elsewhere (deep meal-plan view) so
+  // toggling "eaten" in another tab reflects here on tab switch.
+  const [refreshTick, setRefreshTick] = useState(0)
+  useEffect(
+    () => subscribeDataChanged('meal_logs', () => setRefreshTick(t => t + 1)),
+    []
+  )
   // Re-tick once a minute so missed-meal status updates as the clock
   // crosses scheduled times. Reading `Date.now()` directly in render is
   // impure (different value each call), but reading it inside a memo
@@ -733,7 +751,7 @@ function MealsCard({
     return () => {
       cancelled = true
     }
-  }, [supabase, clientId, loggedDate])
+  }, [supabase, clientId, loggedDate, refreshTick])
 
   const meals = useMemo(() => {
     if (!assignments)
@@ -799,6 +817,8 @@ function MealsCard({
         return rolled
       })
       showToast('Failed to update meal', 'error')
+    } else {
+      notifyDataChanged('meal_logs')
     }
   }
 
@@ -950,6 +970,13 @@ function WeightCard({
   // setState behind an `await`, which the eslint plugin accepts; calling
   // a sync function that internally setStates would trip the rule.
   const [refreshTick, setRefreshTick] = useState(0)
+  // Also re-fetch when the weight log changes elsewhere — the deep
+  // WeightTracker writes and deletes, and those won't update this card
+  // otherwise.
+  useEffect(
+    () => subscribeDataChanged('weight_logs', () => setRefreshTick(t => t + 1)),
+    []
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -1010,6 +1037,7 @@ function WeightCard({
       // Trigger a re-fetch via the load effect — see comment by
       // `refreshTick` for why we don't call an async fetcher directly.
       setRefreshTick(t => t + 1)
+      notifyDataChanged('weight_logs')
     }
     setSaving(false)
   }
@@ -1190,6 +1218,12 @@ function BodyMeasurementCard({
   const supabase = useSupabase()
   const [latest, setLatest] = useState<{ recorded_at: string } | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
+  useEffect(
+    () =>
+      subscribeDataChanged('body_measurements', () => setRefreshTick(t => t + 1)),
+    []
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -1211,7 +1245,7 @@ function BodyMeasurementCard({
     return () => {
       cancelled = true
     }
-  }, [supabase, userId])
+  }, [supabase, userId, refreshTick])
 
   const today = todayISO()
   const daysSince = latest ? Math.max(0, daysBetween(latest.recorded_at, today)) : null
@@ -1256,6 +1290,11 @@ function StreakCard({
   const supabase = useSupabase()
   const [streak, setStreak] = useState<number | null>(null)
   const [thisWeek, setThisWeek] = useState<number>(0)
+  const [refreshTick, setRefreshTick] = useState(0)
+  useEffect(
+    () => subscribeDataChanged('set_logs', () => setRefreshTick(t => t + 1)),
+    []
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -1305,7 +1344,7 @@ function StreakCard({
     return () => {
       cancelled = true
     }
-  }, [supabase, clientId])
+  }, [supabase, clientId, refreshTick])
 
   return (
     <Card onClick={onOpen} accent="purple" icon={Flame} label="Streak">

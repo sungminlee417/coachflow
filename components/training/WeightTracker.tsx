@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Trash2, TrendingUp, TrendingDown, Minus, Scale, Share2 } from 'lucide-react'
 import { todayISO, formatDate, roundMacro } from '@/lib/utils'
 import { cachedQuery } from '@/lib/cached-query'
+import { notifyDataChanged } from '@/lib/data-bus'
 import type { WeightLog } from '@/lib/types'
 import { WeightChart } from './WeightChart'
 import { WeightShareDialog } from './WeightShareDialog'
@@ -106,6 +107,7 @@ export default function WeightTracker({
       setNewWeight('')
       setNewDate(todayISO())
       await fetchLogs()
+      notifyDataChanged('weight_logs')
       showToast('Weight logged')
     } catch {
       showToast('Failed to log weight', 'error')
@@ -120,6 +122,7 @@ export default function WeightTracker({
       const { error } = await supabase.from('weight_logs').delete().eq('id', deletingId)
       if (error) throw error
       await fetchLogs()
+      notifyDataChanged('weight_logs')
       showToast('Weight entry deleted')
     } catch {
       showToast('Failed to delete entry', 'error')

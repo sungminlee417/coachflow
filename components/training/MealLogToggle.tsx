@@ -4,6 +4,7 @@ import { Check } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { queuedUpsert } from '@/lib/write-queue'
+import { notifyDataChanged } from '@/lib/data-bus'
 
 interface MealLogToggleProps {
   assignmentId: string
@@ -55,6 +56,8 @@ export function MealLogToggle({
       // Real error (not "we queued it"). Roll back the optimistic flip.
       onToggled(!next)
       showToast('Failed to update meal', 'error')
+    } else {
+      notifyDataChanged('meal_logs')
     }
   }
 

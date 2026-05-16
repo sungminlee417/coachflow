@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
 import { queuedUpsert } from '@/lib/write-queue'
+import { notifyDataChanged } from '@/lib/data-bus'
 import { cachedQuery, cachedFetch } from '@/lib/cached-query'
 import { getCardioFields, type CardioSubtype } from '@/lib/cardio'
 import { useRestTimer } from '@/components/ui/RestTimer'
@@ -309,6 +310,7 @@ export function ExerciseSetLogger({
       { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
     )
     if (error) showToast('Failed to save set', 'error')
+    else notifyDataChanged('set_logs')
     updateRow(row.set_number, { saving: false })
   }
 

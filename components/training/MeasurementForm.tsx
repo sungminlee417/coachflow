@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
+import { notifyDataChanged } from '@/lib/data-bus'
 import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -117,6 +118,7 @@ export default function MeasurementForm({
         if (error) throw error
         showToast('Measurement logged')
       }
+      notifyDataChanged('body_measurements')
       onClose()
     } catch {
       showToast('Failed to save measurement', 'error')

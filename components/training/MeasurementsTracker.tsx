@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Plus, Pencil, Trash2, Ruler, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { formatDate, roundMacro, formatLength } from '@/lib/utils'
 import { cachedQuery } from '@/lib/cached-query'
+import { notifyDataChanged } from '@/lib/data-bus'
 import type { BodyMeasurement, LengthUnit } from '@/lib/types'
 import MeasurementForm from './MeasurementForm'
 
@@ -98,6 +99,7 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
         .eq('id', deletingId)
       if (error) throw error
       await fetchEntries()
+      notifyDataChanged('body_measurements')
       showToast('Measurement deleted')
     } catch {
       showToast('Failed to delete measurement', 'error')
