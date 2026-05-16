@@ -62,17 +62,26 @@ function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-export async function enqueueWrite(op: QueuedOp): Promise<void> {
+export async function enqueueWrite(op: QueuedOp): Promise<string | null> {
   const db = await getDB()
-  if (!db) return
+  if (!db) return null
+  const id = makeId()
   const entry: QueueEntry = {
-    id: makeId(),
+    id,
     op,
     createdAt: Date.now(),
     attempts: 0,
     lastError: null,
   }
   await db.put(WRITE_QUEUE_STORE, entry)
+  notify()
+  return id
+}
+
+/** Remove a queued write by id. Safe to call on a missing entry — the
+ *  drain loop may have already removed it. */
+export async function removeQueuedWrite(id: string): Promise<void> {
+  await deleteEntry(id)
   notify()
 }
 
@@ -208,12 +217,19 @@ export async function drainQueue(
 }
 
 /**
- * Try to upsert live. If we're offline or the call fails with a network
- * error, queue it for later and report success to the caller so optimistic
- * UI continues to render. Non-network errors (validation, permission,
- * conflict) are surfaced as a normal Supabase error envelope.
+ * Write-ahead upsert. We enqueue to IDB *first*, then attempt the live
+ * request, and only dequeue on confirmed success. This guarantees the
+ * write survives mid-request page navigations / tab closes / process
+ * kills — the browser may abort the in-flight fetch, but the queued
+ * entry stays put and the drainer will replay it on next mount.
  *
- * Returns `{ error: null, queued: true }` when the write was queued.
+ * On a non-network error (validation, permission, conflict) we surface
+ * the error to the caller AND remove the entry, since retrying won't
+ * help.
+ *
+ * Returns `{ error: null, queued: true }` when the write was queued —
+ * either because we were offline, the network failed, or replay deferred
+ * to the drainer.
  */
 export async function queuedUpsert(
   supabase: SupabaseClient,
@@ -227,24 +243,36 @@ export async function queuedUpsert(
     payload,
     onConflict: options?.onConflict,
   }
+  // Persist intent first so a mid-flight unload doesn't drop the write.
+  // `id` is null only if IDB isn't usable (rare — SSR or private mode);
+  // in that case we still try the live path and fall back to ephemeral
+  // failure handling.
+  const queuedId = await enqueueWrite(op)
+
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    await enqueueWrite(op)
+    // Drainer will pick this up on the next `online` event.
     return { error: null, queued: true }
   }
   try {
     const { error } = await runOp(supabase, op)
-    if (!error) return { error: null, queued: false }
+    if (!error) {
+      if (queuedId) await removeQueuedWrite(queuedId)
+      return { error: null, queued: false }
+    }
     if (isNetworkError(error.message)) {
-      await enqueueWrite(op)
+      // Leave it queued; drainer retries on next online event / mount.
       return { error: null, queued: true }
     }
+    // Real server-side error — won't fix itself on replay. Pull it back
+    // out of the queue and surface the error.
+    if (queuedId) await removeQueuedWrite(queuedId)
     return { error: { message: error.message }, queued: false }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     if (isNetworkError(message)) {
-      await enqueueWrite(op)
       return { error: null, queued: true }
     }
+    if (queuedId) await removeQueuedWrite(queuedId)
     return { error: { message }, queued: false }
   }
 }
