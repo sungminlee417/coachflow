@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -15,9 +16,21 @@ import {
   useLogWeight,
   useWeightLogs,
 } from '@/lib/hooks/use-weight-logs'
-import { WeightChart } from './WeightChart'
 import { WeightShareDialog } from './WeightShareDialog'
 import type { WeightUnit } from '@/lib/types'
+
+// Recharts is ~180KB gzipped — defer until this tab is actually visited so
+// the initial app shell + Today dashboard stay lean. SSR off because the
+// chart is purely client-side anyway.
+const WeightChart = dynamic(
+  () => import('./WeightChart').then(m => m.WeightChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 h-72 animate-pulse" />
+    ),
+  }
+)
 
 interface WeightTrackerProps {
   userId: string

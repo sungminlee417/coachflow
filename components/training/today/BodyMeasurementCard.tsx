@@ -19,7 +19,15 @@ export function BodyMeasurementCard({
   // need the most-recent entry to drive this card's copy.
   const measurementsQuery = useBodyMeasurements(userId)
   const latest = measurementsQuery.data?.[0] ?? null
-  const loaded = measurementsQuery.isSuccess
+  // Hold the skeleton over a stale-empty cache until a fresh fetch
+  // confirms emptiness — `isStale` covers the brief gap before
+  // `isFetching` flips.
+  const loaded =
+    measurementsQuery.isSuccess &&
+    !(
+      (measurementsQuery.data?.length ?? 0) === 0 &&
+      (measurementsQuery.isFetching || measurementsQuery.isStale)
+    )
 
   const today = todayISO()
   const daysSince = latest ? Math.max(0, daysBetween(latest.recorded_at, today)) : null

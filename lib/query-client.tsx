@@ -15,9 +15,12 @@
 //     actually changed.
 //   • `gcTime: 24h` — keep cached data around long enough to power
 //     offline reads after the user returns the next day.
-//   • `refetchOnWindowFocus: true` — when the user returns to the tab
-//     after some time, re-validate. Matches "I switched apps and came
-//     back" expectations on mobile and desktop.
+//   • `refetchOnWindowFocus: false` — coaches tab-switch constantly
+//     (browser tabs, alt-tab to messages, lock screen on phone). Every
+//     focus event firing a wave of refetches drowns the network and
+//     causes empty-state flashes when stale cache rehydrates first.
+//     Mutations already invalidate explicitly when something actually
+//     changed, so stale-while-revalidate is plenty.
 //   • `networkMode: 'offlineFirst'` — try the cache first; only fail a
 //     query if there's no cache and we're offline.
 //   • `retry` policy that gives up fast in the UI but lets the persister
@@ -126,7 +129,7 @@ function buildClient(): QueryClient {
       queries: {
         staleTime: 30_000,
         gcTime: 24 * 60 * 60 * 1000,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
         refetchOnReconnect: true,
         networkMode: 'offlineFirst',
         retry: (failureCount, error) => {

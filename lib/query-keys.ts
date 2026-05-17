@@ -59,6 +59,13 @@ export const queryKeys = {
     all: () => ['meal_plan_assignments'] as const,
   },
 
+  /** Coach's active client list — invalidated when an invite is accepted
+   *  or a relationship is otherwise mutated. */
+  clients: {
+    forCoach: (coachId: string) => ['clients', coachId] as const,
+    all: () => ['clients'] as const,
+  },
+
   /** Prior-week performance hint, per (exercise, variant). */
   priorPerformance: {
     forExercise: (

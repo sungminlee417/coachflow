@@ -27,7 +27,12 @@ export function WeightCard({
   const weightQuery = useWeightLogs(userId)
   const allLogs = weightQuery.data ?? []
   const latest = allLogs[0] ?? null
-  const logsLoaded = weightQuery.isSuccess
+  // Treat a rehydrated-but-empty cache as still loading until a fresh
+  // fetch confirms emptiness — otherwise "No entries" flashes briefly
+  // on cold-open. `isStale` covers the gap before `isFetching` flips.
+  const logsLoaded =
+    weightQuery.isSuccess &&
+    !(allLogs.length === 0 && (weightQuery.isFetching || weightQuery.isStale))
   const logWeight = useLogWeight(userId)
   const [draft, setDraft] = useState('')
   const saving = logWeight.isPending

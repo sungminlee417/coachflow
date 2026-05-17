@@ -32,8 +32,17 @@ export function StreakCard({
     },
   })
 
+  // Treat a stale-empty cache as "still loading" — otherwise "Log a
+  // workout today to start a streak" flashes before the refetch
+  // resolves with the real history. `isStale` covers the brief gap
+  // between IndexedDB rehydration and the refetch actually starting.
+  const streakStale =
+    (streakQuery.data?.length ?? 0) === 0 &&
+    (streakQuery.isFetching || streakQuery.isStale)
+
   const { streak, thisWeek } = useMemo(() => {
-    if (!streakQuery.data) return { streak: null as number | null, thisWeek: 0 }
+    if (!streakQuery.data || streakStale)
+      return { streak: null as number | null, thisWeek: 0 }
     const dates = new Set(streakQuery.data.map(r => r.logged_date))
     const today = todayISO()
     let s = 0
@@ -52,7 +61,7 @@ export function StreakCard({
       if (dates.has(shiftISO(today, -i))) week += 1
     }
     return { streak: s, thisWeek: week }
-  }, [streakQuery.data])
+  }, [streakQuery.data, streakStale])
 
   return (
     <Card onClick={onOpen} accent="purple" icon={Flame} label="Streak">

@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { useSupabase } from '@/lib/use-supabase'
+import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -10,6 +9,7 @@ import { LibrarySearch } from '@/components/ui/LibrarySearch'
 import { LibrarySort, type LibrarySortMode } from '@/components/ui/LibrarySort'
 import { UserPlus, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { useClients } from '@/lib/hooks/use-clients'
 import type { Client } from '@/lib/types'
 import ClientDetailView from './ClientDetailView'
 import InviteCodeGenerator from './InviteCodeGenerator'
@@ -19,9 +19,20 @@ interface ClientListProps {
 }
 
 export default function ClientList({ coachId }: ClientListProps) {
-  const supabase = useSupabase()
-  const [clients, setClients] = useState<Client[]>([])
-  const [loading, setLoading] = useState(true)
+  const clientsQuery = useClients(coachId)
+  const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data])
+  // Mirror the today-card pattern: hold the skeleton while a refetch is
+  // settling over a cached-empty list — otherwise the "No clients yet"
+  // empty state can flash for coaches who actually have content.
+  // `isFetching` covers the in-flight refetch; `isStale` covers the gap
+  // between IndexedDB rehydration and the refetch actually starting —
+  // without that, a stale-empty cache flashes "No clients yet" for a
+  // frame on cold open.
+  const loading =
+    clientsQuery.isLoading ||
+    (clients.length === 0 &&
+      (clientsQuery.isFetching || clientsQuery.isStale))
+
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [showInvites, setShowInvites] = useState(false)
   const [query, setQuery] = useState('')
@@ -52,36 +63,6 @@ export default function ClientList({ coachId }: ClientListProps) {
     }
     return sorted
   }, [clients, query, sortMode])
-
-  useEffect(() => {
-    fetchClients()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const fetchClients = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('coach_client_relationships')
-        .select('started_at, client:client_id ( id, full_name, email )')
-        .eq('coach_id', coachId)
-        .eq('status', 'active')
-        .neq('client_id', coachId)
-
-      if (error) throw error
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const transformed: Client[] = (data || []).map((item: any) => ({
-        id: item.client.id,
-        full_name: item.client.full_name,
-        email: item.client.email,
-        started_at: item.started_at,
-      }))
-      setClients(transformed)
-    } catch {
-    } finally {
-      setLoading(false)
-    }
-  }
 
   if (loading) {
     return (

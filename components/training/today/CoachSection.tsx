@@ -53,11 +53,24 @@ export function CoachSection({
     },
   })
   const counts = countsQuery.data ?? null
+  // Don't commit to the "first-run" CTA branch while a refetch is in flight
+  // (or the cache is stale and the refetch hasn't started yet) over a
+  // cached all-zero snapshot — otherwise the dashed empty tile flashes
+  // for coaches who actually have content, before the real counts land.
+  const countsAreZero =
+    !!counts &&
+    counts.clients === 0 &&
+    counts.workouts === 0 &&
+    counts.programs === 0 &&
+    counts.mealPlans === 0
+  const stillResolving =
+    !counts ||
+    (countsAreZero && (countsQuery.isFetching || countsQuery.isStale))
 
   // Skip the whole section while loading is still null AND there's never
   // been any coaching content. Once there's at least one client or one
   // template, the section sticks around.
-  if (!counts) {
+  if (stillResolving) {
     return (
       <section className="space-y-3">
         <SectionHeader title="Coaching" />

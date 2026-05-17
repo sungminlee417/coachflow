@@ -21,7 +21,16 @@ export function MealsCard({
 }) {
   const assignmentsQuery = useMealPlanAssignments(clientId, loggedDate)
   const assignments = assignmentsQuery.data ?? null
-  const loading = assignmentsQuery.isLoading && !assignmentsQuery.isSuccess
+  // Two-tier loading. `loading` covers the fresh-fetch case. We also keep
+  // the skeleton up when the cache served us empty data that hasn't been
+  // confirmed fresh yet — `isFetching` covers the in-flight refetch, and
+  // `isStale` covers the brief gap between IndexedDB rehydration and the
+  // refetch actually starting. Without the `isStale` guard "No meals
+  // planned" flashes for a frame on cold open.
+  const loading = assignmentsQuery.isLoading
+  const revalidatingEmpty =
+    (assignments?.length ?? 0) === 0 &&
+    (assignmentsQuery.isFetching || assignmentsQuery.isStale)
   // Eaten state comes from TanStack Query — shared with the deep
   // meal-plan view and per-row MealLogToggles. Toggle optimistically
   // updates the same cache so everything stays in sync without re-fetch.
@@ -124,7 +133,7 @@ export function MealsCard({
 
   return (
     <Card onClick={onOpen} accent="amber" icon={Utensils} label="Meals">
-      {loading ? (
+      {loading || revalidatingEmpty ? (
         <CardSkeletonBody lines={3} />
       ) : meals.length === 0 ? (
         <CardEmpty

@@ -32,7 +32,12 @@ export function WorkoutCard({
 }) {
   const assignmentsQuery = useWorkoutAssignments(clientId, loggedDate)
   const assignments = assignmentsQuery.data ?? null
-  const loadingAssignments = assignmentsQuery.isLoading && !assignmentsQuery.isSuccess
+  const loadingAssignments = assignmentsQuery.isLoading
+  // Stale-empty refetch — see MealsCard for the rationale on the
+  // `isFetching || isStale` pairing.
+  const revalidatingEmpty =
+    (assignments?.length ?? 0) === 0 &&
+    (assignmentsQuery.isFetching || assignmentsQuery.isStale)
 
   // Day-wide set_logs query shared with the deep logger via cache
   // updates the save mutation does in `onMutate`. The Today card just
@@ -127,7 +132,7 @@ export function WorkoutCard({
 
   return (
     <Card onClick={onOpen} accent="emerald" icon={Dumbbell} label="Workout">
-      {loading ? (
+      {loading || revalidatingEmpty ? (
         <CardSkeletonBody lines={2} />
       ) : !assignments || assignments.length === 0 ? (
         <CardEmpty
