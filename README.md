@@ -25,6 +25,7 @@ A coaching-and-training platform where every user can both coach and train. One 
 - **Meal logging** — per-day check on each meal with a daily "X / Y eaten" chip; coach can see their clients' check history via RLS.
 - **Body measurements + weight chart** (Recharts) with a smooth area line, hover crosshair, lowest/avg/highest stats, and configurable units (lb/kg, in/cm).
 - **Settings** — `/app` Settings tab with two sections. Preferences: hide the rest timer, hide the streak card (persisted on `profiles`). Account: change password via Supabase Auth. Toggle changes patch through TanStack Query optimistically so the UI flips instantly.
+- **Meal plan builder polish** — quantity inputs split into amount + unit dropdown (`g, oz, ml, cup, tbsp, tsp, piece, slice, scoop, Other…`) serialized into the existing `quantity` text column so no migration is needed; legacy values like "1/2 cup" auto-flip into "Other" mode on edit. Ingredient name fields type-ahead from the coach's own previously-saved ingredients ([useIngredientCatalog](lib/hooks/use-ingredient-catalog.ts)) — picking a suggestion bulk-fills name + qty + macros in one state update, so the same chicken-breast row isn't re-typed across plans.
 
 ### Cross-cutting UX
 - **URL-driven dashboard tabs** (`?tab=my-workouts`) so reload, back/forward, and deep links all preserve the active section.

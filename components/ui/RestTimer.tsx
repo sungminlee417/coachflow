@@ -30,6 +30,9 @@ interface RestTimerContextValue {
   cancel: () => void
   /** Add seconds onto the current deadline (for the "+30s" button). */
   addSeconds: (delta: number) => void
+  /** Per-user preference from profiles.rest_timer_enabled. When false
+   *  the idle launcher hides AND any `start()` call short-circuits. */
+  enabled: boolean
 }
 
 const RestTimerContext = createContext<RestTimerContextValue | null>(null)
@@ -43,6 +46,7 @@ export function useRestTimer(): RestTimerContextValue {
       start: () => {},
       cancel: () => {},
       addSeconds: () => {},
+      enabled: true,
     }
   }
   return ctx
@@ -169,8 +173,8 @@ export function RestTimerProvider({
   }, [])
 
   const value = useMemo<RestTimerContextValue>(
-    () => ({ state, start, cancel, addSeconds }),
-    [state, start, cancel, addSeconds]
+    () => ({ state, start, cancel, addSeconds, enabled: restTimerEnabled }),
+    [state, start, cancel, addSeconds, restTimerEnabled]
   )
 
   return (
@@ -197,7 +201,7 @@ function formatPresetLabel(seconds: number): string {
  *  for the rest between exercises / circuits / anywhere set-logging
  *  isn't the trigger. */
 function RestTimerBar() {
-  const { state, cancel, addSeconds, start } = useRestTimer()
+  const { state, cancel, addSeconds, start, enabled } = useRestTimer()
   const [now, setNow] = useState(() => Date.now())
   // Idle launcher is dismissible per-tab so users who never need a
   // manual rest don't keep seeing the pill. The active countdown bar
@@ -209,6 +213,12 @@ function RestTimerBar() {
     const handle = window.setInterval(() => setNow(Date.now()), 250)
     return () => window.clearInterval(handle)
   }, [state])
+
+  // Hard kill the whole bar when the user has turned the rest timer
+  // off in Settings → Preferences. Covers both the idle launcher and
+  // any in-flight countdown (which couldn't have started anyway, but
+  // belt + suspenders).
+  if (!enabled) return null
 
   // Idle: render the compact launcher with quick-start preset chips
   // unless the user dismissed it for this session.

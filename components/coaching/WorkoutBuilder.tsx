@@ -7,12 +7,16 @@ import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Field, Input, Textarea } from '@/components/ui/Input'
 import { ExerciseNameInput } from '@/components/ui/ExerciseNameInput'
-import { Link2, Dumbbell, HeartPulse, ArrowUpFromLine } from 'lucide-react'
+import { Link2, Dumbbell, HeartPulse, ArrowUpFromLine, Plus, X } from 'lucide-react'
 import { ScheduleSection, type ScheduleMode } from './ScheduleSection'
-import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { BuilderHeader } from '@/components/ui/BuilderHeader'
+import { BuilderSaveBar } from '@/components/ui/BuilderSaveBar'
+import { BuilderCard } from '@/components/ui/BuilderCard'
+import { EmptyStateCard } from '@/components/ui/EmptyStateCard'
+import { DiscardDialog } from '@/components/ui/DiscardDialog'
+import { AddItemButton } from '@/components/ui/AddItemButton'
+import { AddFab } from '@/components/ui/AddFab'
 import { useDirtyState } from '@/lib/use-dirty-state'
-import { ArrowLeft, Plus, X, Save } from 'lucide-react'
 import {
   DndContext,
   DragEndEvent,
@@ -41,11 +45,11 @@ import {
   type CardioSubtype,
 } from '@/lib/cardio'
 import type { DayOfWeek, Exercise, ExerciseSet, ExerciseType, Workout } from '@/lib/types'
-
-// Internal exercise type carrying a stable client-side id for drag-and-drop.
-// _dndKey isn't persisted; it just gives every row a sortable identity even
-// before it has a real database id.
-type DraftExercise = Exercise & { _dndKey: string }
+import {
+  loadWorkoutExercises,
+  saveWorkout,
+  type DraftExercise,
+} from './workout/persistence'
 const newDndKey = (): string =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -95,30 +99,6 @@ const emptySet = (setNumber: number, copyFrom?: ExerciseSet): ExerciseSet => ({
   target_incline: copyFrom?.target_incline ?? null,
   target_resistance: copyFrom?.target_resistance ?? null,
 })
-
-// Build initial exercise_sets when an exercise has none yet — derive from
-// legacy `sets` count + flat reps so existing workouts keep rendering.
-const seedSetsFromLegacy = (ex: Exercise): ExerciseSet[] => {
-  const count = Math.max(1, ex.sets ?? 1)
-  return Array.from({ length: count }, (_, i) => ({
-    set_number: i + 1,
-    target_reps: ex.reps ?? '',
-    target_duration_seconds: null,
-    notes: '',
-  }))
-}
-
-// While editing a cardio set, the user's text lives in `target_reps` so we
-// don't need separate edit-state. On load, hydrate it from the canonical
-// `target_duration_seconds` so the input shows a human-friendly value.
-const hydrateCardioInputs = (sets: ExerciseSet[]): ExerciseSet[] =>
-  sets.map(s => ({
-    ...s,
-    target_reps:
-      s.target_duration_seconds != null && s.target_duration_seconds > 0
-        ? formatDuration(s.target_duration_seconds)
-        : s.target_reps,
-  }))
 
 export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBuilderProps) {
   const supabase = useSupabase()
@@ -176,81 +156,10 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
   const fetchExercises = async () => {
     if (!workout?.id) return
     try {
-      // Pull exercises and per-set rows separately so a problem with one
-      // doesn't blank out the whole form.
-      const { data: exerciseRows, error: exErr } = await supabase
-        .from('exercises')
-        .select('*')
-        .eq('workout_id', workout.id)
-        .order('order_index')
-
-      if (exErr) throw exErr
-      const exerciseList = exerciseRows || []
-      if (exerciseList.length === 0) {
-        setExercises([])
-        return
-      }
-
-      const ids = exerciseList.map(e => e.id)
-
-      let setsByExercise = new Map<string, ExerciseSet[]>()
-      try {
-        const { data: setRows } = await supabase
-          .from('exercise_sets')
-          .select('id, exercise_id, set_number, target_reps, target_duration_seconds, notes, target_speed, target_incline, target_resistance')
-          .in('exercise_id', ids)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setsByExercise = (setRows || []).reduce((map: Map<string, ExerciseSet[]>, s: any) => {
-          const arr = map.get(s.exercise_id) ?? []
-          arr.push(s)
-          map.set(s.exercise_id, arr)
-          return map
-        }, new Map<string, ExerciseSet[]>())
-      } catch {
-        // Fall back to legacy-derived sets if the second query fails.
-      }
-
-      // Same defensive split for alternatives — if the table doesn't exist yet
-      // (migration pending) the form should still render.
-      const altsByExercise = new Map<string, string[]>()
-      try {
-        const { data: altRows } = await supabase
-          .from('exercise_alternatives')
-          .select('exercise_id, name, order_index')
-          .in('exercise_id', ids)
-          .order('order_index', { ascending: true })
-        for (const a of (altRows ?? []) as {
-          exercise_id: string
-          name: string
-          order_index: number
-        }[]) {
-          const arr = altsByExercise.get(a.exercise_id) ?? []
-          arr.push(a.name)
-          altsByExercise.set(a.exercise_id, arr)
-        }
-      } catch {
-        // Alternatives are optional — silently skip if unavailable.
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized: DraftExercise[] = exerciseList.map((ex: any) => {
-        const sets = (setsByExercise.get(ex.id) ?? [])
-          .slice()
-          .sort((a: ExerciseSet, b: ExerciseSet) => a.set_number - b.set_number)
-        const baseSets = sets.length > 0 ? sets : seedSetsFromLegacy(ex)
-        const type: ExerciseType = ex.exercise_type === 'cardio' ? 'cardio' : 'strength'
-        return {
-          ...ex,
-          exercise_type: type,
-          alternatives: altsByExercise.get(ex.id) ?? [],
-          exercise_sets: type === 'cardio' ? hydrateCardioInputs(baseSets) : baseSets,
-          // Reuse the server id as the DnD key so identity is stable across
-          // unrelated state updates.
-          _dndKey: ex.id,
-        }
-      })
-      setExercises(normalized)
+      const loaded = await loadWorkoutExercises(supabase, workout.id)
+      setExercises(loaded)
     } catch {
+      // Empty form — coach can still add new exercises.
     } finally {
       setSnapshotReady(true)
     }
@@ -422,338 +331,20 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
       showToast('Please enter a workout name', 'error')
       return
     }
-
     setSaving(true)
     try {
-      let workoutId = workout?.id
-
-      // Only write the schedule columns belonging to the active mode; the
-      // others are nulled so a stale value can't haunt a switched-modes workout.
-      const isCycle = scheduleMode === 'cycle'
-      const sanitizedLength = Math.max(1, Math.min(60, Math.floor(cycleLength) || 1))
-      const sanitizedPosition = Math.max(1, Math.min(sanitizedLength, Math.floor(cyclePosition) || 1))
-      const schedulePayload = isCycle
-        ? {
-            days_of_week: [],
-            cycle_length: sanitizedLength,
-            cycle_position: sanitizedPosition,
-          }
-        : {
-            days_of_week: daysOfWeek,
-            cycle_length: null,
-            cycle_position: null,
-          }
-
-      if (workoutId) {
-        const { error } = await supabase
-          .from('workouts')
-          .update({
-            name,
-            description,
-            is_template: isTemplate,
-            ...schedulePayload,
-          })
-          .eq('id', workoutId)
-        if (error) throw error
-      } else {
-        const { data, error } = await supabase
-          .from('workouts')
-          .insert({
-            coach_id: coachId,
-            name,
-            description,
-            is_template: isTemplate,
-            ...schedulePayload,
-          })
-          .select()
-          .single()
-        if (error) throw error
-        workoutId = data.id
-      }
-
-      // ── Diff-based exercise sync ───────────────────────────────────────────
-      // Goal: preserve exercise IDs across edits so client-owned data
-      // (set_logs, exercise_substitutions) keyed on exercise_id stays valid.
-      // Only exercises the coach explicitly removed get deleted; everything
-      // else is updated in place.
-      const exerciseFields = (ex: Exercise, formIndex: number) => ({
-        name: ex.name,
-        exercise_type: ex.exercise_type ?? 'strength',
-        sets: ex.exercise_sets?.length ?? null,
-        reps: ex.exercise_sets?.[0]?.target_reps ?? ex.reps ?? '',
-        weight: '',
-        rest_seconds: ex.rest_seconds,
-        notes: ex.notes,
-        order_index: formIndex,
-        // Last exercise can't pair with anything.
-        pair_with_next: formIndex < exercises.length - 1 ? !!ex.pair_with_next : false,
-        catalog_id: ex.catalog_id ?? null,
-        // Drop the cardio subtype on strength exercises so toggling cardio →
-        // strength doesn't leave a stale machine type on the row.
-        cardio_subtype:
-          ex.exercise_type === 'cardio' ? ex.cardio_subtype ?? null : null,
+      await saveWorkout(supabase, {
+        coachId,
+        existingWorkoutId: workout?.id,
+        name,
+        description,
+        isTemplate,
+        scheduleMode,
+        cycleLength,
+        cyclePosition,
+        daysOfWeek,
+        exercises,
       })
-
-      // 1) Find what the server has now, so we can compute the delta. Also
-      // pull `name` so we can detect "promoted alternative" swaps later — the
-      // alternatives need to come from a separate query since they live in a
-      // child table.
-      const serverIds = new Set<string>()
-      const serverNameById = new Map<string, string>()
-      const serverAltsById = new Map<string, string[]>()
-      if (workout?.id) {
-        const { data: existing } = await supabase
-          .from('exercises')
-          .select('id, name')
-          .eq('workout_id', workoutId)
-        for (const r of (existing ?? []) as { id: string; name: string }[]) {
-          serverIds.add(r.id)
-          serverNameById.set(r.id, r.name)
-        }
-        if (serverIds.size > 0) {
-          try {
-            const { data: altRows } = await supabase
-              .from('exercise_alternatives')
-              .select('exercise_id, name, order_index')
-              .in('exercise_id', Array.from(serverIds))
-              .order('order_index', { ascending: true })
-            for (const a of (altRows ?? []) as {
-              exercise_id: string
-              name: string
-            }[]) {
-              const arr = serverAltsById.get(a.exercise_id) ?? []
-              arr.push(a.name)
-              serverAltsById.set(a.exercise_id, arr)
-            }
-          } catch {
-            // Alternatives table may not exist on older deployments.
-          }
-        }
-      }
-
-      const formIdSet = new Set(
-        exercises.map(ex => ex.id).filter((id): id is string => !!id)
-      )
-
-      // 2) Delete exercises the coach removed from the form. CASCADE here is
-      // intentional — set_logs / exercise_substitutions for these rows go too.
-      const toDeleteIds = Array.from(serverIds).filter(id => !formIdSet.has(id))
-      if (toDeleteIds.length > 0) {
-        const { error } = await supabase.from('exercises').delete().in('id', toDeleteIds)
-        if (error) throw error
-      }
-
-      // 2.5) Detect promotions and rewrite history so progressive-overload
-      // comparisons stay variant-aware.
-      //
-      // A "promotion" means the form's main name was previously an alternative
-      // on the server, AND the previous main name is now in the form's
-      // alternatives list. When that happens:
-      //   - Past dates with set_logs but no substitution row were performed on
-      //     the OLD main → backfill substitutions naming the old main, so
-      //     they're correctly variant-tagged after the rename.
-      //   - Past substitutions that named the NEW main are no longer swaps
-      //     (that's now the default) → delete those rows.
-      for (let i = 0; i < exercises.length; i++) {
-        const ex = exercises[i]
-        if (!ex.id || !serverIds.has(ex.id)) continue
-
-        const oldMain = serverNameById.get(ex.id)
-        if (!oldMain || oldMain === ex.name) continue
-
-        const oldAlts = serverAltsById.get(ex.id) ?? []
-        const newMain = ex.name
-        const newAlts = ex.alternatives ?? []
-        const isPromotion =
-          oldAlts.includes(newMain) && newAlts.includes(oldMain)
-        if (!isPromotion) continue
-
-        try {
-          // Each set_log row carries (assignment_id, logged_date). The
-          // workout might be assigned to several clients, and each
-          // (assignment_id, logged_date) pair needs its own substitution row
-          // since exercise_substitutions is keyed per-assignment.
-          const { data: logRows } = await supabase
-            .from('set_logs')
-            .select('assignment_id, logged_date')
-            .eq('exercise_id', ex.id)
-          const pairs = Array.from(
-            new Set(
-              (logRows ?? []).map(
-                (r: { assignment_id: string; logged_date: string }) =>
-                  `${r.assignment_id}::${r.logged_date}`
-              )
-            )
-          ).map(s => {
-            const [assignment_id, logged_date] = s.split('::')
-            return { assignment_id, logged_date }
-          })
-
-          if (pairs.length > 0) {
-            // Pre-existing substitution rows for any of these pairs — we
-            // don't want to clobber a real swap.
-            const { data: subRows } = await supabase
-              .from('exercise_substitutions')
-              .select('assignment_id, logged_date')
-              .eq('exercise_id', ex.id)
-              .in('assignment_id', Array.from(new Set(pairs.map(p => p.assignment_id))))
-            const subbed = new Set(
-              (subRows ?? []).map(
-                (r: { assignment_id: string; logged_date: string }) =>
-                  `${r.assignment_id}::${r.logged_date}`
-              )
-            )
-
-            // Pairs with logs and no substitution row = the trainee did the
-            // OLD main on those days. Tag retroactively.
-            const toBackfill = pairs.filter(
-              p => !subbed.has(`${p.assignment_id}::${p.logged_date}`)
-            )
-            if (toBackfill.length > 0) {
-              await supabase.from('exercise_substitutions').insert(
-                toBackfill.map(p => ({
-                  assignment_id: p.assignment_id,
-                  exercise_id: ex.id,
-                  logged_date: p.logged_date,
-                  substituted_name: oldMain,
-                }))
-              )
-            }
-          }
-        } catch {
-          // Backfill is best-effort — never block the promotion itself on
-          // a substitutions-table error.
-        }
-      }
-
-      // 2.6) For every promoted exercise, drop substitutions whose name
-      // matches the new main — they're no longer swaps. Done as a separate
-      // pass so we don't delete what we just inserted in step 2.5.
-      for (let i = 0; i < exercises.length; i++) {
-        const ex = exercises[i]
-        if (!ex.id || !serverIds.has(ex.id)) continue
-        const oldMain = serverNameById.get(ex.id)
-        if (!oldMain || oldMain === ex.name) continue
-        const oldAlts = serverAltsById.get(ex.id) ?? []
-        const newAlts = ex.alternatives ?? []
-        if (!(oldAlts.includes(ex.name) && newAlts.includes(oldMain))) continue
-
-        try {
-          await supabase
-            .from('exercise_substitutions')
-            .delete()
-            .eq('exercise_id', ex.id)
-            .eq('substituted_name', ex.name)
-        } catch {
-          // best-effort
-        }
-      }
-
-      // 3) Update exercises that survived (preserves exercise_id → keeps logs).
-      for (let i = 0; i < exercises.length; i++) {
-        const ex = exercises[i]
-        if (!ex.id || !serverIds.has(ex.id)) continue
-        const { error } = await supabase
-          .from('exercises')
-          .update(exerciseFields(ex, i))
-          .eq('id', ex.id)
-        if (error) throw error
-      }
-
-      // 4) Insert newly added exercises in one batch and capture their ids.
-      // We use the form's order_index (unique within the form) to map the
-      // returned rows back to the corresponding form entries.
-      const newRows = exercises
-        .map((ex, i) => ({ ex, i }))
-        .filter(({ ex }) => !ex.id || !serverIds.has(ex.id))
-      const insertedIdByOrderIndex = new Map<number, string>()
-      if (newRows.length > 0) {
-        const { data: inserted, error } = await supabase
-          .from('exercises')
-          .insert(
-            newRows.map(({ ex, i }) => ({ workout_id: workoutId, ...exerciseFields(ex, i) }))
-          )
-          .select('id, order_index')
-        if (error) throw error
-        for (const r of (inserted ?? []) as { id: string; order_index: number }[]) {
-          insertedIdByOrderIndex.set(r.order_index, r.id)
-        }
-      }
-
-      // Final exercise_id per form entry.
-      const exerciseIdAt = (formIndex: number): string => {
-        const ex = exercises[formIndex]
-        if (ex.id && serverIds.has(ex.id)) return ex.id
-        const fresh = insertedIdByOrderIndex.get(formIndex)
-        if (!fresh) {
-          // Should never happen — the insert above covers every new form row.
-          throw new Error('Missing inserted id for new exercise')
-        }
-        return fresh
-      }
-      const allExerciseIds = exercises.map((_, i) => exerciseIdAt(i))
-
-      // 5) Replace exercise_sets and exercise_alternatives for every surviving
-      // exercise. set_logs reference exercise_id (not exercise_sets.id), and
-      // exercise_substitutions reference exercise_id (not exercise_alternatives.id),
-      // so wiping these child rows does NOT touch client logs.
-      if (allExerciseIds.length > 0) {
-        const { error: setDelErr } = await supabase
-          .from('exercise_sets')
-          .delete()
-          .in('exercise_id', allExerciseIds)
-        if (setDelErr) throw setDelErr
-        // Alternatives table may not exist yet on older deployments.
-        try {
-          await supabase
-            .from('exercise_alternatives')
-            .delete()
-            .in('exercise_id', allExerciseIds)
-        } catch {
-          // best-effort
-        }
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const setsToInsert: any[] = []
-      exercises.forEach((ex, i) => {
-        const exId = allExerciseIds[i]
-        const isCardio = ex.exercise_type === 'cardio'
-        ;(ex.exercise_sets ?? []).forEach(s => {
-          const durationSeconds = isCardio ? parseDuration(s.target_reps) : null
-          setsToInsert.push({
-            exercise_id: exId,
-            set_number: s.set_number,
-            target_reps: isCardio ? '' : s.target_reps,
-            target_duration_seconds: durationSeconds,
-            notes: s.notes,
-            target_speed: isCardio ? s.target_speed ?? null : null,
-            target_incline: isCardio ? s.target_incline ?? null : null,
-            target_resistance: isCardio ? s.target_resistance ?? null : null,
-          })
-        })
-      })
-      if (setsToInsert.length > 0) {
-        const { error } = await supabase.from('exercise_sets').insert(setsToInsert)
-        if (error) throw error
-      }
-
-      const altsToInsert: { exercise_id: string; name: string; order_index: number }[] = []
-      exercises.forEach((ex, i) => {
-        const exId = allExerciseIds[i]
-        ;(ex.alternatives ?? [])
-          .map(n => n.trim())
-          .filter(n => n.length > 0)
-          .forEach((name, j) => {
-            altsToInsert.push({ exercise_id: exId, name, order_index: j })
-          })
-      })
-      if (altsToInsert.length > 0) {
-        // Best-effort — if the alternatives table doesn't exist on this
-        // deployment yet, the rest of the save still succeeded.
-        await supabase.from('exercise_alternatives').insert(altsToInsert)
-      }
-
       onClose()
     } catch {
       showToast('Failed to save workout', 'error')
@@ -764,16 +355,12 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <IconButton onClick={requestClose} aria-label="Go back">
-          <ArrowLeft size={18} />
-        </IconButton>
-        <h2 className="text-xl font-bold text-slate-900">
-          {workout ? 'Edit Workout' : 'Create Workout'}
-        </h2>
-      </div>
+      <BuilderHeader
+        title={workout ? 'Edit Workout' : 'Create Workout'}
+        onBack={requestClose}
+      />
 
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 space-y-4">
+      <BuilderCard>
         <Field id="wb-name" label="Workout Name">
           <Input
             id="wb-name"
@@ -813,7 +400,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
           />
           <span className="text-sm text-slate-700">Save as template</span>
         </label>
-      </div>
+      </BuilderCard>
 
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Exercises</h3>
@@ -824,9 +411,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
       </div>
 
       {exercises.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center">
-          <p className="text-slate-400 text-sm">No exercises yet. Add your first exercise above.</p>
-        </div>
+        <EmptyStateCard message="No exercises yet. Add your first exercise above." />
       ) : (
         <DndContext
           sensors={dndSensors}
@@ -1233,73 +818,24 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         </DndContext>
       )}
 
-      {/* Bottom "Add exercise" — saves the coach a long scroll back to the
-          top button after appending a card. Hidden in the empty state since
-          the dashed empty card already prompts the action. */}
       {exercises.length > 0 && (
-        <button
-          type="button"
-          onClick={addExercise}
-          className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50/40 transition-colors cursor-pointer text-sm font-medium"
-        >
-          <Plus size={16} />
-          Add Exercise
-        </button>
+        <AddItemButton label="Add Exercise" onClick={addExercise} />
       )}
+      {exercises.length > 0 && <AddFab ariaLabel="Add exercise" onClick={addExercise} />}
 
-      {/* Spacer keeps the last card clear of the fixed save bar at the bottom
-          of the scroll. Mobile is taller because the bar sits above the
-          ~3.5rem bottom tab nav. */}
-      <div className="h-32 md:h-24" aria-hidden />
+      <BuilderSaveBar
+        count={exercises.length}
+        noun="exercise"
+        isDirty={isDirty}
+        saving={saving}
+        onCancel={requestClose}
+        onSave={handleSave}
+        saveLabel="Save Workout"
+      />
 
-      {/* Pinned action bar — fixed to the viewport (not sticky to the parent)
-          so it stays visible no matter how short the form is. Respects the
-          desktop sidebar via `md:left-64` and the mobile tab nav via the
-          calc-bottom offset. */}
-      <div className="fixed left-0 right-0 md:left-64 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 z-30 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]">
-        {/* Inner row matches the form's max-w-5xl + padding so the buttons
-            sit under the form content instead of drifting to the screen
-            edge on wide displays. */}
-        <div className="max-w-5xl mx-auto px-4 sm:px-8 flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-            <span className="tabular-nums">
-              <span className="font-semibold text-slate-700">{exercises.length}</span>{' '}
-              {exercises.length === 1 ? 'exercise' : 'exercises'}
-            </span>
-            <UnsavedBadge visible={isDirty && !saving} />
-          </div>
-          <div className="sm:hidden">
-            <UnsavedBadge visible={isDirty && !saving} />
-          </div>
-          <div className="flex-1" />
-          <Button variant="secondary" onClick={requestClose} disabled={saving} size="sm">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            loading={saving}
-            disabled={!isDirty}
-            size="sm"
-          >
-            {!saving && <Save size={14} />}
-            {saving ? (
-              'Saving…'
-            ) : (
-              <>
-                <span className="sm:hidden">Save</span>
-                <span className="hidden sm:inline">Save Workout</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      <ConfirmDialog
+      <DiscardDialog
         open={confirmDiscard}
-        title="Discard changes?"
-        message="You have unsaved edits to this workout. They'll be lost if you leave now."
-        confirmLabel="Discard"
-        destructive
+        noun="workout"
         onConfirm={onClose}
         onCancel={() => setConfirmDiscard(false)}
       />

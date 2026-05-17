@@ -1,0 +1,178 @@
+'use client'
+
+import { useQuery } from '@tanstack/react-query'
+import {
+  Apple,
+  ArrowRight,
+  Dumbbell,
+  ListChecks,
+  Users,
+} from 'lucide-react'
+import { useSupabase } from '@/lib/use-supabase'
+import { Card, CardSkeletonBody, SectionHeader, type TodayNavTarget } from './primitives'
+
+export function CoachSection({
+  coachId,
+  onNavigate,
+}: {
+  coachId: string
+  onNavigate: (tab: TodayNavTarget) => void
+}) {
+  const supabase = useSupabase()
+  const countsQuery = useQuery({
+    queryKey: ['coach_counts', coachId] as const,
+    queryFn: async () => {
+      // Fire all four counts in parallel. `head: true` + `count: 'exact'`
+      // tells PostgREST to return only the count without the rows.
+      const [clientsRes, workoutsRes, programsRes, mealPlansRes] = await Promise.all([
+        supabase
+          .from('coach_client_relationships')
+          .select('client_id', { count: 'exact', head: true })
+          .eq('coach_id', coachId)
+          .eq('status', 'active')
+          .neq('client_id', coachId),
+        supabase
+          .from('workouts')
+          .select('id', { count: 'exact', head: true })
+          .eq('coach_id', coachId),
+        supabase
+          .from('workout_programs')
+          .select('id', { count: 'exact', head: true })
+          .eq('coach_id', coachId),
+        supabase
+          .from('meal_plans')
+          .select('id', { count: 'exact', head: true })
+          .eq('coach_id', coachId),
+      ])
+      return {
+        clients: clientsRes.count ?? 0,
+        workouts: workoutsRes.count ?? 0,
+        programs: programsRes.count ?? 0,
+        mealPlans: mealPlansRes.count ?? 0,
+      }
+    },
+  })
+  const counts = countsQuery.data ?? null
+
+  // Skip the whole section while loading is still null AND there's never
+  // been any coaching content. Once there's at least one client or one
+  // template, the section sticks around.
+  if (!counts) {
+    return (
+      <section className="space-y-3">
+        <SectionHeader title="Coaching" />
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <CardSkeletonBody lines={2} />
+        </div>
+      </section>
+    )
+  }
+
+  const hasAny =
+    counts.clients > 0 ||
+    counts.workouts > 0 ||
+    counts.programs > 0 ||
+    counts.mealPlans > 0
+  if (!hasAny) {
+    // First-run: empty Coaching section is just a soft CTA tile. Tap
+    // routes to the workout library where they can build their first one.
+    return (
+      <section className="space-y-3">
+        <SectionHeader title="Coaching" />
+        <button
+          type="button"
+          onClick={() => onNavigate('my-workouts')}
+          className="w-full text-left bg-white rounded-2xl border border-dashed border-slate-300 p-5 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center">
+              <Dumbbell size={16} />
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium text-slate-700">
+                Build your first workout
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Coach yourself or invite a client — same tools either way.
+              </p>
+            </div>
+            <ArrowRight size={14} className="ml-auto text-slate-300" />
+          </div>
+        </button>
+      </section>
+    )
+  }
+
+  return (
+    <section className="space-y-3">
+      <SectionHeader title="Coaching" />
+      <Card
+        icon={Users}
+        label="Clients"
+        accent="indigo"
+        onClick={() => onNavigate('my-clients')}
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="font-semibold text-slate-900">
+            <span className="text-2xl tabular-nums">{counts.clients}</span>
+            <span className="text-sm text-slate-500 font-normal">
+              {' '}
+              {counts.clients === 1 ? 'client' : 'clients'}
+            </span>
+          </p>
+          <p className="text-xs text-slate-500 shrink-0">
+            {counts.clients === 0 ? 'Invite to start' : 'Manage'}
+          </p>
+        </div>
+      </Card>
+      <div className="grid grid-cols-3 gap-2">
+        <LibraryTile
+          label="Workouts"
+          count={counts.workouts}
+          icon={Dumbbell}
+          onClick={() => onNavigate('my-workouts')}
+        />
+        <LibraryTile
+          label="Programs"
+          count={counts.programs}
+          icon={ListChecks}
+          onClick={() => onNavigate('my-programs')}
+        />
+        <LibraryTile
+          label="Meal plans"
+          count={counts.mealPlans}
+          icon={Apple}
+          onClick={() => onNavigate('my-meal-plans')}
+        />
+      </div>
+    </section>
+  )
+}
+
+function LibraryTile({
+  label,
+  count,
+  icon: Icon,
+  onClick,
+}: {
+  label: string
+  count: number
+  icon: typeof Dumbbell
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="bg-white rounded-xl border border-slate-200 p-3 hover:border-indigo-200 hover:shadow-sm transition-all cursor-pointer text-left"
+    >
+      <Icon size={14} className="text-slate-400 mb-1.5" />
+      <p className="text-lg font-bold text-slate-900 tabular-nums leading-tight">
+        {count}
+      </p>
+      <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 mt-0.5">
+        {label}
+      </p>
+    </button>
+  )
+}

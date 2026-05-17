@@ -6,12 +6,17 @@ import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Field, Input, Textarea } from '@/components/ui/Input'
-import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
 import { SortableList, DragHandle } from '@/components/ui/SortableList'
+import { BuilderHeader } from '@/components/ui/BuilderHeader'
+import { BuilderSaveBar } from '@/components/ui/BuilderSaveBar'
+import { BuilderCard } from '@/components/ui/BuilderCard'
+import { EmptyStateCard } from '@/components/ui/EmptyStateCard'
+import { DiscardDialog } from '@/components/ui/DiscardDialog'
+import { AddItemButton } from '@/components/ui/AddItemButton'
+import { AddFab } from '@/components/ui/AddFab'
 import { useDirtyState } from '@/lib/use-dirty-state'
-import { ArrowLeft, Plus, X, Save, Search } from 'lucide-react'
+import { Plus, X, Search } from 'lucide-react'
 import type { WorkoutProgram } from '@/lib/types'
 
 interface ProgramBuilderProps {
@@ -247,16 +252,12 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <IconButton onClick={requestClose} aria-label="Go back">
-          <ArrowLeft size={18} />
-        </IconButton>
-        <h2 className="text-xl font-bold text-slate-900">
-          {program ? 'Edit Program' : 'Create Program'}
-        </h2>
-      </div>
+      <BuilderHeader
+        title={program ? 'Edit Program' : 'Create Program'}
+        onBack={requestClose}
+      />
 
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 space-y-4">
+      <BuilderCard>
         <Field id="pb-name" label="Program Name">
           <Input
             id="pb-name"
@@ -285,7 +286,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
           />
           <span className="text-sm text-slate-700">Save as template</span>
         </label>
-      </div>
+      </BuilderCard>
 
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
@@ -298,11 +299,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
       </div>
 
       {members.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center">
-          <p className="text-slate-400 text-sm">
-            No workouts in this program yet. Add one to get started.
-          </p>
-        </div>
+        <EmptyStateCard message="No workouts in this program yet. Add one to get started." />
       ) : (
         <SortableList
           items={members}
@@ -345,57 +342,21 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
       )}
 
       {members.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowPicker(true)}
-          className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50/40 transition-colors cursor-pointer text-sm font-medium"
-        >
-          <Plus size={16} />
-          Add Workout
-        </button>
+        <AddItemButton label="Add Workout" onClick={() => setShowPicker(true)} />
+      )}
+      {members.length > 0 && (
+        <AddFab ariaLabel="Add workout" onClick={() => setShowPicker(true)} />
       )}
 
-      {/* Spacer keeps the last card clear of the fixed save bar. Taller on
-          mobile because the bar sits above the ~3.5rem bottom tab nav. */}
-      <div className="h-32 md:h-24" aria-hidden />
-
-      {/* Pinned action bar — fixed to the viewport so it stays visible no
-          matter how short the form is. Respects the desktop sidebar via
-          `md:left-64` and the mobile tab nav via the calc-bottom offset. */}
-      <div className="fixed left-0 right-0 md:left-64 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 z-30 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-8 flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-            <span className="tabular-nums">
-              <span className="font-semibold text-slate-700">{members.length}</span>{' '}
-              {members.length === 1 ? 'workout' : 'workouts'}
-            </span>
-            <UnsavedBadge visible={isDirty && !saving} />
-          </div>
-          <div className="sm:hidden">
-            <UnsavedBadge visible={isDirty && !saving} />
-          </div>
-          <div className="flex-1" />
-          <Button variant="secondary" onClick={requestClose} disabled={saving} size="sm">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            loading={saving}
-            disabled={!isDirty}
-            size="sm"
-          >
-            {!saving && <Save size={14} />}
-            {saving ? (
-              'Saving…'
-            ) : (
-              <>
-                <span className="sm:hidden">Save</span>
-                <span className="hidden sm:inline">Save Program</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      <BuilderSaveBar
+        count={members.length}
+        noun="workout"
+        isDirty={isDirty}
+        saving={saving}
+        onCancel={requestClose}
+        onSave={handleSave}
+        saveLabel="Save Program"
+      />
 
       <Modal
         open={showPicker}
@@ -456,12 +417,9 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
         </div>
       </Modal>
 
-      <ConfirmDialog
+      <DiscardDialog
         open={confirmDiscard}
-        title="Discard changes?"
-        message="You have unsaved edits to this program. They'll be lost if you leave now."
-        confirmLabel="Discard"
-        destructive
+        noun="program"
         onConfirm={onClose}
         onCancel={() => setConfirmDiscard(false)}
       />
