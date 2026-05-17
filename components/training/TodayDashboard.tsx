@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight,
   ClipboardList,
@@ -17,16 +18,23 @@ import {
   Apple,
 } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
-import { cachedFetch, cachedQuery } from '@/lib/cached-query'
-import { queuedUpsert } from '@/lib/write-queue'
-import { notifyDataChanged, subscribeDataChanged } from '@/lib/data-bus'
+import { useMealLogs, useToggleMealLog } from '@/lib/hooks/use-meal-logs'
+import {
+  useDaySetLogs,
+  useSaveSetLog,
+  type DaySetLogRow,
+  type SetLogRow,
+} from '@/lib/hooks/use-set-logs'
+import { useLogWeight, useWeightLogs } from '@/lib/hooks/use-weight-logs'
+import { useBodyMeasurements } from '@/lib/hooks/use-body-measurements'
+import {
+  useMealPlanAssignments,
+  useWorkoutAssignments,
+} from '@/lib/hooks/use-assignments'
+import { queryKeys } from '@/lib/query-keys'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import {
-  fetchActiveMealPlanAssignments,
-  fetchActiveWorkoutAssignments,
-} from '@/lib/queries'
 import {
   daysBetween,
   formatDate,
@@ -45,12 +53,14 @@ function parseLocalISO(s: string): Date {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
+
+// Stable empty sets so memoised consumers don't see a fresh identity
+// before the queries resolve.
+const EMPTY_EATEN_SET: Set<string> = new Set()
 import type {
-  MealPlanAssignment,
   Profile,
   WeightLog,
   WeightUnit,
-  WorkoutAssignment,
 } from '@/lib/types'
 
 interface TodayDashboardProps {
@@ -169,39 +179,25 @@ function WelcomeBanner({
   onNavigate: (tab: TodayNavTarget) => void
 }) {
   const supabase = useSupabase()
-  const [show, setShow] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      // Fast existence checks — only need to know "is there at least one
-      // row?". `limit(1)` keeps the response tiny, `head: true` would
-      // require `count:` which is a heavier read on the server.
+  // Fast existence checks — only need to know "is there at least one
+  // row?". `limit(1)` keeps the payload tiny.
+  const firstRunQuery = useQuery({
+    queryKey: ['first_run', userId] as const,
+    queryFn: async () => {
       const [workoutsRes, assignmentsRes] = await Promise.all([
-        cachedQuery<Array<{ id: string }>>(
-          `first_run_workouts:${userId}`,
-          () =>
-            supabase.from('workouts').select('id').eq('coach_id', userId).limit(1)
-        ),
-        cachedQuery<Array<{ id: string }>>(
-          `first_run_assignments:${userId}`,
-          () =>
-            supabase
-              .from('workout_assignments')
-              .select('id')
-              .eq('client_id', userId)
-              .limit(1)
-        ),
+        supabase.from('workouts').select('id').eq('coach_id', userId).limit(1),
+        supabase
+          .from('workout_assignments')
+          .select('id')
+          .eq('client_id', userId)
+          .limit(1),
       ])
-      if (cancelled) return
       const hasWorkouts = (workoutsRes.data ?? []).length > 0
       const hasAssignments = (assignmentsRes.data ?? []).length > 0
-      setShow(!hasWorkouts && !hasAssignments)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [supabase, userId])
+      return !hasWorkouts && !hasAssignments
+    },
+  })
+  const show = firstRunQuery.data
 
   if (!show) return null
 
@@ -256,6 +252,10 @@ function greetingForHour(h: number) {
 
 // ── Workout card ────────────────────────────────────────────────────────
 
+// Stable empty fallback so memo deps don't see a new Map identity on
+// every render before the query resolves.
+const EMPTY_DAY_SET_LOGS: Map<string, DaySetLogRow> = new Map()
+
 function WorkoutCard({
   clientId,
   loggedDate,
@@ -265,67 +265,35 @@ function WorkoutCard({
   loggedDate: string
   onOpen: () => void
 }) {
-  const supabase = useSupabase()
-  const [assignments, setAssignments] = useState<WorkoutAssignment[] | null>(null)
-  const [completedKeys, setCompletedKeys] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
-  // Bumping this re-runs the load effect after a successful inline log
-  // so the progress bar + "next set" pointer advance to the next set.
-  const [refreshTick, setRefreshTick] = useState(0)
+  const assignmentsQuery = useWorkoutAssignments(clientId, loggedDate)
+  const assignments = assignmentsQuery.data ?? null
+  const loadingAssignments = assignmentsQuery.isLoading && !assignmentsQuery.isSuccess
 
-  // Also bump the tick when set_logs are written from *anywhere* else
-  // (deep logger, superset logger). Without this the card stays stale
-  // when the user logs sets from the Workouts tab and switches back.
-  useEffect(
-    () => subscribeDataChanged('set_logs', () => setRefreshTick(t => t + 1)),
-    []
+  // Day-wide set_logs query shared with the deep logger via cache
+  // updates the save mutation does in `onMutate`. The Today card just
+  // derives its progress numbers from this; toggling completion in
+  // any logger patches the same cache so this re-renders without
+  // re-fetching.
+  const assignmentIds = useMemo(
+    () => (assignments ?? []).map(a => a.id),
+    [assignments]
   )
+  const setLogsQuery = useDaySetLogs({
+    clientId,
+    date: loggedDate,
+    assignmentIds,
+  })
+  const daySetLogs: Map<string, DaySetLogRow> = setLogsQuery.data ?? EMPTY_DAY_SET_LOGS
+  const loading = loadingAssignments || (assignmentIds.length > 0 && !setLogsQuery.isSuccess)
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      setLoading(true)
-      const { data } = await cachedFetch<WorkoutAssignment[]>(
-        // Same cache key as ClientWorkoutView so the data is shared.
-        `workout_assignments:${clientId}:${loggedDate}`,
-        () => fetchActiveWorkoutAssignments(supabase, clientId, loggedDate)
-      )
-      if (cancelled) return
-      const list = data ?? []
-      setAssignments(list)
-      // Pull completed set_logs for the day so we can paint a real
-      // progress bar. We only need (exercise_id, set_number) pairs that
-      // are `completed: true`.
-      if (list.length === 0) {
-        setCompletedKeys(new Set())
-        setLoading(false)
-        return
-      }
-      const assignmentIds = list.map(a => a.id)
-      const { data: logs } = await cachedQuery<
-        Array<{ exercise_id: string; set_number: number; completed: boolean }>
-      >(
-        `set_logs_summary:${clientId}:${loggedDate}:${assignmentIds.sort().join(',')}`,
-        () =>
-          supabase
-            .from('set_logs')
-            .select('exercise_id, set_number, completed')
-            .in('assignment_id', assignmentIds)
-            .eq('logged_date', loggedDate)
-      )
-      if (cancelled) return
-      const keys = new Set<string>()
-      for (const l of logs ?? []) {
-        if (l.completed) keys.add(`${l.exercise_id}::${l.set_number}`)
-      }
-      setCompletedKeys(keys)
-      setLoading(false)
+  // Derived: `exerciseId::setNumber` for every set marked completed today.
+  const completedKeys = useMemo(() => {
+    const out = new Set<string>()
+    for (const [, row] of daySetLogs) {
+      if (row.completed) out.add(`${row.exercise_id}::${row.set_number}`)
     }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [supabase, clientId, loggedDate, refreshTick])
+    return out
+  }, [daySetLogs])
 
   const summary = useMemo(() => {
     if (!assignments) return null
@@ -434,7 +402,11 @@ function WorkoutCard({
           {summary?.nextSet ? (
             <NextSetMiniLogger
               // Remount on advance — fresh empty inputs for the new set.
+              // The new `key` changes automatically once the mutation's
+              // cache patch flips `completedKeys` and `summary.nextSet`
+              // points at the next unfinished set.
               key={`${summary.nextSet.exerciseId}::${summary.nextSet.setNumber}`}
+              clientId={clientId}
               kind={summary.nextSet.kind}
               assignmentId={summary.nextSet.assignmentId}
               exerciseId={summary.nextSet.exerciseId}
@@ -444,7 +416,6 @@ function WorkoutCard({
               targetReps={summary.nextSet.targetReps}
               targetDurationSeconds={summary.nextSet.targetDurationSeconds}
               loggedDate={loggedDate}
-              onLogged={() => setRefreshTick(t => t + 1)}
             />
           ) : summary?.nextExercise ? (
             // The next thing to do is a cardio exercise or superset
@@ -470,9 +441,11 @@ function WorkoutCard({
 // Compact "log the next set" form rendered inline in the Workout card.
 // Only fires for plain strength exercises — supersets and cardio still
 // require the full ClientWorkoutView (open via the corner Open button).
-// On a successful upsert, `onLogged()` bumps a refresh tick on the
-// parent which re-derives "the next set" and advances the form to it.
+// Patches the shared set-logs store on success; the parent's
+// `completedKeys` re-derives off the store and its `key={...}` on this
+// component changes, which remounts with fresh empty inputs.
 function NextSetMiniLogger({
+  clientId,
   kind,
   assignmentId,
   exerciseId,
@@ -482,8 +455,8 @@ function NextSetMiniLogger({
   targetReps,
   targetDurationSeconds,
   loggedDate,
-  onLogged,
 }: {
+  clientId: string
   kind: 'strength' | 'cardio'
   assignmentId: string
   exerciseId: string
@@ -493,84 +466,84 @@ function NextSetMiniLogger({
   targetReps: string
   targetDurationSeconds: number | null
   loggedDate: string
-  onLogged: () => void
 }) {
-  const supabase = useSupabase()
-  // Inputs are local to *this* set. The parent's refreshTick remounts
-  // the form's `key` when we advance, which is enough to reset state —
-  // see the `key={...}` on the wrapper in WorkoutCard.
+  const qc = useQueryClient()
+  const saveSetLog = useSaveSetLog()
   const [weight, setWeight] = useState('')
   const [reps, setReps] = useState('')
   // Cardio path uses a single duration field — accepts the same loose
   // formats as the deep cardio logger ("20:30", "30", "1h 20m").
   const [duration, setDuration] = useState('')
-  const [saving, setSaving] = useState(false)
+  const saving = saveSetLog.isPending
 
   const handleLog = async () => {
-    setSaving(true)
+    // Read any existing per-exercise cache so we don't clobber machine
+    // columns that the deep ExerciseSetLogger has populated.
+    const exerciseRows =
+      qc.getQueryData<Map<number, SetLogRow>>(
+        queryKeys.setLogs.forExercise(assignmentId, exerciseId, loggedDate)
+      ) ?? new Map<number, SetLogRow>()
+    const existing = exerciseRows.get(setNumber)
+
     if (kind === 'strength') {
       const w = weight === '' ? null : parseFloat(weight)
       const r = reps === '' ? null : parseFloat(reps)
       if (r == null || !Number.isFinite(r) || r <= 0) {
         showToast('Enter reps to log this set', 'error')
-        setSaving(false)
         return
       }
-      const { error } = await queuedUpsert(
-        supabase,
-        'set_logs',
-        {
-          assignment_id: assignmentId,
-          exercise_id: exerciseId,
-          set_number: setNumber,
-          logged_date: loggedDate,
-          reps_performed: r,
-          weight_performed: w != null && Number.isFinite(w) ? w : null,
-          duration_performed_seconds: null,
-          completed: true,
-        },
-        { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
-      )
-      setSaving(false)
-      if (error) {
+      const persisted: SetLogRow = {
+        set_number: setNumber,
+        reps_performed: r,
+        weight_performed: w != null && Number.isFinite(w) ? w : null,
+        duration_performed_seconds: null,
+        speed_performed: existing?.speed_performed ?? null,
+        incline_performed: existing?.incline_performed ?? null,
+        resistance_performed: existing?.resistance_performed ?? null,
+        completed: true,
+      }
+      try {
+        await saveSetLog.mutateAsync({
+          assignmentId,
+          exerciseId,
+          date: loggedDate,
+          clientId,
+          row: persisted,
+        })
+      } catch {
         showToast('Failed to log set', 'error')
-        return
       }
-      notifyDataChanged('set_logs')
-      onLogged()
       return
     }
-    // Cardio path: persist duration_performed_seconds. Strength columns
-    // stay null. Speed / incline / resistance are intentionally not
-    // collected here — they live in the deep view's per-machine UI.
+    // Cardio path: persist duration_performed_seconds. Speed/incline/
+    // resistance are intentionally not collected here — they live in
+    // the deep view's per-machine UI.
     const parsedSeconds = parseDuration(duration)
     if (parsedSeconds == null || parsedSeconds <= 0) {
       showToast('Enter a duration (e.g. 20 or 20:30)', 'error')
-      setSaving(false)
       return
     }
-    const { error } = await queuedUpsert(
-      supabase,
-      'set_logs',
-      {
-        assignment_id: assignmentId,
-        exercise_id: exerciseId,
-        set_number: setNumber,
-        logged_date: loggedDate,
-        reps_performed: null,
-        weight_performed: null,
-        duration_performed_seconds: parsedSeconds,
-        completed: true,
-      },
-      { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
-    )
-    setSaving(false)
-    if (error) {
+    const persisted: SetLogRow = {
+      set_number: setNumber,
+      reps_performed: null,
+      weight_performed: null,
+      duration_performed_seconds: parsedSeconds,
+      speed_performed: existing?.speed_performed ?? null,
+      incline_performed: existing?.incline_performed ?? null,
+      resistance_performed: existing?.resistance_performed ?? null,
+      completed: true,
+    }
+    try {
+      await saveSetLog.mutateAsync({
+        assignmentId,
+        exerciseId,
+        date: loggedDate,
+        clientId,
+        row: persisted,
+      })
+    } catch {
       showToast('Failed to log set', 'error')
-      return
     }
-    notifyDataChanged('set_logs')
-    onLogged()
   }
 
   const isCardio = kind === 'cardio'
@@ -683,75 +656,32 @@ function MealsCard({
   loggedDate: string
   onOpen: () => void
 }) {
-  const supabase = useSupabase()
-  const [assignments, setAssignments] = useState<MealPlanAssignment[] | null>(null)
-  const [eaten, setEaten] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
+  const assignmentsQuery = useMealPlanAssignments(clientId, loggedDate)
+  const assignments = assignmentsQuery.data ?? null
+  const loading = assignmentsQuery.isLoading && !assignmentsQuery.isSuccess
+  // Eaten state comes from TanStack Query — shared with the deep
+  // meal-plan view and per-row MealLogToggles. Toggle optimistically
+  // updates the same cache so everything stays in sync without re-fetch.
+  const mealLogs = useMealLogs({ clientId, date: loggedDate })
+  const eaten = mealLogs.data ?? EMPTY_EATEN_SET
+  const toggleMealLog = useToggleMealLog({ clientId, date: loggedDate })
   // Per-row assignment id lookup — needed for the `meal_logs` upsert.
-  const [assignmentByMealId, setAssignmentByMealId] = useState<Map<string, string>>(
-    new Map()
-  )
-  // Re-fetch when meal_logs change elsewhere (deep meal-plan view) so
-  // toggling "eaten" in another tab reflects here on tab switch.
-  const [refreshTick, setRefreshTick] = useState(0)
-  useEffect(
-    () => subscribeDataChanged('meal_logs', () => setRefreshTick(t => t + 1)),
-    []
-  )
+  const assignmentByMealId = useMemo(() => {
+    const lookup = new Map<string, string>()
+    for (const a of assignments ?? []) {
+      for (const m of a.meal_plan.meals) {
+        if (m.id) lookup.set(m.id, a.id)
+      }
+    }
+    return lookup
+  }, [assignments])
   // Re-tick once a minute so missed-meal status updates as the clock
-  // crosses scheduled times. Reading `Date.now()` directly in render is
-  // impure (different value each call), but reading it inside a memo
-  // keyed on a tick state is fine — the result is stable for the
-  // duration of the minute.
+  // crosses scheduled times.
   const [minuteTick, setMinuteTick] = useState(0)
   useEffect(() => {
     const handle = window.setInterval(() => setMinuteTick(n => n + 1), 60_000)
     return () => window.clearInterval(handle)
   }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      setLoading(true)
-      const [{ data: aData }, { data: logsData }] = await Promise.all([
-        cachedFetch<MealPlanAssignment[]>(
-          `meal_plan_assignments:${clientId}:${loggedDate}`,
-          () => fetchActiveMealPlanAssignments(supabase, clientId, loggedDate)
-        ),
-        cachedQuery<Array<{ meal_id: string; completed: boolean }>>(
-          `meal_logs:${clientId}:${loggedDate}`,
-          () =>
-            supabase
-              .from('meal_logs')
-              .select('meal_id, completed')
-              .eq('user_id', clientId)
-              .eq('logged_date', loggedDate)
-        ),
-      ])
-      if (cancelled) return
-      const list = aData ?? []
-      setAssignments(list)
-      const next = new Set<string>()
-      for (const r of logsData ?? []) {
-        if (r.completed) next.add(r.meal_id)
-      }
-      setEaten(next)
-      // Index meal id → assignment id for the inline toggle. The
-      // `meal_logs` upsert needs both.
-      const lookup = new Map<string, string>()
-      for (const a of list) {
-        for (const m of a.meal_plan.meals) {
-          if (m.id) lookup.set(m.id, a.id)
-        }
-      }
-      setAssignmentByMealId(lookup)
-      setLoading(false)
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [supabase, clientId, loggedDate, refreshTick])
 
   const meals = useMemo(() => {
     if (!assignments)
@@ -782,44 +712,16 @@ function MealsCard({
 
   // Inline toggle: flip a meal's eaten state from the Today card itself
   // so the user doesn't have to navigate into the meal logger to check
-  // off "ate breakfast." Optimistic — the local Set updates immediately,
-  // and `queuedUpsert` handles offline + retries. Rolls back on real
-  // (non-network) errors.
-  const toggleMeal = async (mealId: string) => {
+  // off "ate breakfast." The mutation hook handles the optimistic patch
+  // + rollback in one place — every subscriber re-renders without a
+  // re-fetch.
+  const toggleMeal = (mealId: string) => {
     const assignmentId = assignmentByMealId.get(mealId)
     if (!assignmentId) return
-    const wasEaten = eaten.has(mealId)
-    const nextEaten = !wasEaten
-    setEaten(prev => {
-      const next = new Set(prev)
-      if (nextEaten) next.add(mealId)
-      else next.delete(mealId)
-      return next
-    })
-    const { error } = await queuedUpsert(
-      supabase,
-      'meal_logs',
-      {
-        assignment_id: assignmentId,
-        meal_id: mealId,
-        user_id: clientId,
-        logged_date: loggedDate,
-        completed: nextEaten,
-      },
-      { onConflict: 'meal_id,user_id,logged_date' }
+    toggleMealLog.mutate(
+      { assignmentId, mealId, completed: !eaten.has(mealId) },
+      { onError: () => showToast('Failed to update meal', 'error') }
     )
-    if (error) {
-      // Roll back the optimistic flip.
-      setEaten(prev => {
-        const rolled = new Set(prev)
-        if (wasEaten) rolled.add(mealId)
-        else rolled.delete(mealId)
-        return rolled
-      })
-      showToast('Failed to update meal', 'error')
-    } else {
-      notifyDataChanged('meal_logs')
-    }
   }
 
   const eatenCount = meals.filter(m => eaten.has(m.id)).length
@@ -961,46 +863,17 @@ function WeightCard({
   weightGoal: number | null
   onOpen: () => void
 }) {
-  const supabase = useSupabase()
-  const [logs, setLogs] = useState<WeightLog[] | null>(null)
+  // Weight reads + log share one TanStack Query cache with the deep
+  // WeightTracker — optimistic updates flow through this card without
+  // a re-fetch.
+  const weightQuery = useWeightLogs(userId)
+  const allLogs = weightQuery.data ?? []
+  const latest = allLogs[0] ?? null
+  const logsLoaded = weightQuery.isSuccess
+  const logWeight = useLogWeight(userId)
   const [draft, setDraft] = useState('')
-  const [saving, setSaving] = useState(false)
-  // Bumping `refreshTick` forces the load effect to re-run after a
-  // successful log. The async load + cancel-guard pattern keeps the
-  // setState behind an `await`, which the eslint plugin accepts; calling
-  // a sync function that internally setStates would trip the rule.
-  const [refreshTick, setRefreshTick] = useState(0)
-  // Also re-fetch when the weight log changes elsewhere — the deep
-  // WeightTracker writes and deletes, and those won't update this card
-  // otherwise.
-  useEffect(
-    () => subscribeDataChanged('weight_logs', () => setRefreshTick(t => t + 1)),
-    []
-  )
+  const saving = logWeight.isPending
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const { data } = await cachedQuery<WeightLog[]>(
-        // Same cache key as WeightTracker — opening Today refreshes the
-        // shared cache, and vice versa.
-        `weight_logs:${userId}:recent30`,
-        () =>
-          supabase
-            .from('weight_logs')
-            .select('*')
-            .eq('user_id', userId)
-            .order('recorded_at', { ascending: false })
-            .limit(30)
-      )
-      if (!cancelled) setLogs(data ?? [])
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [supabase, userId, refreshTick])
-
-  const latest = logs?.[0] ?? null
   const today = todayISO()
   const loggedToday = latest?.recorded_at === today
 
@@ -1016,35 +889,27 @@ function WeightCard({
       ? latest.weight - weightGoal
       : null
 
-  const handleLog = async () => {
+  const handleLog = () => {
     const weight = parseFloat(draft)
     if (!draft || Number.isNaN(weight) || weight <= 0) {
       showToast('Enter a valid weight', 'error')
       return
     }
-    setSaving(true)
-    const { error } = await queuedUpsert(
-      supabase,
-      'weight_logs',
-      { user_id: userId, recorded_at: today, weight },
-      { onConflict: 'user_id,recorded_at' }
+    logWeight.mutate(
+      { recorded_at: today, weight },
+      {
+        onSuccess: () => {
+          showToast('Weight logged')
+          setDraft('')
+        },
+        onError: () => showToast('Failed to log weight', 'error'),
+      }
     )
-    if (error) {
-      showToast('Failed to log weight', 'error')
-    } else {
-      showToast('Weight logged')
-      setDraft('')
-      // Trigger a re-fetch via the load effect — see comment by
-      // `refreshTick` for why we don't call an async fetcher directly.
-      setRefreshTick(t => t + 1)
-      notifyDataChanged('weight_logs')
-    }
-    setSaving(false)
   }
 
   return (
     <Card onClick={onOpen} accent="indigo" icon={Scale} label="Weight">
-      {logs === null ? (
+      {!logsLoaded ? (
         <CardSkeletonBody lines={1} />
       ) : (
         <div className="space-y-2.5">
@@ -1090,7 +955,7 @@ function WeightCard({
               </p>
             )}
           </div>
-          <WeightWeekStrip logs={logs} todayISO={today} />
+          <WeightWeekStrip logs={allLogs} todayISO={today} />
           {!loggedToday && (
             <form
               onSubmit={e => {
@@ -1215,37 +1080,11 @@ function BodyMeasurementCard({
   userId: string
   onOpen: () => void
 }) {
-  const supabase = useSupabase()
-  const [latest, setLatest] = useState<{ recorded_at: string } | null>(null)
-  const [loaded, setLoaded] = useState(false)
-  const [refreshTick, setRefreshTick] = useState(0)
-  useEffect(
-    () =>
-      subscribeDataChanged('body_measurements', () => setRefreshTick(t => t + 1)),
-    []
-  )
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const { data } = await cachedQuery<Array<{ recorded_at: string }>>(
-        `body_measurements_latest:${userId}`,
-        () =>
-          supabase
-            .from('body_measurements')
-            .select('recorded_at')
-            .eq('user_id', userId)
-            .order('recorded_at', { ascending: false })
-            .limit(1)
-      )
-      if (cancelled) return
-      setLatest((data ?? [])[0] ?? null)
-      setLoaded(true)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [supabase, userId, refreshTick])
+  // Same query the deep tracker uses, so the cache is shared. We only
+  // need the most-recent entry to drive this card's copy.
+  const measurementsQuery = useBodyMeasurements(userId)
+  const latest = measurementsQuery.data?.[0] ?? null
+  const loaded = measurementsQuery.isSuccess
 
   const today = todayISO()
   const daysSince = latest ? Math.max(0, daysBetween(latest.recorded_at, today)) : null
@@ -1288,63 +1127,43 @@ function StreakCard({
   onOpen: () => void
 }) {
   const supabase = useSupabase()
-  const [streak, setStreak] = useState<number | null>(null)
-  const [thisWeek, setThisWeek] = useState<number>(0)
-  const [refreshTick, setRefreshTick] = useState(0)
-  useEffect(
-    () => subscribeDataChanged('set_logs', () => setRefreshTick(t => t + 1)),
-    []
-  )
+  // Lifetime-ish aggregate; the save mutation invalidates this key
+  // automatically, so the streak refreshes after every logged set.
+  const streakQuery = useQuery({
+    queryKey: queryKeys.setLogs.streak(clientId),
+    queryFn: async (): Promise<Array<{ logged_date: string }>> => {
+      const { data, error } = await supabase
+        .from('set_logs')
+        .select('logged_date')
+        .eq('completed', true)
+        .order('logged_date', { ascending: false })
+        .limit(60)
+      if (error) throw error
+      return (data ?? []) as Array<{ logged_date: string }>
+    },
+  })
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      // Pull recent logged_dates and count back-to-back streak from today.
-      // The cache key intentionally doesn't include a date — the streak
-      // moves day-to-day but the read is cheap and the value is shared
-      // with the WorkoutHistory progress view.
-      const { data } = await cachedQuery<Array<{ logged_date: string }>>(
-        `streak_logs:${clientId}`,
-        () =>
-          supabase
-            .from('set_logs')
-            .select('logged_date')
-            .eq('completed', true)
-            .order('logged_date', { ascending: false })
-            .limit(60)
-      )
-      if (cancelled) return
-      const dates = new Set((data ?? []).map(r => r.logged_date))
-      // Streak: count consecutive days going back from today, allowing
-      // "today not yet logged" to use yesterday as the anchor (avoids
-      // breaking a streak before the user has had a chance to lift).
-      const today = todayISO()
-      let s = 0
-      let cursor = today
-      if (!dates.has(cursor)) {
-        // Today is not yet logged — try starting from yesterday so the
-        // streak shows what the user achieved through yesterday.
-        cursor = shiftISO(cursor, -1)
-      }
-      while (dates.has(cursor)) {
-        s += 1
-        cursor = shiftISO(cursor, -1)
-      }
-      setStreak(s)
-
-      // This-week count: how many distinct days hit in the last 7 days.
-      const weekDates = new Set<string>()
-      for (let i = 0; i < 7; i++) {
-        const d = shiftISO(today, -i)
-        if (dates.has(d)) weekDates.add(d)
-      }
-      setThisWeek(weekDates.size)
+  const { streak, thisWeek } = useMemo(() => {
+    if (!streakQuery.data) return { streak: null as number | null, thisWeek: 0 }
+    const dates = new Set(streakQuery.data.map(r => r.logged_date))
+    const today = todayISO()
+    let s = 0
+    let cursor = today
+    if (!dates.has(cursor)) {
+      // Today not yet logged — anchor on yesterday so a streak only
+      // breaks once the day actually ends.
+      cursor = shiftISO(cursor, -1)
     }
-    load()
-    return () => {
-      cancelled = true
+    while (dates.has(cursor)) {
+      s += 1
+      cursor = shiftISO(cursor, -1)
     }
-  }, [supabase, clientId, refreshTick])
+    let week = 0
+    for (let i = 0; i < 7; i++) {
+      if (dates.has(shiftISO(today, -i))) week += 1
+    }
+    return { streak: s, thisWeek: week }
+  }, [streakQuery.data])
 
   return (
     <Card onClick={onOpen} accent="purple" icon={Flame} label="Streak">
@@ -1514,70 +1333,40 @@ function CoachSection({
   onNavigate: (tab: TodayNavTarget) => void
 }) {
   const supabase = useSupabase()
-  const [counts, setCounts] = useState<{
-    clients: number
-    workouts: number
-    programs: number
-    mealPlans: number
-  } | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
+  const countsQuery = useQuery({
+    queryKey: ['coach_counts', coachId] as const,
+    queryFn: async () => {
       // Fire all four counts in parallel. `head: true` + `count: 'exact'`
-      // tells PostgREST to return only the count without the rows — cheap.
+      // tells PostgREST to return only the count without the rows.
       const [clientsRes, workoutsRes, programsRes, mealPlansRes] = await Promise.all([
-        cachedQuery<{ count: number }>(
-          `count_clients:${coachId}`,
-          () =>
-            supabase
-              .from('coach_client_relationships')
-              .select('client_id', { count: 'exact', head: true })
-              .eq('coach_id', coachId)
-              .eq('status', 'active')
-              .neq('client_id', coachId)
-              .then(r => ({ data: { count: r.count ?? 0 }, error: r.error })),
-        ),
-        cachedQuery<{ count: number }>(
-          `count_workouts:${coachId}`,
-          () =>
-            supabase
-              .from('workouts')
-              .select('id', { count: 'exact', head: true })
-              .eq('coach_id', coachId)
-              .then(r => ({ data: { count: r.count ?? 0 }, error: r.error })),
-        ),
-        cachedQuery<{ count: number }>(
-          `count_programs:${coachId}`,
-          () =>
-            supabase
-              .from('workout_programs')
-              .select('id', { count: 'exact', head: true })
-              .eq('coach_id', coachId)
-              .then(r => ({ data: { count: r.count ?? 0 }, error: r.error })),
-        ),
-        cachedQuery<{ count: number }>(
-          `count_meal_plans:${coachId}`,
-          () =>
-            supabase
-              .from('meal_plans')
-              .select('id', { count: 'exact', head: true })
-              .eq('coach_id', coachId)
-              .then(r => ({ data: { count: r.count ?? 0 }, error: r.error })),
-        ),
+        supabase
+          .from('coach_client_relationships')
+          .select('client_id', { count: 'exact', head: true })
+          .eq('coach_id', coachId)
+          .eq('status', 'active')
+          .neq('client_id', coachId),
+        supabase
+          .from('workouts')
+          .select('id', { count: 'exact', head: true })
+          .eq('coach_id', coachId),
+        supabase
+          .from('workout_programs')
+          .select('id', { count: 'exact', head: true })
+          .eq('coach_id', coachId),
+        supabase
+          .from('meal_plans')
+          .select('id', { count: 'exact', head: true })
+          .eq('coach_id', coachId),
       ])
-      if (cancelled) return
-      setCounts({
-        clients: clientsRes.data?.count ?? 0,
-        workouts: workoutsRes.data?.count ?? 0,
-        programs: programsRes.data?.count ?? 0,
-        mealPlans: mealPlansRes.data?.count ?? 0,
-      })
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [supabase, coachId])
+      return {
+        clients: clientsRes.count ?? 0,
+        workouts: workoutsRes.count ?? 0,
+        programs: programsRes.count ?? 0,
+        mealPlans: mealPlansRes.count ?? 0,
+      }
+    },
+  })
+  const counts = countsQuery.data ?? null
 
   // Skip the whole section while loading is still null AND there's never
   // been any coaching content. Once there's at least one client or one

@@ -1,21 +1,20 @@
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import { WifiOff } from 'lucide-react'
-import { getQueueCount, subscribeQueue } from '@/lib/write-queue'
+// Offline / sync banner.
+//
+// Two surfacing rules:
+//   • Browser reports `navigator.onLine === false` → show "You're
+//     offline" so the user knows why things look wrong.
+//   • There are in-flight (or paused) mutations — could be writes
+//     waiting on reconnect from TanStack Query's mutation queue, or
+//     just normal saves still mid-roundtrip. We surface the count so
+//     "your last set is saved locally, syncing soon" reads correctly
+//     even after coming back online while the queue drains.
 
-/**
- * Slim banner that appears at the top of the app whenever the browser
- * reports `navigator.onLine === false`. Saves the user from wondering why
- * "things look wrong" when their gym wifi drops — at least they know
- * what's happening. Also surfaces the count of queued writes so the user
- * sees "your last set is saved locally, syncing when you're back".
- *
- * `navigator.onLine` is best-effort: some networks claim "online" while
- * being effectively dead. That's fine here — a false positive just means
- * the banner doesn't show; the failing fetches still raise their own
- * errors. SSR returns `true` so the banner never flashes on first paint.
- */
+import { useSyncExternalStore } from 'react'
+import { WifiOff } from 'lucide-react'
+import { useIsMutating } from '@tanstack/react-query'
+
 function subscribeOnline(cb: () => void) {
   window.addEventListener('online', cb)
   window.addEventListener('offline', cb)
@@ -31,37 +30,18 @@ function getOnline() {
 
 export function OfflineBanner() {
   const online = useSyncExternalStore(subscribeOnline, getOnline, () => true)
-  const [queueCount, setQueueCount] = useState(0)
+  // `useIsMutating` counts pending mutations across the whole client —
+  // includes ones paused offline + ones currently in-flight. Exactly
+  // what we want to show as "still syncing".
+  const pendingMutations = useIsMutating()
 
-  // Track the queued-write count separately from the online state — we
-  // want to surface "syncing X" briefly even after coming back online,
-  // and the count is updated asynchronously after every enqueue / drain.
-  useEffect(() => {
-    let cancelled = false
-    const refresh = () => {
-      getQueueCount().then(n => {
-        if (!cancelled) setQueueCount(n)
-      })
-    }
-    refresh()
-    const unsubscribe = subscribeQueue(refresh)
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
-  }, [])
-
-  // Don't render when everything's healthy. The banner shows whenever the
-  // user is offline OR there are queued writes still draining — the
-  // second case covers the "back online but the drain hasn't finished
-  // yet" window.
-  if (online && queueCount === 0) return null
+  if (online && pendingMutations === 0) return null
 
   const message = !online
-    ? queueCount > 0
-      ? `You're offline. ${queueCount} ${queueCount === 1 ? 'change' : 'changes'} queued to sync when you're back.`
+    ? pendingMutations > 0
+      ? `You're offline. ${pendingMutations} ${pendingMutations === 1 ? 'change' : 'changes'} queued to sync when you're back.`
       : "You're offline. Showing cached content."
-    : `Syncing ${queueCount} ${queueCount === 1 ? 'change' : 'changes'}…`
+    : `Syncing ${pendingMutations} ${pendingMutations === 1 ? 'change' : 'changes'}…`
 
   return (
     <div

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -10,9 +10,11 @@ import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Trash2, TrendingUp, TrendingDown, Minus, Scale, Share2 } from 'lucide-react'
 import { todayISO, formatDate, roundMacro } from '@/lib/utils'
-import { cachedQuery } from '@/lib/cached-query'
-import { notifyDataChanged } from '@/lib/data-bus'
-import type { WeightLog } from '@/lib/types'
+import {
+  useDeleteWeightLog,
+  useLogWeight,
+  useWeightLogs,
+} from '@/lib/hooks/use-weight-logs'
 import { WeightChart } from './WeightChart'
 import { WeightShareDialog } from './WeightShareDialog'
 import type { WeightUnit } from '@/lib/types'
@@ -51,12 +53,16 @@ export default function WeightTracker({
   weightUnit,
   weightGoal,
 }: WeightTrackerProps) {
+  // All weight reads/writes flow through the shared TanStack Query
+  // cache, so this view and Today's WeightCard stay in sync without
+  // re-fetches.
+  const weightQuery = useWeightLogs(userId)
+  const logs = weightQuery.data ?? []
+  const logWeight = useLogWeight(userId)
+  const deleteWeight = useDeleteWeightLog(userId)
   const supabase = useSupabase()
-  const [logs, setLogs] = useState<WeightLog[]>([])
-  const [loading, setLoading] = useState(true)
   const [newDate, setNewDate] = useState(todayISO())
   const [newWeight, setNewWeight] = useState('')
-  const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showShare, setShowShare] = useState(false)
   // Local mirror so the dashed line moves immediately when the user
@@ -65,70 +71,35 @@ export default function WeightTracker({
   const [editingGoal, setEditingGoal] = useState(false)
   const [goalDraft, setGoalDraft] = useState('')
   const [savingGoal, setSavingGoal] = useState(false)
+  const saving = logWeight.isPending
 
-  useEffect(() => {
-    fetchLogs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const fetchLogs = async () => {
-    setLoading(true)
-    const { data } = await cachedQuery<WeightLog[]>(
-      `weight_logs:${userId}:recent30`,
-      () =>
-        supabase
-          .from('weight_logs')
-          .select('*')
-          .eq('user_id', userId)
-          .order('recorded_at', { ascending: false })
-          .limit(30)
-    )
-    setLogs(data || [])
-    setLoading(false)
-  }
-
-  const handleLog = async () => {
+  const handleLog = () => {
     const weight = parseFloat(newWeight)
     if (!newWeight || Number.isNaN(weight) || weight <= 0) {
       showToast('Enter a valid weight', 'error')
       return
     }
-
-    setSaving(true)
-    try {
-      // Upsert: if there's already an entry for this date, overwrite it.
-      const { error } = await supabase
-        .from('weight_logs')
-        .upsert(
-          { user_id: userId, recorded_at: newDate, weight },
-          { onConflict: 'user_id,recorded_at' }
-        )
-      if (error) throw error
-      setNewWeight('')
-      setNewDate(todayISO())
-      await fetchLogs()
-      notifyDataChanged('weight_logs')
-      showToast('Weight logged')
-    } catch {
-      showToast('Failed to log weight', 'error')
-    } finally {
-      setSaving(false)
-    }
+    logWeight.mutate(
+      { recorded_at: newDate, weight },
+      {
+        onSuccess: () => {
+          setNewWeight('')
+          setNewDate(todayISO())
+          showToast('Weight logged')
+        },
+        onError: () => showToast('Failed to log weight', 'error'),
+      }
+    )
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deletingId) return
-    try {
-      const { error } = await supabase.from('weight_logs').delete().eq('id', deletingId)
-      if (error) throw error
-      await fetchLogs()
-      notifyDataChanged('weight_logs')
-      showToast('Weight entry deleted')
-    } catch {
-      showToast('Failed to delete entry', 'error')
-    } finally {
-      setDeletingId(null)
-    }
+    const id = deletingId
+    setDeletingId(null)
+    deleteWeight.mutate(id, {
+      onSuccess: () => showToast('Weight entry deleted'),
+      onError: () => showToast('Failed to delete entry', 'error'),
+    })
   }
 
   const latest = logs[0]
@@ -324,7 +295,7 @@ export default function WeightTracker({
         </div>
 
         {/* Recent history */}
-        {!loading && logs.length > 0 && (
+        {logs.length > 0 && (
           <div className="mt-5 pt-4 border-t border-slate-100">
             <div className="flex items-center justify-between mb-2 gap-2">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">

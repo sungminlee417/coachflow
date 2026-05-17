@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { useSupabase } from '@/lib/use-supabase'
+import { useState, useMemo } from 'react'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -10,8 +9,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Plus, Pencil, Trash2, Ruler, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { formatDate, roundMacro, formatLength } from '@/lib/utils'
-import { cachedQuery } from '@/lib/cached-query'
-import { notifyDataChanged } from '@/lib/data-bus'
+import {
+  useBodyMeasurements,
+  useDeleteBodyMeasurement,
+} from '@/lib/hooks/use-body-measurements'
 import type { BodyMeasurement, LengthUnit } from '@/lib/types'
 import MeasurementForm from './MeasurementForm'
 
@@ -61,51 +62,27 @@ function deltaIndicator(current: number, previous: number) {
   }
 }
 
+const EMPTY_MEASUREMENTS: BodyMeasurement[] = []
+
 export default function MeasurementsTracker({ userId, lengthUnit }: MeasurementsTrackerProps) {
-  const supabase = useSupabase()
-  const [entries, setEntries] = useState<BodyMeasurement[]>([])
-  const [loading, setLoading] = useState(true)
+  // Shared cache: this view, the form modal, and Today's
+  // BodyMeasurementCard all read the same data and patch optimistically.
+  const entriesQuery = useBodyMeasurements(userId)
+  const entries = entriesQuery.data ?? EMPTY_MEASUREMENTS
+  const loading = entriesQuery.isLoading && !entriesQuery.isSuccess
+  const deleteMeasurement = useDeleteBodyMeasurement(userId)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<BodyMeasurement | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchEntries()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const fetchEntries = async () => {
-    setLoading(true)
-    const { data } = await cachedQuery<BodyMeasurement[]>(
-      `body_measurements:${userId}`,
-      () =>
-        supabase
-          .from('body_measurements')
-          .select('*')
-          .eq('user_id', userId)
-          .order('recorded_at', { ascending: false })
-          .order('created_at', { ascending: false })
-    )
-    setEntries(data ?? [])
-    setLoading(false)
-  }
-
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deletingId) return
-    try {
-      const { error } = await supabase
-        .from('body_measurements')
-        .delete()
-        .eq('id', deletingId)
-      if (error) throw error
-      await fetchEntries()
-      notifyDataChanged('body_measurements')
-      showToast('Measurement deleted')
-    } catch {
-      showToast('Failed to delete measurement', 'error')
-    } finally {
-      setDeletingId(null)
-    }
+    const id = deletingId
+    setDeletingId(null)
+    deleteMeasurement.mutate(id, {
+      onSuccess: () => showToast('Measurement deleted'),
+      onError: () => showToast('Failed to delete measurement', 'error'),
+    })
   }
 
   // Pre-compute the history row metadata once per entry change. The previous
@@ -167,7 +144,6 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
         onClose={() => {
           setShowForm(false)
           setEditing(null)
-          fetchEntries()
         }}
       />
 

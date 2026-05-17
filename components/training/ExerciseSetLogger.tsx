@@ -6,9 +6,13 @@ import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
-import { queuedUpsert } from '@/lib/write-queue'
-import { notifyDataChanged } from '@/lib/data-bus'
-import { cachedQuery, cachedFetch } from '@/lib/cached-query'
+import { useQuery } from '@tanstack/react-query'
+import {
+  useExerciseSetLogs,
+  useSaveSetLog,
+  type SetLogRow,
+} from '@/lib/hooks/use-set-logs'
+import { queryKeys } from '@/lib/query-keys'
 import { getCardioFields, type CardioSubtype } from '@/lib/cardio'
 import { useRestTimer } from '@/components/ui/RestTimer'
 import {
@@ -21,7 +25,15 @@ import {
 } from '@/lib/training'
 import type { Exercise } from '@/lib/types'
 
+// Stable empty fallback so the merge effect's `[persistedRows]` dep
+// doesn't change identity on each render before the query resolves.
+const EMPTY_SET_LOGS: Map<number, SetLogRow> = new Map()
+
 interface ExerciseSetLoggerProps {
+  /** Trainee whose set logs we're reading/writing — used by the save
+   *  mutation to invalidate the day-summary cache the Today dashboard
+   *  reads. */
+  clientId: string
   assignmentId: string
   exercise: Exercise
   /** Date the user is logging against — drives both the upsert and the
@@ -172,6 +184,7 @@ function PostSetHint({
 }
 
 export function ExerciseSetLogger({
+  clientId,
   assignmentId,
   exercise,
   loggedDate,
@@ -180,103 +193,88 @@ export function ExerciseSetLogger({
   const supabase = useSupabase()
   const restTimer = useRestTimer()
   const [rows, setRows] = useState<RowState[]>(() => buildInitialRows(exercise))
-  const [loaded, setLoaded] = useState(false)
-  const [priorBySet, setPriorBySet] = useState<Map<number, PriorPerformance>>(new Map())
   // Set numbers the user manually re-expanded after auto-collapse fired. Reset
   // on every load and per-toggle so a fresh "complete" always auto-collapses.
   const [manuallyExpanded, setManuallyExpanded] = useState<Set<number>>(new Set())
   const isCardio = exercise.exercise_type === 'cardio'
+  // Persisted rows for this scope come from the TanStack Query cache —
+  // the Today mini-logger and the SupersetLogger patch the same key, so
+  // changes flow back here without a re-fetch.
+  const setLogsQuery = useExerciseSetLogs(
+    assignmentId,
+    exercise.id ?? '',
+    loggedDate,
+    { enabled: !!exercise.id }
+  )
+  const persistedRows = setLogsQuery.data ?? EMPTY_SET_LOGS
+  const loaded = setLogsQuery.isSuccess
+  const saveSetLog = useSaveSetLog()
 
+  // Prior-performance ghost hint. Fetched via TanStack so it benefits
+  // from the same cache + offline fallback as everything else; the
+  // variant string is part of the key so swaps get their own cached
+  // priors.
+  const priorQuery = useQuery({
+    queryKey: queryKeys.priorPerformance.forExercise(
+      assignmentId,
+      exercise.id ?? '',
+      loggedDate,
+      currentVariant
+    ),
+    enabled: !!exercise.id,
+    queryFn: () =>
+      fetchPriorPerformance(
+        supabase,
+        assignmentId,
+        exercise.id!,
+        loggedDate,
+        currentVariant
+      ),
+  })
+  const priorBySet = priorQuery.data ?? new Map<number, PriorPerformance>()
+
+  // Reset draft inputs when the scope changes. This is the legitimate
+  // "mirror server-derived state into a mutable draft" pattern — the
+  // local state owns mid-edit input strings which can't live in the
+  // query cache. The React-19 lint rule's general advice doesn't apply.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    let cancelled = false
     setRows(buildInitialRows(exercise))
-    setLoaded(false)
-    setPriorBySet(new Map())
     setManuallyExpanded(new Set())
+  }, [assignmentId, exercise, loggedDate, currentVariant])
 
-    const load = async () => {
-      // Today's logs (the values to populate the inputs) and prior performance
-      // (the ghost hint) can fly in parallel — they don't depend on each other.
-      // Both fetches go through the offline cache layer so a previously-
-      // visited day's set values + "Last: 135 × 6" hint reload when offline.
-      const [todayResult, priorResult] = await Promise.all([
-        cachedQuery<
-          Array<{
-            set_number: number
-            reps_performed: number | null
-            weight_performed: number | null
-            duration_performed_seconds: number | null
-            speed_performed: number | null
-            incline_performed: number | null
-            resistance_performed: number | null
-            completed: boolean
-          }>
-        >(
-          `set_logs:${assignmentId}:${exercise.id ?? ''}:${loggedDate}`,
-          () =>
-            supabase
-              .from('set_logs')
-              .select(
-                'set_number, reps_performed, weight_performed, duration_performed_seconds, speed_performed, incline_performed, resistance_performed, completed'
-              )
-              .eq('assignment_id', assignmentId)
-              .eq('exercise_id', exercise.id ?? '')
-              .eq('logged_date', loggedDate)
-        ),
-        exercise.id
-          ? cachedFetch<Map<number, PriorPerformance>>(
-              `prior:${assignmentId}:${exercise.id}:${loggedDate}:${currentVariant ?? ''}`,
-              () =>
-                fetchPriorPerformance(
-                  supabase,
-                  assignmentId,
-                  exercise.id!,
-                  loggedDate,
-                  currentVariant
-                )
-            )
-          : Promise.resolve({
-              data: new Map<number, PriorPerformance>(),
-              error: null,
-              fromCache: false,
-            }),
-      ])
-
-      if (cancelled) return
-
-      const prior: Map<number, PriorPerformance> =
-        priorResult.data ?? new Map<number, PriorPerformance>()
-      const logBySet = new Map(
-        (todayResult.data ?? []).map(l => [l.set_number, l])
-      )
-
-      setRows(prev =>
-        prev.map(r => {
-          const log = logBySet.get(r.set_number)
-          if (!log) return r
-          const performedSeconds = log.duration_performed_seconds ?? null
-          return {
-            ...r,
-            reps_performed: log.reps_performed != null ? String(log.reps_performed) : '',
-            weight_performed: log.weight_performed != null ? String(log.weight_performed) : '',
-            duration_input: performedSeconds != null ? formatDuration(performedSeconds) : '',
-            duration_performed_seconds: performedSeconds,
-            speed_performed: log.speed_performed != null ? String(log.speed_performed) : '',
-            incline_performed: log.incline_performed != null ? String(log.incline_performed) : '',
-            resistance_performed: log.resistance_performed != null ? String(log.resistance_performed) : '',
-            completed: !!log.completed,
-          }
-        })
-      )
-      setPriorBySet(prior)
-      setLoaded(true)
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignmentId, exercise.id, loggedDate, currentVariant])
+  // Merge the query's persisted rows into local `rows` state whenever
+  // they change. Local state still owns the in-flight input strings so
+  // the user's keystrokes between persists aren't lost — we only stamp
+  // a row from the cache when there's an actual persisted row for it.
+  useEffect(() => {
+    setRows(prev =>
+      prev.map(r => {
+        const log = persistedRows.get(r.set_number)
+        if (!log) return r
+        const performedSeconds = log.duration_performed_seconds ?? null
+        return {
+          ...r,
+          reps_performed: log.reps_performed != null ? String(log.reps_performed) : '',
+          weight_performed:
+            log.weight_performed != null ? String(log.weight_performed) : '',
+          duration_input:
+            performedSeconds != null ? formatDuration(performedSeconds) : '',
+          duration_performed_seconds: performedSeconds,
+          speed_performed:
+            log.speed_performed != null ? String(log.speed_performed) : '',
+          incline_performed:
+            log.incline_performed != null ? String(log.incline_performed) : '',
+          resistance_performed:
+            log.resistance_performed != null
+              ? String(log.resistance_performed)
+              : '',
+          completed: !!log.completed,
+        }
+      })
+    )
+  }, [persistedRows])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const updateRow = (setNumber: number, patch: Partial<RowState>) => {
     setRows(prev => prev.map(r => (r.set_number === setNumber ? { ...r, ...patch } : r)))
@@ -291,26 +289,32 @@ export function ExerciseSetLogger({
     const incline = row.incline_performed === '' ? null : parseFloat(row.incline_performed)
     const resistance =
       row.resistance_performed === '' ? null : parseFloat(row.resistance_performed)
-    const { error } = await queuedUpsert(
-      supabase,
-      'set_logs',
-      {
-        assignment_id: assignmentId,
-        exercise_id: exercise.id,
-        set_number: row.set_number,
-        logged_date: loggedDate,
-        reps_performed: Number.isNaN(reps as number) ? null : reps,
-        weight_performed: Number.isNaN(weight as number) ? null : weight,
-        duration_performed_seconds: row.duration_performed_seconds,
-        speed_performed: Number.isNaN(speed as number) ? null : speed,
-        incline_performed: Number.isNaN(incline as number) ? null : incline,
-        resistance_performed: Number.isNaN(resistance as number) ? null : resistance,
-        completed: row.completed,
-      },
-      { onConflict: 'assignment_id,exercise_id,set_number,logged_date' }
-    )
-    if (error) showToast('Failed to save set', 'error')
-    else notifyDataChanged('set_logs')
+    const persisted: SetLogRow = {
+      set_number: row.set_number,
+      reps_performed: Number.isNaN(reps as number) ? null : reps,
+      weight_performed: Number.isNaN(weight as number) ? null : weight,
+      duration_performed_seconds: row.duration_performed_seconds,
+      speed_performed: Number.isNaN(speed as number) ? null : speed,
+      incline_performed: Number.isNaN(incline as number) ? null : incline,
+      resistance_performed: Number.isNaN(resistance as number) ? null : resistance,
+      completed: row.completed,
+    }
+    // The mutation's onMutate patches both the per-exercise query (which
+    // this view reads) AND the Today day-summary in one shot, with
+    // automatic rollback on real error. Network errors keep the
+    // mutation in TanStack's cache and resume when the persister
+    // rehydrates on next mount.
+    try {
+      await saveSetLog.mutateAsync({
+        assignmentId,
+        exerciseId: exercise.id,
+        date: loggedDate,
+        clientId,
+        row: persisted,
+      })
+    } catch {
+      showToast('Failed to save set', 'error')
+    }
     updateRow(row.set_number, { saving: false })
   }
 

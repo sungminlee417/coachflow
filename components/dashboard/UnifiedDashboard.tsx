@@ -7,9 +7,8 @@ import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Ute
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { RestTimerProvider } from '@/components/ui/RestTimer'
-import { WriteQueueDrainer } from '@/components/ui/WriteQueueDrainer'
 import { AuthGuard } from '@/components/ui/AuthGuard'
-import { clearCache } from '@/lib/offline-cache'
+import { clearPersistedQueryCache } from '@/lib/query-client'
 import ClientList from '@/components/coaching/ClientList'
 import WorkoutLibrary from '@/components/coaching/WorkoutLibrary'
 import ProgramLibrary from '@/components/coaching/ProgramLibrary'
@@ -152,7 +151,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
     // weight / workout / measurement snapshots. The SW's HTML cache also
     // pins the prior dashboard render — message it to flush so the next
     // sign-in doesn't briefly flash the old account's bundled HTML.
-    await clearCache()
+    await clearPersistedQueryCache()
     if (
       typeof navigator !== 'undefined' &&
       navigator.serviceWorker?.controller
@@ -190,7 +189,6 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
 
   return (
     <RestTimerProvider>
-    <WriteQueueDrainer />
     <AuthGuard />
     <div className="min-h-screen bg-slate-50">
       <div className="flex">

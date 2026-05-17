@@ -1,64 +1,43 @@
 'use client'
 
 import { Check } from 'lucide-react'
-import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
-import { queuedUpsert } from '@/lib/write-queue'
-import { notifyDataChanged } from '@/lib/data-bus'
+import { useMealLogs, useToggleMealLog } from '@/lib/hooks/use-meal-logs'
 
 interface MealLogToggleProps {
   assignmentId: string
   mealId: string
   userId: string
   loggedDate: string
-  completed: boolean
-  loaded: boolean
-  // Parent owns the optimistic value so the whole-day summary updates instantly.
-  onToggled: (next: boolean) => void
 }
 
 /**
- * Per-meal "I ate this" toggle. Mirrors the strength logger's done-button:
- * upsert on (assignment_id, meal_id, user_id, logged_date) with a `completed`
- * flag that flips on click. Optimistic; reverts on error.
+ * Per-meal "I ate this" toggle. Reads the eaten set from the TanStack
+ * Query cache and toggles via a mutation with optimistic update +
+ * rollback. The mutation's stable `mutationKey` means a write
+ * interrupted by a page reload resumes on next mount.
  */
 export function MealLogToggle({
   assignmentId,
   mealId,
   userId,
   loggedDate,
-  completed,
-  loaded,
-  onToggled,
 }: MealLogToggleProps) {
-  const supabase = useSupabase()
+  const eaten = useMealLogs({ clientId: userId, date: loggedDate })
+  const toggle = useToggleMealLog({ clientId: userId, date: loggedDate })
 
-  if (!loaded) {
+  if (!eaten.isSuccess && eaten.isLoading) {
     return <div className="h-7 w-7 bg-slate-200/70 rounded-md animate-pulse" />
   }
+  const completed = eaten.data?.has(mealId) ?? false
 
-  const handleClick = async () => {
-    const next = !completed
-    onToggled(next)
-    const { error } = await queuedUpsert(
-      supabase,
-      'meal_logs',
+  const handleClick = () => {
+    toggle.mutate(
+      { assignmentId, mealId, completed: !completed },
       {
-        assignment_id: assignmentId,
-        meal_id: mealId,
-        user_id: userId,
-        logged_date: loggedDate,
-        completed: next,
-      },
-      { onConflict: 'meal_id,user_id,logged_date' }
+        onError: () => showToast('Failed to update meal', 'error'),
+      }
     )
-    if (error) {
-      // Real error (not "we queued it"). Roll back the optimistic flip.
-      onToggled(!next)
-      showToast('Failed to update meal', 'error')
-    } else {
-      notifyDataChanged('meal_logs')
-    }
   }
 
   return (

@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSupabase } from '@/lib/use-supabase'
-import { notifyDataChanged } from '@/lib/data-bus'
+import { useSaveBodyMeasurement } from '@/lib/hooks/use-body-measurements'
 import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -75,18 +74,22 @@ export default function MeasurementForm({
   lengthUnit,
   onClose,
 }: MeasurementFormProps) {
-  const supabase = useSupabase()
   const [data, setData] = useState<BodyMeasurement>(initial ?? emptyMeasurement())
-  const [saving, setSaving] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const saveMutation = useSaveBodyMeasurement(userId)
+  const saving = saveMutation.isPending
   // Reset form state every time the modal is opened so editing pre-fills with
-  // the right entry (and "Log entry" starts empty).
+  // the right entry (and "Log entry" starts empty). Local-state mirror of
+  // props — the React-19 lint rule's general "avoid setState in effect"
+  // advice doesn't apply here because the modal owns mid-edit drafts.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       setData(initial ?? emptyMeasurement())
       setConfirmDiscard(false)
     }
   }, [open, initial])
+  /* eslint-enable react-hooks/set-state-in-effect */
   // Tie dirty-state ready flag to `open` so the snapshot resets per opening.
   const isDirty = useDirtyState(data, open)
 
@@ -100,31 +103,18 @@ export default function MeasurementForm({
     setData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const payload = { ...data, user_id: userId }
-      delete payload.id
-
-      if (initial?.id) {
-        const { error } = await supabase
-          .from('body_measurements')
-          .update(payload)
-          .eq('id', initial.id)
-        if (error) throw error
-        showToast('Measurement updated')
-      } else {
-        const { error } = await supabase.from('body_measurements').insert(payload)
-        if (error) throw error
-        showToast('Measurement logged')
+  const handleSave = () => {
+    saveMutation.mutate(
+      // Keep `initial.id` when editing; the hook treats absent id as insert.
+      { ...data, id: initial?.id ?? undefined, user_id: userId },
+      {
+        onSuccess: () => {
+          showToast(initial?.id ? 'Measurement updated' : 'Measurement logged')
+          onClose()
+        },
+        onError: () => showToast('Failed to save measurement', 'error'),
       }
-      notifyDataChanged('body_measurements')
-      onClose()
-    } catch {
-      showToast('Failed to save measurement', 'error')
-    } finally {
-      setSaving(false)
-    }
+    )
   }
 
   return (

@@ -4,6 +4,7 @@ import './globals.css'
 import ToastContainer from '@/components/ui/Toast'
 import { ServiceWorkerRegister } from '@/components/ui/ServiceWorkerRegister'
 import { OfflineBanner } from '@/components/ui/OfflineBanner'
+import { QueryProviders } from '@/lib/query-client'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -42,10 +43,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.className} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <OfflineBanner />
-        {children}
-        <ToastContainer />
-        <ServiceWorkerRegister />
+        <QueryProviders>
+          <OfflineBanner />
+          {children}
+          <ToastContainer />
+          <ServiceWorkerRegister />
+        </QueryProviders>
       </body>
     </html>
   )

@@ -19,23 +19,32 @@ import {
   mealDisplayName,
   numberMealsForDay,
 } from '@/lib/utils'
-import { fetchActiveMealPlanAssignments } from '@/lib/queries'
-import { cachedFetch, cachedQuery } from '@/lib/cached-query'
+import { useQueryClient } from '@tanstack/react-query'
+import { useMealLogs } from '@/lib/hooks/use-meal-logs'
+import { useMealPlanAssignments } from '@/lib/hooks/use-assignments'
+import { queryKeys } from '@/lib/query-keys'
 import type { MealPlanAssignment } from '@/lib/types'
 
 interface ClientMealPlanViewProps {
   clientId: string
 }
 
+const EMPTY_EATEN: Set<string> = new Set()
+const EMPTY_MP_ASSIGNMENTS: MealPlanAssignment[] = []
+
 export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps) {
   const supabase = useSupabase()
-  const [assignments, setAssignments] = useState<MealPlanAssignment[]>([])
+  const qc = useQueryClient()
   const [selectedDate, setSelectedDate] = useState(todayISO())
-  const [loading, setLoading] = useState(true)
-  // Set of meal_ids eaten on the selectedDate. Source of truth for the
-  // per-meal toggle's checked state and the daily progress chip.
-  const [eatenMealIds, setEatenMealIds] = useState<Set<string>>(new Set())
-  const [logsLoaded, setLogsLoaded] = useState(false)
+  const assignmentsQuery = useMealPlanAssignments(clientId, selectedDate)
+  const assignments = assignmentsQuery.data ?? EMPTY_MP_ASSIGNMENTS
+  const loading = assignmentsQuery.isLoading && !assignmentsQuery.isSuccess
+  // Eaten state comes from TanStack Query — the same cache the Today
+  // MealsCard and per-row MealLogToggle read from, with optimistic
+  // updates flowing across all subscribers without a re-fetch.
+  const mealLogs = useMealLogs({ clientId, date: selectedDate })
+  const eatenMealIds = mealLogs.data ?? EMPTY_EATEN
+  const logsLoaded = mealLogs.isSuccess
   // Per-session dismissal of the missed-meal banner so the user can hide it
   // without it nagging them again on the same day.
   const [missedBannerDismissed, setMissedBannerDismissed] = useState(false)
@@ -68,18 +77,10 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
     }
   }
 
-  const fetchAssignments = async () => {
-    setLoading(true)
-    const { data } = await cachedFetch(
-      `meal_plan_assignments:${clientId}:${selectedDate}`,
-      () => fetchActiveMealPlanAssignments(supabase, clientId, selectedDate)
-    )
-    setAssignments(data ?? [])
-    setLoading(false)
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchAssignments() }, [selectedDate])
+  const fetchAssignments = () =>
+    qc.invalidateQueries({
+      queryKey: queryKeys.mealPlanAssignments.forDay(clientId, selectedDate),
+    })
 
   // Reset the banner-dismiss state whenever the user navigates to a new date —
   // a fresh day deserves a fresh nudge.
@@ -126,48 +127,6 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps -- MISSED_GRACE_MS is a constant
   }, [selectedDate, assignments, eatenMealIds, minuteTick])
-
-  // Load meal_logs for the selected date so the toggle reflects what the user
-  // already checked off. Independent of fetchAssignments — runs in parallel.
-  // Routed through cachedQuery so a previously-visited day shows the right
-  // "eaten" state offline.
-  useEffect(() => {
-    let cancelled = false
-    setLogsLoaded(false)
-    setEatenMealIds(new Set())
-    ;(async () => {
-      const { data } = await cachedQuery<
-        Array<{ meal_id: string; completed: boolean }>
-      >(
-        `meal_logs:${clientId}:${selectedDate}`,
-        () =>
-          supabase
-            .from('meal_logs')
-            .select('meal_id, completed')
-            .eq('user_id', clientId)
-            .eq('logged_date', selectedDate)
-      )
-      if (cancelled) return
-      const eaten = new Set<string>()
-      ;(data ?? []).forEach(row => {
-        if (row.completed) eaten.add(row.meal_id)
-      })
-      setEatenMealIds(eaten)
-      setLogsLoaded(true)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [clientId, selectedDate, supabase])
-
-  const setMealEaten = (mealId: string, eaten: boolean) => {
-    setEatenMealIds(prev => {
-      const next = new Set(prev)
-      if (eaten) next.add(mealId)
-      else next.delete(mealId)
-      return next
-    })
-  }
 
   // Per-day aggregates. Memoized so a re-render from an unrelated state
   // change (modal open, missed-banner dismissed) doesn't recompute over
@@ -365,9 +324,6 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                                 mealId={meal.id}
                                 userId={clientId}
                                 loggedDate={selectedDate}
-                                completed={eaten}
-                                loaded={logsLoaded}
-                                onToggled={next => setMealEaten(meal.id!, next)}
                               />
                             )}
                           </div>

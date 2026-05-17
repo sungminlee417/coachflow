@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
 import { WeekSelector } from '@/components/ui/WeekSelector'
 import { IconButton } from '@/components/ui/IconButton'
@@ -9,8 +10,8 @@ import { showToast } from '@/components/ui/Toast'
 import { ChevronDown, ChevronRight, HeartPulse, Trash2 } from 'lucide-react'
 import { AssignmentCardSkeleton } from '@/components/ui/Skeleton'
 import { formatDuration, todayISO, formatLongDate } from '@/lib/utils'
-import { fetchActiveWorkoutAssignments } from '@/lib/queries'
-import { cachedFetch } from '@/lib/cached-query'
+import { useWorkoutAssignments } from '@/lib/hooks/use-assignments'
+import { queryKeys } from '@/lib/query-keys'
 import type { Exercise, WorkoutAssignment } from '@/lib/types'
 import { ExerciseSetLogger } from './ExerciseSetLogger'
 import { SubstitutionPicker } from './SubstitutionPicker'
@@ -75,11 +76,15 @@ function formatEstimate(seconds: number): string {
   return m === 0 ? `~${h}h` : `~${h}h ${m}m`
 }
 
+const EMPTY_ASSIGNMENTS: WorkoutAssignment[] = []
+
 export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) {
   const supabase = useSupabase()
-  const [assignments, setAssignments] = useState<WorkoutAssignment[]>([])
+  const qc = useQueryClient()
   const [selectedDate, setSelectedDate] = useState(todayISO())
-  const [loading, setLoading] = useState(true)
+  const assignmentsQuery = useWorkoutAssignments(clientId, selectedDate)
+  const assignments = assignmentsQuery.data ?? EMPTY_ASSIGNMENTS
+  const loading = assignmentsQuery.isLoading && !assignmentsQuery.isSuccess
   const [expanded, setExpanded] = useState<string | null>(null)
   const [pendingUnassign, setPendingUnassign] = useState<{ id: string; name: string } | null>(null)
   // Per-exercise/per-superset collapse state. Keyed by `${assignment.id}::solo::${exId}`
@@ -139,18 +144,10 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
     }
   }
 
-  const fetchAssignments = async () => {
-    setLoading(true)
-    const { data } = await cachedFetch<WorkoutAssignment[]>(
-      `workout_assignments:${clientId}:${selectedDate}`,
-      () => fetchActiveWorkoutAssignments(supabase, clientId, selectedDate)
-    )
-    setAssignments(data ?? [])
-    setLoading(false)
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchAssignments() }, [selectedDate])
+  const fetchAssignments = () =>
+    qc.invalidateQueries({
+      queryKey: queryKeys.workoutAssignments.forDay(clientId, selectedDate),
+    })
 
   // Reseed the substitution overrides whenever the assignments refresh — this
   // includes the per-day swap pulled by queries.ts so the chips reflect the
@@ -448,6 +445,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   </p>
                                 )}
                                 <ExerciseSetLogger
+                                  clientId={clientId}
                                   assignmentId={assignment.id}
                                   exercise={exercise}
                                   loggedDate={selectedDate}
@@ -569,6 +567,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                 })}
                               </div>
                               <SupersetLogger
+                                clientId={clientId}
                                 assignmentId={assignment.id}
                                 exercises={group.exercises}
                                 loggedDate={selectedDate}

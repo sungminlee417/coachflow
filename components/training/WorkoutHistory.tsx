@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Trophy, Flame, TrendingUp, Activity, HeartPulse } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { formatDate, formatDuration, shiftDateISO, todayISO } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { queryKeys } from '@/lib/query-keys'
 import { StatRowSkeleton, SummaryTilesSkeleton } from '@/components/ui/Skeleton'
 
 interface WorkoutHistoryProps {
@@ -46,30 +48,16 @@ const unwrap = <T,>(v: T | T[] | null | undefined): T | null => {
   return (v ?? null) as T | null
 }
 
+const EMPTY_STATS: ExerciseStats[] = []
+const EMPTY_LOGGED_DATES: Set<string> = new Set()
+
 export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
   const supabase = useSupabase()
-  const [stats, setStats] = useState<ExerciseStats[]>([])
-  const [totals, setTotals] = useState({
-    sessionDays: 0,
-    weekDays: 0,
-    monthDays: 0,
-    totalSets: 0,
-  })
-  // Distinct days the trainee logged at least one set on. Drives the
-  // calendar heatmap below the summary tiles.
-  const [loggedDates, setLoggedDates] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchHistory()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const fetchHistory = async () => {
-    try {
-      // Pull every set log this trainee has ever recorded, joined to its
-      // exercise for the name + type. PostgREST nests joins, so the row's
-      // `exercise` field is either an object or a single-element array.
+  // Lifetime stats query — the save mutation invalidates this key,
+  // so PRs and heatmap stay in sync without a manual refetch.
+  const historyQuery = useQuery({
+    queryKey: queryKeys.setLogs.lifetime(clientId),
+    queryFn: async (): Promise<SetLogRow[]> => {
       const { data, error } = await supabase
         .from('set_logs')
         .select(`
@@ -79,96 +67,106 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
         `)
         .eq('assignment.client_id', clientId)
       if (error) throw error
+      return (data ?? []) as SetLogRow[]
+    },
+  })
+  const loading = historyQuery.isLoading && !historyQuery.isSuccess
 
-      const byExercise = new Map<string, ExerciseStats>()
-      const sessionDays = new Set<string>()
-      let totalSets = 0
+  // `Date.now()` is impure; lift it out of the memo body so the React-19
+  // purity lint rule doesn't trip and so the memo keys off a stable
+  // anchor for the day. Re-anchored when the underlying data changes.
+  const todayAnchor = useMemo(
+    () => new Date(todayISO() + 'T00:00:00').getTime(),
+    []
+  )
 
-      for (const row of (data ?? []) as SetLogRow[]) {
-        const ex = unwrap(row.exercise)
-        if (!ex?.name) continue
-        const key = ex.name.toLowerCase()
-        const isCardio = ex.exercise_type === 'cardio'
-        sessionDays.add(row.logged_date)
-        totalSets += 1
-
-        const reps = row.reps_performed ?? 0
-        const weight = row.weight_performed ?? 0
-        const duration = row.duration_performed_seconds ?? 0
-
-        const existing =
-          byExercise.get(key) ??
-          ({
-            key,
-            name: ex.name,
-            type: isCardio ? 'cardio' : 'strength',
-            totalSets: 0,
-            totalReps: 0,
-            totalVolume: 0,
-            bestWeight: null,
-            bestWeightReps: null,
-            bestWeightDate: null,
-            longestDurationSeconds: null,
-            longestDurationDate: null,
-            lastLoggedDate: row.logged_date,
-          } as ExerciseStats)
-
-        existing.totalSets += 1
-        if (!isCardio) {
-          existing.totalReps += reps
-          existing.totalVolume += weight * reps
-          if (weight > 0 && (existing.bestWeight == null || weight > existing.bestWeight)) {
-            existing.bestWeight = weight
-            existing.bestWeightReps = reps || null
-            existing.bestWeightDate = row.logged_date
-          }
-        } else {
-          if (
-            duration > 0 &&
-            (existing.longestDurationSeconds == null ||
-              duration > existing.longestDurationSeconds)
-          ) {
-            existing.longestDurationSeconds = duration
-            existing.longestDurationDate = row.logged_date
-          }
-        }
-        if (row.logged_date.localeCompare(existing.lastLoggedDate) > 0) {
-          existing.lastLoggedDate = row.logged_date
-          // Pick up the most recent capitalization variant if it's been edited.
-          existing.name = ex.name
-        }
-        byExercise.set(key, existing)
+  const { stats, totals, loggedDates } = useMemo(() => {
+    if (!historyQuery.data) {
+      return {
+        stats: EMPTY_STATS,
+        totals: { sessionDays: 0, weekDays: 0, monthDays: 0, totalSets: 0 },
+        loggedDates: EMPTY_LOGGED_DATES,
       }
+    }
+    const byExercise = new Map<string, ExerciseStats>()
+    const sessionDays = new Set<string>()
+    let totalSets = 0
 
-      const list = Array.from(byExercise.values())
-      // Most recent activity first — matches what people scan for.
-      list.sort((a, b) => b.lastLoggedDate.localeCompare(a.lastLoggedDate))
+    for (const row of historyQuery.data) {
+      const ex = unwrap(row.exercise)
+      if (!ex?.name) continue
+      const key = ex.name.toLowerCase()
+      const isCardio = ex.exercise_type === 'cardio'
+      sessionDays.add(row.logged_date)
+      totalSets += 1
 
-      const today = new Date()
-      const todayMs = today.getTime()
-      const weekDays = new Set<string>()
-      const monthDays = new Set<string>()
-      for (const d of sessionDays) {
-        const t = new Date(`${d}T00:00:00`).getTime()
-        const diff = todayMs - t
-        if (diff <= 7 * 86400_000) weekDays.add(d)
-        if (diff <= 30 * 86400_000) monthDays.add(d)
+      const reps = row.reps_performed ?? 0
+      const weight = row.weight_performed ?? 0
+      const duration = row.duration_performed_seconds ?? 0
+
+      const existing =
+        byExercise.get(key) ??
+        ({
+          key,
+          name: ex.name,
+          type: isCardio ? 'cardio' : 'strength',
+          totalSets: 0,
+          totalReps: 0,
+          totalVolume: 0,
+          bestWeight: null,
+          bestWeightReps: null,
+          bestWeightDate: null,
+          longestDurationSeconds: null,
+          longestDurationDate: null,
+          lastLoggedDate: row.logged_date,
+        } as ExerciseStats)
+
+      existing.totalSets += 1
+      if (!isCardio) {
+        existing.totalReps += reps
+        existing.totalVolume += weight * reps
+        if (weight > 0 && (existing.bestWeight == null || weight > existing.bestWeight)) {
+          existing.bestWeight = weight
+          existing.bestWeightReps = reps || null
+          existing.bestWeightDate = row.logged_date
+        }
+      } else if (
+        duration > 0 &&
+        (existing.longestDurationSeconds == null ||
+          duration > existing.longestDurationSeconds)
+      ) {
+        existing.longestDurationSeconds = duration
+        existing.longestDurationDate = row.logged_date
       }
+      if (row.logged_date.localeCompare(existing.lastLoggedDate) > 0) {
+        existing.lastLoggedDate = row.logged_date
+        existing.name = ex.name
+      }
+      byExercise.set(key, existing)
+    }
 
-      setStats(list)
-      setTotals({
+    const list = Array.from(byExercise.values())
+    list.sort((a, b) => b.lastLoggedDate.localeCompare(a.lastLoggedDate))
+
+    const weekDays = new Set<string>()
+    const monthDays = new Set<string>()
+    for (const d of sessionDays) {
+      const t = new Date(`${d}T00:00:00`).getTime()
+      const diff = todayAnchor - t
+      if (diff <= 7 * 86400_000) weekDays.add(d)
+      if (diff <= 30 * 86400_000) monthDays.add(d)
+    }
+    return {
+      stats: list,
+      totals: {
         sessionDays: sessionDays.size,
         weekDays: weekDays.size,
         monthDays: monthDays.size,
         totalSets,
-      })
-      setLoggedDates(sessionDays)
-    } catch {
-      // Silent — empty state handles it.
-    } finally {
-      setLoading(false)
+      },
+      loggedDates: sessionDays,
     }
-  }
+  }, [historyQuery.data, todayAnchor])
 
   if (loading) {
     return (
