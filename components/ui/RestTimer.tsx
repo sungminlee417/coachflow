@@ -12,6 +12,7 @@ import {
 } from 'react'
 import { Timer, X, Plus } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
+import { useProfile } from '@/lib/hooks/use-profile'
 
 interface RestTimerState {
   // Wall-clock time the timer should fire at (ms since epoch). Using an
@@ -90,12 +91,26 @@ function vibrate(pattern: number | number[]) {
   }
 }
 
-export function RestTimerProvider({ children }: { children: ReactNode }) {
+export function RestTimerProvider({
+  children,
+  userId,
+}: {
+  children: ReactNode
+  /** Trainee whose preference flag gates whether the timer can fire.
+   *  Optional so non-app surfaces (e.g. tests) can render the provider
+   *  without a profile fetch — falls back to "enabled". */
+  userId?: string
+}) {
   const [state, setState] = useState<RestTimerState | null>(null)
   // Drives the visible countdown — re-renders every ~250ms while a timer is active.
   const [now, setNow] = useState(() => Date.now())
   // We only fire the "done" sound/haptic once per timer instance.
   const firedFor = useRef<number | null>(null)
+  // Read the user's preference once; missing/loading profile defaults to
+  // enabled so a brief fetch delay never accidentally suppresses a timer.
+  // The hook is no-op when `userId` is falsy.
+  const profileQuery = useProfile(userId ?? '')
+  const restTimerEnabled = profileQuery.data?.rest_timer_enabled !== false
 
   // Tick loop: only run while a timer is active.
   useEffect(() => {
@@ -120,15 +135,21 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(dismiss)
   }, [now, state])
 
-  const start = useCallback((seconds: number, label: string | null = null) => {
-    if (!seconds || seconds <= 0) return
-    firedFor.current = null
-    setState({
-      deadline: Date.now() + seconds * 1000,
-      totalSeconds: seconds,
-      label,
-    })
-  }, [])
+  const start = useCallback(
+    (seconds: number, label: string | null = null) => {
+      if (!seconds || seconds <= 0) return
+      // Respect the per-user preference — when off, every `start` is a
+      // no-op so callers don't have to thread the check at each callsite.
+      if (!restTimerEnabled) return
+      firedFor.current = null
+      setState({
+        deadline: Date.now() + seconds * 1000,
+        totalSeconds: seconds,
+        label,
+      })
+    },
+    [restTimerEnabled]
+  )
 
   const cancel = useCallback(() => {
     firedFor.current = null

@@ -11,6 +11,9 @@ export interface Profile {
   /** Optional body-weight goal; rendered as a dashed line on the weight
    *  chart. NULL = no goal set. */
   weight_goal?: number | null
+  /** Settings → Preferences toggles. Default true (historical behavior). */
+  rest_timer_enabled?: boolean
+  show_streak_card?: boolean
   created_at?: string
   updated_at?: string
 }

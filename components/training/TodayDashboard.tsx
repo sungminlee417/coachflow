@@ -121,8 +121,12 @@ export default function TodayDashboard({
 
       <WelcomeBanner userId={user.id} onNavigate={onNavigate} />
 
+      <HeroStats clientId={user.id} loggedDate={today} />
+
       <section className="space-y-3">
         <SectionHeader title="Training" />
+        {/* Hero rows — full-width because they pack the most info
+            (next set logger, meal toggles). */}
         <WorkoutCard
           clientId={user.id}
           loggedDate={today}
@@ -133,16 +137,30 @@ export default function TodayDashboard({
           loggedDate={today}
           onOpen={() => onNavigate('assigned-meals')}
         />
-        <WeightCard
-          userId={user.id}
-          weightUnit={profile.weight_unit ?? 'lbs'}
-          weightGoal={profile.weight_goal ?? null}
-          onOpen={() => onNavigate('measurements')}
-        />
-        <StreakCard
-          clientId={user.id}
-          onOpen={() => onNavigate('history')}
-        />
+        {/* Secondary tiles — paired side-by-side on every viewport
+            (including phones) so the dashboard reads as a mosaic
+            instead of a row-row-row stack. Content inside each is
+            already condensed enough for a half-width column.
+            Streak card respects the per-user preference; when hidden,
+            the Weight card spans the full grid row on its own. */}
+        <div
+          className={`grid gap-3 ${
+            profile.show_streak_card === false ? 'grid-cols-1' : 'grid-cols-2'
+          }`}
+        >
+          <WeightCard
+            userId={user.id}
+            weightUnit={profile.weight_unit ?? 'lbs'}
+            weightGoal={profile.weight_goal ?? null}
+            onOpen={() => onNavigate('measurements')}
+          />
+          {profile.show_streak_card !== false && (
+            <StreakCard
+              clientId={user.id}
+              onOpen={() => onNavigate('history')}
+            />
+          )}
+        </div>
         <BodyMeasurementCard
           userId={user.id}
           onOpen={() => onNavigate('measurements')}
@@ -159,6 +177,134 @@ function SectionHeader({ title }: { title: string }) {
     <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">
       {title}
     </h3>
+  )
+}
+
+/**
+ * Quick "vital signs" strip rendered just below the greeting. Three
+ * compact pills surface today's most-checked numbers — streak, sets
+ * done, meals eaten — so the user gets a sense of momentum without
+ * scanning every card. Each pill is data-light by design: we reuse
+ * queries the cards below already issue, so this adds no extra fetches
+ * (TanStack dedupes identical query keys).
+ */
+function HeroStats({
+  clientId,
+  loggedDate,
+}: {
+  clientId: string
+  loggedDate: string
+}) {
+  const supabase = useSupabase()
+  // Streak — same query the StreakCard uses, dedupes via the cache.
+  const streakQuery = useQuery({
+    queryKey: queryKeys.setLogs.streak(clientId),
+    queryFn: async (): Promise<Array<{ logged_date: string }>> => {
+      const { data, error } = await supabase
+        .from('set_logs')
+        .select('logged_date')
+        .eq('completed', true)
+        .order('logged_date', { ascending: false })
+        .limit(60)
+      if (error) throw error
+      return (data ?? []) as Array<{ logged_date: string }>
+    },
+  })
+  const streakDays = useMemo(() => {
+    if (!streakQuery.data) return 0
+    const dates = new Set(streakQuery.data.map(r => r.logged_date))
+    let cursor = loggedDate
+    if (!dates.has(cursor)) cursor = shiftISO(cursor, -1)
+    let n = 0
+    while (dates.has(cursor)) {
+      n += 1
+      cursor = shiftISO(cursor, -1)
+    }
+    return n
+  }, [streakQuery.data, loggedDate])
+
+  // Sets done today + total prescribed — needs assignments + day logs.
+  const assignmentsQuery = useWorkoutAssignments(clientId, loggedDate)
+  const assignmentIds = useMemo(
+    () => (assignmentsQuery.data ?? []).map(a => a.id),
+    [assignmentsQuery.data]
+  )
+  const setLogsQuery = useDaySetLogs({ clientId, date: loggedDate, assignmentIds })
+  const { setsDone, setsTotal } = useMemo(() => {
+    const assignments = assignmentsQuery.data ?? []
+    let total = 0
+    for (const a of assignments) {
+      for (const ex of a.workout.exercises ?? []) {
+        total += ex.exercise_sets?.length ?? ex.sets ?? 0
+      }
+    }
+    let done = 0
+    for (const [, row] of setLogsQuery.data ?? new Map()) {
+      if (row.completed) done += 1
+    }
+    return { setsDone: done, setsTotal: total }
+  }, [assignmentsQuery.data, setLogsQuery.data])
+
+  // Meals — eaten count vs total scheduled for today.
+  const mealAssignments = useMealPlanAssignments(clientId, loggedDate)
+  const mealLogs = useMealLogs({ clientId, date: loggedDate })
+  const { mealsEaten, mealsTotal } = useMemo(() => {
+    let total = 0
+    for (const a of mealAssignments.data ?? []) {
+      for (const m of a.meal_plan.meals) if (m.id) total += 1
+    }
+    return { mealsEaten: mealLogs.data?.size ?? 0, mealsTotal: total }
+  }, [mealAssignments.data, mealLogs.data])
+
+  // Hide the strip entirely when there's nothing useful to surface —
+  // a fresh account with no streak, no workout, no meals would just
+  // show three "0 / 0" pills, which feels like a chore.
+  if (streakDays === 0 && setsTotal === 0 && mealsTotal === 0) return null
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Pill icon="🔥" label={`${streakDays}-day streak`} tone="amber" />
+      {setsTotal > 0 && (
+        <Pill
+          icon="💪"
+          label={`${setsDone}/${setsTotal} sets`}
+          tone={setsDone >= setsTotal && setsTotal > 0 ? 'emerald' : 'indigo'}
+        />
+      )}
+      {mealsTotal > 0 && (
+        <Pill
+          icon="🍳"
+          label={`${mealsEaten}/${mealsTotal} meals`}
+          tone={mealsEaten >= mealsTotal && mealsTotal > 0 ? 'emerald' : 'purple'}
+        />
+      )}
+    </div>
+  )
+}
+
+const PILL_TONES = {
+  amber: 'bg-amber-50 text-amber-800 border-amber-200',
+  emerald: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  indigo: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+  purple: 'bg-purple-50 text-purple-800 border-purple-200',
+} as const
+
+function Pill({
+  icon,
+  label,
+  tone,
+}: {
+  icon: string
+  label: string
+  tone: keyof typeof PILL_TONES
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums border ${PILL_TONES[tone]}`}
+    >
+      <span aria-hidden>{icon}</span>
+      {label}
+    </span>
   )
 }
 
@@ -913,47 +1059,52 @@ function WeightCard({
         <CardSkeletonBody lines={1} />
       ) : (
         <div className="space-y-2.5">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="font-semibold text-slate-900 flex items-baseline gap-2 flex-wrap">
+          {/* Vertical stack so the value + unit stay on one line and
+              the "logged today" timestamp sits below — at half-width on
+              phones the old side-by-side row wrapped "lbs" awkwardly. */}
+          <div>
+            <p className="font-semibold text-slate-900 leading-none whitespace-nowrap">
               {latest ? (
                 <>
-                  <span>
-                    {roundMacro(latest.weight)}{' '}
-                    <span className="text-xs font-normal text-slate-400">
-                      {weightUnit}
-                    </span>
+                  <span className="text-2xl tabular-nums">
+                    {roundMacro(latest.weight)}
                   </span>
-                  {goalDiff != null && (
-                    <span
-                      className={`text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 border ${
-                        Math.abs(goalDiff) < 0.5
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-indigo-50 text-indigo-700 border-indigo-100'
-                      }`}
-                    >
-                      {Math.abs(goalDiff) < 0.5
-                        ? 'At goal'
-                        : `${roundMacro(Math.abs(goalDiff))} ${weightUnit} to goal`}
-                    </span>
-                  )}
+                  <span className="text-xs font-normal text-slate-400 ml-1">
+                    {weightUnit}
+                  </span>
                 </>
               ) : (
                 <span className="text-slate-400 italic font-normal">
-                  No entries yet
+                  No entries
                 </span>
               )}
             </p>
-            {latest && (
-              <p className="text-xs text-slate-500 shrink-0">
-                {loggedToday
-                  ? 'Logged today'
-                  : daysSince === 1
-                    ? 'Yesterday'
-                    : daysSince != null
-                      ? `${daysSince} days ago`
-                      : formatDate(latest.recorded_at)}
-              </p>
-            )}
+            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+              {latest && (
+                <p className="text-[11px] text-slate-500 tabular-nums">
+                  {loggedToday
+                    ? 'Logged today'
+                    : daysSince === 1
+                      ? 'Yesterday'
+                      : daysSince != null
+                        ? `${daysSince}d ago`
+                        : formatDate(latest.recorded_at)}
+                </p>
+              )}
+              {goalDiff != null && (
+                <span
+                  className={`text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 border whitespace-nowrap ${
+                    Math.abs(goalDiff) < 0.5
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                  }`}
+                >
+                  {Math.abs(goalDiff) < 0.5
+                    ? 'At goal'
+                    : `${roundMacro(Math.abs(goalDiff))} ${weightUnit} to go`}
+                </span>
+              )}
+            </div>
           </div>
           <WeightWeekStrip logs={allLogs} todayISO={today} />
           {!loggedToday && (
@@ -971,7 +1122,7 @@ function WeightCard({
                 min="0"
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
-                placeholder={`Today's weight (${weightUnit})`}
+                placeholder={`Weight (${weightUnit})`}
                 className="text-sm py-2"
               />
               <Button
@@ -1174,15 +1325,18 @@ function StreakCard({
           Log a workout today to start a streak.
         </p>
       ) : (
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="font-semibold text-slate-900">
-            <span className="text-2xl tabular-nums">{streak}</span>
-            <span className="text-sm text-slate-500 font-normal">
-              {' '}
-              {streak === 1 ? 'day' : 'days'} in a row
+        // Vertical stack — at half-width on phones, the old
+        // horizontal "{N} days in a row · X/7 this week" row wrapped
+        // and looked squished. Big number on top, supporting label
+        // below, week count as a small footer pill.
+        <div>
+          <p className="font-semibold text-slate-900 leading-none">
+            <span className="text-3xl tabular-nums">{streak}</span>
+            <span className="text-xs text-slate-500 font-normal ml-1">
+              {streak === 1 ? 'day' : 'days'}
             </span>
           </p>
-          <p className="text-xs text-slate-500 shrink-0 tabular-nums">
+          <p className="text-[11px] text-slate-500 mt-2 tabular-nums">
             {thisWeek}/7 this week
           </p>
         </div>
@@ -1206,19 +1360,30 @@ function shiftISO(dateISO: string, days: number): string {
 
 const ACCENTS = {
   emerald: {
-    iconBg: 'bg-emerald-50 text-emerald-600',
+    iconBg: 'bg-emerald-100 text-emerald-700',
+    // Soft tint behind the card body so the dashboard isn't a wall of
+    // identical white rectangles. Subtle gradient from a faint accent
+    // wash to white at the bottom — keeps text contrast safe.
+    cardBg: 'bg-gradient-to-br from-emerald-50/70 via-white to-white',
+    border: 'border-emerald-100/80 hover:border-emerald-300',
     progress: 'bg-emerald-500',
   },
   amber: {
-    iconBg: 'bg-amber-50 text-amber-600',
+    iconBg: 'bg-amber-100 text-amber-700',
+    cardBg: 'bg-gradient-to-br from-amber-50/70 via-white to-white',
+    border: 'border-amber-100/80 hover:border-amber-300',
     progress: 'bg-amber-500',
   },
   indigo: {
-    iconBg: 'bg-indigo-50 text-indigo-600',
+    iconBg: 'bg-indigo-100 text-indigo-700',
+    cardBg: 'bg-gradient-to-br from-indigo-50/70 via-white to-white',
+    border: 'border-indigo-100/80 hover:border-indigo-300',
     progress: 'bg-indigo-500',
   },
   purple: {
-    iconBg: 'bg-purple-50 text-purple-600',
+    iconBg: 'bg-purple-100 text-purple-700',
+    cardBg: 'bg-gradient-to-br from-purple-50/70 via-white to-white',
+    border: 'border-purple-100/80 hover:border-purple-300',
     progress: 'bg-purple-500',
   },
 } as const
@@ -1240,22 +1405,25 @@ function Card({
   // log forms) don't violate the HTML rule against button-in-button.
   // The "navigate to the full view" affordance is a small button in the
   // top-right corner instead, with an explicit aria-label.
+  const a = ACCENTS[accent]
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 hover:border-indigo-200 hover:shadow-sm transition-all">
+    <div
+      className={`rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all h-full ${a.cardBg} ${a.border}`}
+    >
       <div className="flex items-center gap-2.5 mb-3">
         <div
-          className={`h-9 w-9 rounded-xl flex items-center justify-center ${ACCENTS[accent].iconBg}`}
+          className={`h-9 w-9 rounded-xl flex items-center justify-center ${a.iconBg}`}
         >
           <Icon size={16} />
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
           {label}
         </span>
         <button
           type="button"
           onClick={onClick}
           aria-label={`Open ${label}`}
-          className="ml-auto h-7 w-7 rounded-md flex items-center justify-center text-slate-300 hover:text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+          className="ml-auto h-7 w-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-colors cursor-pointer"
         >
           <ArrowRight size={14} />
         </button>

@@ -204,7 +204,19 @@ export default function MeasurementForm({
           Cancel
         </Button>
         <Button onClick={handleSave} loading={saving} disabled={!isDirty}>
-          {saving ? 'Saving…' : initial ? 'Save Changes' : 'Log Measurement'}
+          {saving ? (
+            'Saving…'
+          ) : initial ? (
+            <>
+              <span className="sm:hidden">Save</span>
+              <span className="hidden sm:inline">Save Changes</span>
+            </>
+          ) : (
+            <>
+              <span className="sm:hidden">Log</span>
+              <span className="hidden sm:inline">Log Measurement</span>
+            </>
+          )}
         </Button>
       </div>
 

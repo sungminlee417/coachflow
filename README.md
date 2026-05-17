@@ -24,6 +24,7 @@ A coaching-and-training platform where every user can both coach and train. One 
 - **Cardio support** — duration in `mm:ss`, `1h 20m`, or bare-number minutes; intervals supported.
 - **Meal logging** — per-day check on each meal with a daily "X / Y eaten" chip; coach can see their clients' check history via RLS.
 - **Body measurements + weight chart** (Recharts) with a smooth area line, hover crosshair, lowest/avg/highest stats, and configurable units (lb/kg, in/cm).
+- **Settings** — `/app` Settings tab with two sections. Preferences: hide the rest timer, hide the streak card (persisted on `profiles`). Account: change password via Supabase Auth. Toggle changes patch through TanStack Query optimistically so the UI flips instantly.
 
 ### Cross-cutting UX
 - **URL-driven dashboard tabs** (`?tab=my-workouts`) so reload, back/forward, and deep links all preserve the active section.
@@ -86,7 +87,7 @@ The schema includes:
 
 | Area | Tables |
 | --- | --- |
-| Identity | `profiles` (with `length_unit`, `weight_unit`) |
+| Identity | `profiles` (with `length_unit`, `weight_unit`, `weight_goal`, `rest_timer_enabled`, `show_streak_card`) |
 | Coaching | `coach_client_relationships`, `invite_codes` (with `expires_at`, `revoked_at`, `max_uses`) |
 | Workouts | `workouts`, `exercises`, `exercise_sets`, `exercise_alternatives` |
 | Programs | `workout_programs`, `workout_program_workouts`, `program_assignments` |

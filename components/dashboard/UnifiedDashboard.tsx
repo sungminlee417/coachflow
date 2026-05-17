@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { User } from '@supabase/supabase-js'
-import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Utensils, Ruler, Menu, X, Home } from 'lucide-react'
+import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Utensils, Ruler, Menu, X, Home, Settings as SettingsIcon } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { RestTimerProvider } from '@/components/ui/RestTimer'
@@ -18,9 +18,10 @@ import ClientMealPlanView from '@/components/training/ClientMealPlanView'
 import WorkoutHistory from '@/components/training/WorkoutHistory'
 import BodyTracker from '@/components/training/BodyTracker'
 import TodayDashboard, { type TodayNavTarget } from '@/components/training/TodayDashboard'
+import SettingsView from '@/components/dashboard/SettingsView'
 import type { Profile } from '@/lib/types'
 
-type Tab = 'today' | 'my-clients' | 'my-workouts' | 'my-programs' | 'my-meal-plans' | 'assigned-workouts' | 'assigned-meals' | 'measurements' | 'history'
+type Tab = 'today' | 'my-clients' | 'my-workouts' | 'my-programs' | 'my-meal-plans' | 'assigned-workouts' | 'assigned-meals' | 'measurements' | 'history' | 'settings'
 // `home` is its own section so the Today hub renders above the coaching /
 // training groups in the nav, without an "everything else" section header.
 type Section = 'home' | 'coaching' | 'training'
@@ -188,7 +189,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
   const trainingTabs = TRAINING_TABS
 
   return (
-    <RestTimerProvider>
+    <RestTimerProvider userId={user.id}>
     <AuthGuard />
     <div className="min-h-screen bg-slate-50">
       <div className="flex">
@@ -225,6 +226,15 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
               <p className="text-sm font-medium text-slate-900 truncate">{profile.full_name}</p>
               <p className="text-xs text-slate-500 truncate">{profile.email}</p>
             </div>
+            <IconButton
+              onClick={() => {
+                setActiveTab('settings')
+                setMobileMenuOpen(false)
+              }}
+              aria-label="Settings"
+            >
+              <SettingsIcon size={16} />
+            </IconButton>
             <IconButton onClick={handleLogout} aria-label="Logout">
               <LogOut size={16} />
             </IconButton>
@@ -293,6 +303,34 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                     Training
                   </p>
                   <div className="space-y-1">{trainingTabs.map(t => renderNavButton(t))}</div>
+                </div>
+                <div>
+                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Account
+                  </p>
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('settings')
+                        setMobileMenuOpen(false)
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                        activeTab === 'settings'
+                          ? 'bg-slate-100 text-slate-900'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      }`}
+                    >
+                      <span
+                        className={
+                          activeTab === 'settings' ? 'text-slate-700' : 'text-slate-400'
+                        }
+                      >
+                        <SettingsIcon size={16} />
+                      </span>
+                      Settings
+                    </button>
+                  </div>
                 </div>
               </nav>
 
@@ -389,6 +427,9 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
             </TabPanel>
             <TabPanel active={activeTab === 'history'} mounted={mountedTabs.has('history')}>
               <WorkoutHistory clientId={user.id} />
+            </TabPanel>
+            <TabPanel active={activeTab === 'settings'} mounted={mountedTabs.has('settings')}>
+              <SettingsView userId={user.id} email={user.email ?? ''} />
             </TabPanel>
           </div>
         </main>

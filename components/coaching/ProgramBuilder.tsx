@@ -385,7 +385,14 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
             size="sm"
           >
             {!saving && <Save size={14} />}
-            {saving ? 'Saving…' : 'Save Program'}
+            {saving ? (
+              'Saving…'
+            ) : (
+              <>
+                <span className="sm:hidden">Save</span>
+                <span className="hidden sm:inline">Save Program</span>
+              </>
+            )}
           </Button>
         </div>
       </div>

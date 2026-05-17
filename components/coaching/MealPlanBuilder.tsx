@@ -1497,7 +1497,14 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
             size="sm"
           >
             {!saving && <Save size={14} />}
-            {saving ? 'Saving…' : 'Save Meal Plan'}
+            {saving ? (
+              'Saving…'
+            ) : (
+              <>
+                <span className="sm:hidden">Save</span>
+                <span className="hidden sm:inline">Save Meal Plan</span>
+              </>
+            )}
           </Button>
         </div>
       </div>
