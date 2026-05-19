@@ -49,7 +49,7 @@ export function MealLogToggle({
       className={`h-7 w-7 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
         completed
           ? 'bg-emerald-500 border-emerald-500 text-white'
-          : 'border-slate-300 text-transparent hover:border-slate-400'
+          : 'border-slate-300 dark:border-slate-600 text-transparent hover:border-slate-400'
       }`}
     >
       <Check size={14} />

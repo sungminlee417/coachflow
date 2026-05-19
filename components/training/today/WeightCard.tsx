@@ -80,25 +80,25 @@ export function WeightCard({
               the "logged today" timestamp sits below — at half-width on
               phones the old side-by-side row wrapped "lbs" awkwardly. */}
           <div>
-            <p className="font-semibold text-slate-900 leading-none whitespace-nowrap">
+            <p className="font-semibold text-slate-900 dark:text-slate-100 leading-none whitespace-nowrap">
               {latest ? (
                 <>
                   <span className="text-2xl tabular-nums">
                     {roundMacro(latest.weight)}
                   </span>
-                  <span className="text-xs font-normal text-slate-400 ml-1">
+                  <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-1">
                     {weightUnit}
                   </span>
                 </>
               ) : (
-                <span className="text-slate-400 italic font-normal">
+                <span className="text-slate-400 dark:text-slate-500 italic font-normal">
                   No entries
                 </span>
               )}
             </p>
             <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
               {latest && (
-                <p className="text-[11px] text-slate-500 tabular-nums">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
                   {loggedToday
                     ? 'Logged today'
                     : daysSince === 1
@@ -112,8 +112,8 @@ export function WeightCard({
                 <span
                   className={`text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 border whitespace-nowrap ${
                     Math.abs(goalDiff) < 0.5
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                      : 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-900'
                   }`}
                 >
                   {Math.abs(goalDiff) < 0.5
@@ -132,6 +132,12 @@ export function WeightCard({
               }}
               className="grid grid-cols-[1fr_auto] gap-2"
             >
+              {/* `text-base` keeps mobile keyboards from auto-zooming
+                  the viewport (iOS triggers zoom when an input's
+                  computed font-size is < 16px). `py-2.5` puts the touch
+                  target around iOS's 44pt minimum. `min-w-0` prevents
+                  the input from overflowing the half-width column when
+                  the placeholder is long ("Weight (lbs)" + value). */}
               <Input
                 type="number"
                 inputMode="decimal"
@@ -140,11 +146,10 @@ export function WeightCard({
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
                 placeholder={`Weight (${weightUnit})`}
-                className="text-sm py-2"
+                className="text-base py-2.5 min-w-0"
               />
               <Button
                 type="submit"
-                size="sm"
                 loading={saving}
                 disabled={!draft}
               >
@@ -212,7 +217,7 @@ function WeightWeekStrip({
               className={`block h-2.5 w-2.5 rounded-full ${
                 logged
                   ? 'bg-indigo-500'
-                  : 'bg-transparent border border-slate-200'
+                  : 'bg-transparent border border-slate-200 dark:border-slate-700'
               } ${
                 d.isToday
                   ? logged
@@ -224,7 +229,7 @@ function WeightWeekStrip({
             />
             <span
               className={`text-[9px] font-medium tabular-nums ${
-                d.isToday ? 'text-indigo-700' : 'text-slate-400'
+                d.isToday ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-400 dark:text-slate-500'
               }`}
             >
               {dow}

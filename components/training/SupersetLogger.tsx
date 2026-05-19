@@ -412,11 +412,11 @@ export function SupersetLogger({
                 onClick={() => expandRound(setNumber)}
                 aria-expanded={false}
                 aria-label={`Expand round ${setNumber}`}
-                className="w-full bg-white rounded-lg border border-emerald-300 hover:border-emerald-400 transition-colors cursor-pointer overflow-hidden text-left"
+                className="w-full bg-white dark:bg-slate-900 rounded-lg border border-emerald-300 hover:border-emerald-400 transition-colors cursor-pointer overflow-hidden text-left"
               >
-                <div className="bg-emerald-50 px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
                       Round {setNumber}
                     </span>
                     <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-emerald-500 text-white shrink-0">
@@ -425,9 +425,9 @@ export function SupersetLogger({
                     {summaries.map(s => (
                       <span
                         key={s.letter}
-                        className="text-xs text-slate-600 tabular-nums"
+                        className="text-xs text-slate-600 dark:text-slate-300 tabular-nums"
                       >
-                        <span className="font-bold text-indigo-600 mr-0.5">{s.letter}</span>
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400 mr-0.5">{s.letter}</span>
                         {s.text}
                       </span>
                     ))}
@@ -435,18 +435,18 @@ export function SupersetLogger({
                   {/* Hide the hint on phones — the cluster of per-exercise
                       summaries already crowds the row, and the whole card is
                       a tap target. */}
-                  <span className="hidden sm:inline text-[10px] text-slate-400 shrink-0">
+                  <span className="hidden sm:inline text-[10px] text-slate-400 dark:text-slate-500 shrink-0">
                     Tap to edit
                   </span>
                 </div>
               </button>
               {!isLastRound && restBetweenRounds != null && restBetweenRounds > 0 && (
                 <div className="flex items-center gap-2 my-1 px-3">
-                  <div className="flex-1 h-px bg-slate-200" />
-                  <span className="text-[10px] font-medium text-slate-400 tabular-nums">
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 tabular-nums">
                     Rest {restBetweenRounds}s
                   </span>
-                  <div className="flex-1 h-px bg-slate-200" />
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
                 </div>
               )}
             </div>
@@ -463,20 +463,20 @@ export function SupersetLogger({
           <>
             <span
               className={`text-[10px] font-bold uppercase tracking-widest ${
-                complete ? 'text-emerald-700' : 'text-slate-500'
+                complete ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 dark:text-slate-400'
               }`}
             >
               Round {setNumber}
             </span>
             <div className="flex items-center gap-2">
               {complete && (
-                <span className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1">
+                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
                   <Check size={11} />
                   Complete
                 </span>
               )}
               {headerCanCollapse && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500">
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 dark:text-slate-400">
                   <ChevronUp size={11} />
                   Collapse
                 </span>
@@ -488,8 +488,8 @@ export function SupersetLogger({
         return (
           <div key={`round-${setNumber}`}>
           <div
-            className={`bg-white rounded-lg border overflow-hidden ${
-              complete ? 'border-emerald-300' : 'border-slate-200'
+            className={`bg-white dark:bg-slate-900 rounded-lg border overflow-hidden ${
+              complete ? 'border-emerald-300' : 'border-slate-200 dark:border-slate-700'
             }`}
           >
             {headerCanCollapse ? (
@@ -499,8 +499,8 @@ export function SupersetLogger({
                 aria-label={`Collapse round ${setNumber}`}
                 className={`w-full px-3 py-1.5 border-b flex items-center justify-between gap-2 cursor-pointer ${
                   complete
-                    ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200'
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800'
+                    : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
                 }`}
               >
                 {headerInner}
@@ -509,14 +509,14 @@ export function SupersetLogger({
               <div
                 className={`px-3 py-1.5 border-b flex items-center justify-between gap-2 ${
                   complete
-                    ? 'bg-emerald-50 border-emerald-200'
-                    : 'bg-slate-50 border-slate-200'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800'
+                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                 }`}
               >
                 {headerInner}
               </div>
             )}
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {exercises.map((ex, exIdx) => {
                 if (!ex.id) return null
                 const row = rowsByExercise.get(ex.id)?.find(r => r.set_number === setNumber)
@@ -560,17 +560,17 @@ export function SupersetLogger({
                     {(priorText || preSuggestion) && (
                       <div className="flex items-center gap-2 text-[10px] mb-1.5 flex-wrap">
                         {priorText && (
-                          <span className="text-slate-400 tabular-nums">
+                          <span className="text-slate-400 dark:text-slate-500 tabular-nums">
                             Last:{' '}
-                            <span className="font-medium text-slate-500">{priorText}</span>
+                            <span className="font-medium text-slate-500 dark:text-slate-400">{priorText}</span>
                           </span>
                         )}
                         {preSuggestion && (
                           <span
                             className={`inline-flex items-center gap-1 font-medium border rounded-full px-2 py-0.5 tabular-nums ${
                               preSuggestion.direction === 'up'
-                                ? 'text-indigo-700 bg-indigo-50 border-indigo-100'
-                                : 'text-amber-700 bg-amber-50 border-amber-100'
+                                ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 border-indigo-100 dark:border-indigo-900'
+                                : 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900'
                             }`}
                           >
                             {preSuggestion.direction === 'up' ? (
@@ -591,7 +591,7 @@ export function SupersetLogger({
                       <div className="flex items-baseline gap-2 min-w-0 flex-1">
                         <span
                           className={`text-[10px] font-bold tabular-nums shrink-0 ${
-                            isCardio ? 'text-amber-600' : 'text-indigo-600'
+                            isCardio ? 'text-amber-600 dark:text-amber-400' : 'text-indigo-600 dark:text-indigo-400'
                           }`}
                         >
                           {positionLetter}
@@ -602,24 +602,24 @@ export function SupersetLogger({
                             needed) than hide it behind ellipses. `title=` is
                             a fallback for desktop hover. */}
                         <span
-                          className="text-sm font-medium text-slate-900 min-w-0 wrap-break-word"
+                          className="text-sm font-medium text-slate-900 dark:text-slate-100 min-w-0 wrap-break-word"
                           title={displayName}
                         >
                           {displayName}
                         </span>
                         {activeVariant && (
-                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px shrink-0">
+                          <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded px-1 py-px shrink-0">
                             Swapped
                           </span>
                         )}
                         {isCardio && (
-                          <span className="text-[9px] uppercase tracking-widest font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-px shrink-0">
+                          <span className="text-[9px] uppercase tracking-widest font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded px-1 py-px shrink-0">
                             Cardio
                           </span>
                         )}
                       </div>
                       {targetLabel && (
-                        <span className="text-[10px] text-slate-500 shrink-0">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0">
                           target <span className="font-semibold">{targetLabel}</span>
                         </span>
                       )}
@@ -648,7 +648,7 @@ export function SupersetLogger({
                             className={`h-7 w-7 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
                               row.completed
                                 ? 'bg-emerald-500 border-emerald-500 text-white'
-                                : 'border-slate-300 text-transparent hover:border-slate-400'
+                                : 'border-slate-300 dark:border-slate-600 text-transparent hover:border-slate-400'
                             }`}
                           >
                             <Check size={14} />
@@ -710,7 +710,7 @@ export function SupersetLogger({
                             className={`h-7 w-7 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
                               row.completed
                                 ? 'bg-emerald-500 border-emerald-500 text-white'
-                                : 'border-slate-300 text-transparent hover:border-slate-400'
+                                : 'border-slate-300 dark:border-slate-600 text-transparent hover:border-slate-400'
                             }`}
                           >
                             <Check size={14} />
@@ -722,7 +722,7 @@ export function SupersetLogger({
                     )}
                     {improved && (
                       <div className="flex items-center justify-end gap-2 text-[10px]">
-                        <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px font-semibold tabular-nums">
+                        <span className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-full px-1.5 py-px font-semibold tabular-nums">
                           ↑ Beat last
                         </span>
                       </div>
@@ -735,11 +735,11 @@ export function SupersetLogger({
 
           {!isLastRound && restBetweenRounds != null && restBetweenRounds > 0 && (
             <div className="flex items-center gap-2 my-1 px-3">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-[10px] font-medium text-slate-400 tabular-nums">
+              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 tabular-nums">
                 Rest {restBetweenRounds}s
               </span>
-              <div className="flex-1 h-px bg-slate-200" />
+              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
             </div>
           )}
           </div>

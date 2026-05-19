@@ -83,8 +83,8 @@ export default function MealPlanAssignmentModal({
 
   return (
     <Modal open={open} title="Assign Meal Plan" onClose={onClose}>
-      <div className="mb-5 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg">
-        <p className="text-sm text-indigo-700 font-medium">{mealPlanName}</p>
+      <div className="mb-5 px-3 py-2 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg">
+        <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">{mealPlanName}</p>
       </div>
 
       <div className="space-y-4">
@@ -99,13 +99,13 @@ export default function MealPlanAssignmentModal({
           <button
             type="button"
             onClick={() => setShowSchedule(!showSchedule)}
-            className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 cursor-pointer"
+            className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
           >
             <Calendar size={14} />
             {showSchedule ? 'Hide schedule' : 'Schedule (optional)'}
           </button>
           {!showSchedule && (
-            <p className="text-xs text-slate-400 mt-1 ml-6">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 ml-6">
               Active immediately, no end date. Meals appear on their tagged days of the week.
             </p>
           )}

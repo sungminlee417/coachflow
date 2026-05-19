@@ -24,7 +24,8 @@ A coaching-and-training platform where every user can both coach and train. One 
 - **Cardio support** — duration in `mm:ss`, `1h 20m`, or bare-number minutes; intervals supported.
 - **Meal logging** — per-day check on each meal with a daily "X / Y eaten" chip; coach can see their clients' check history via RLS.
 - **Body measurements + weight chart** (Recharts) with a smooth area line, hover crosshair, lowest/avg/highest stats, and configurable units (lb/kg, in/cm).
-- **Settings** — `/app` Settings tab with two sections. Preferences: hide the rest timer, hide the streak card (persisted on `profiles`). Account: change password via Supabase Auth. Toggle changes patch through TanStack Query optimistically so the UI flips instantly.
+- **Settings** — `/app` Settings tab with three sections. Appearance: light / dark / system theme (persisted on `profiles.theme` for cross-device sync + `localStorage` for FOUC-free first paint). Preferences: hide the rest timer, hide the streak card. Account: change password via Supabase Auth. Toggle changes patch through TanStack Query optimistically so the UI flips instantly.
+- **Dark mode** — full app dark theme via Tailwind v4 class-based `dark:` variant. Inline bootstrap script in `<head>` applies the theme before React mounts (no flash), system preference auto-tracked when in 'system' mode, cross-tab sync via the `storage` event. Implementation in [lib/theme.tsx](lib/theme.tsx).
 - **Meal plan builder polish** — quantity inputs split into amount + unit dropdown (`g, oz, ml, cup, tbsp, tsp, piece, slice, scoop, Other…`) serialized into the existing `quantity` text column so no migration is needed; legacy values like "1/2 cup" auto-flip into "Other" mode on edit. Ingredient name fields type-ahead from the coach's own previously-saved ingredients ([useIngredientCatalog](lib/hooks/use-ingredient-catalog.ts)) — picking a suggestion bulk-fills name + qty + macros in one state update, so the same chicken-breast row isn't re-typed across plans.
 
 ### Cross-cutting UX
@@ -88,7 +89,7 @@ The schema includes:
 
 | Area | Tables |
 | --- | --- |
-| Identity | `profiles` (with `length_unit`, `weight_unit`, `weight_goal`, `rest_timer_enabled`, `show_streak_card`) |
+| Identity | `profiles` (with `length_unit`, `weight_unit`, `weight_goal`, `rest_timer_enabled`, `show_streak_card`, `theme`) |
 | Coaching | `coach_client_relationships`, `invite_codes` (with `expires_at`, `revoked_at`, `max_uses`) |
 | Workouts | `workouts`, `exercises`, `exercise_sets`, `exercise_alternatives` |
 | Programs | `workout_programs`, `workout_program_workouts`, `program_assignments` |

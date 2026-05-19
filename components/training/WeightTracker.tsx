@@ -27,7 +27,7 @@ const WeightChart = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 h-72 animate-pulse" />
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 h-72 animate-pulse" />
     ),
   }
 )
@@ -138,15 +138,15 @@ export default function WeightTracker({
         onClose={() => setShowShare(false)}
       />
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-              <Scale size={18} className="text-indigo-600" />
+            <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center shrink-0">
+              <Scale size={18} className="text-indigo-600 dark:text-indigo-400" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-semibold text-slate-900">Weight</h3>
-              <p className="text-xs text-slate-500 truncate">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Weight</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 Log daily &middot; {logs.length} {logs.length === 1 ? 'entry' : 'entries'}
               </p>
             </div>
@@ -154,10 +154,10 @@ export default function WeightTracker({
           {latest && (
             <div className="text-right ml-auto">
               <div className="flex items-baseline gap-2 justify-end flex-wrap">
-                <span className="text-3xl font-bold text-slate-900 tabular-nums">
+                <span className="text-3xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                   {roundMacro(latest.weight)}
                 </span>
-                <span className="text-sm font-medium text-slate-400">{weightUnit}</span>
+                <span className="text-sm font-medium text-slate-400 dark:text-slate-500">{weightUnit}</span>
                 {delta && (
                   <span className={`flex items-center gap-0.5 text-sm font-medium ${delta.color}`}>
                     <delta.Icon size={14} />
@@ -165,7 +165,7 @@ export default function WeightTracker({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">{formatDate(latest.recorded_at)}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{formatDate(latest.recorded_at)}</p>
             </div>
           )}
         </div>
@@ -183,14 +183,14 @@ export default function WeightTracker({
           {!editingGoal ? (
             <>
               {goal != null ? (
-                <p className="text-slate-500">
+                <p className="text-slate-500 dark:text-slate-400">
                   Goal:{' '}
-                  <span className="font-semibold text-slate-700 tabular-nums">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
                     {roundMacro(goal)} {weightUnit}
                   </span>
                 </p>
               ) : (
-                <p className="text-slate-400 italic">No goal set</p>
+                <p className="text-slate-400 dark:text-slate-500 italic">No goal set</p>
               )}
               <button
                 type="button"
@@ -198,7 +198,7 @@ export default function WeightTracker({
                   setGoalDraft(goal != null ? String(goal) : '')
                   setEditingGoal(true)
                 }}
-                className="text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
+                className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 font-medium cursor-pointer"
               >
                 {goal != null ? 'Edit' : 'Set goal'}
               </button>
@@ -220,7 +220,7 @@ export default function WeightTracker({
                     }
                   }}
                   disabled={savingGoal}
-                  className="text-slate-400 hover:text-red-600 font-medium cursor-pointer disabled:opacity-50"
+                  className="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 font-medium cursor-pointer disabled:opacity-50"
                 >
                   Clear
                 </button>
@@ -251,7 +251,7 @@ export default function WeightTracker({
               }}
               className="flex items-center gap-2 flex-wrap"
             >
-              <label className="text-slate-500">
+              <label className="text-slate-500 dark:text-slate-400">
                 Goal weight ({weightUnit})
               </label>
               <Input
@@ -271,7 +271,7 @@ export default function WeightTracker({
               <button
                 type="button"
                 onClick={() => setEditingGoal(false)}
-                className="text-slate-400 hover:text-slate-700 font-medium cursor-pointer"
+                className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium cursor-pointer"
               >
                 Cancel
               </button>
@@ -282,13 +282,13 @@ export default function WeightTracker({
         {/* Quick log form */}
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
           <div>
-            <label htmlFor="wt-date" className="block text-[10px] text-slate-500 mb-1 uppercase tracking-wide">
+            <label htmlFor="wt-date" className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide">
               Date
             </label>
             <DatePicker id="wt-date" value={newDate} onChange={setNewDate} />
           </div>
           <div>
-            <label htmlFor="wt-weight" className="block text-[10px] text-slate-500 mb-1 uppercase tracking-wide">
+            <label htmlFor="wt-weight" className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide">
               Weight ({weightUnit})
             </label>
             <Input
@@ -309,15 +309,15 @@ export default function WeightTracker({
 
         {/* Recent history */}
         {logs.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-slate-100">
+          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between mb-2 gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                 Recent
               </p>
               <button
                 type="button"
                 onClick={() => setShowShare(true)}
-                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2.5 py-1.5 rounded-md transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 px-2.5 py-1.5 rounded-md transition-colors cursor-pointer"
               >
                 <Share2 size={14} />
                 Share
@@ -330,14 +330,14 @@ export default function WeightTracker({
                 return (
                   <div
                     key={log.id}
-                    className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-50 group"
+                    className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 group"
                   >
-                    <span className="text-xs text-slate-500 shrink-0 min-w-0 truncate">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0 min-w-0 truncate">
                       {formatDate(log.recorded_at)}
                     </span>
-                    <span className="text-sm font-medium text-slate-900 tabular-nums ml-auto">
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100 tabular-nums ml-auto">
                       {roundMacro(log.weight)}{' '}
-                      <span className="text-xs text-slate-400 font-normal">{weightUnit}</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-normal">{weightUnit}</span>
                     </span>
                     {d && (
                       <span className={`flex items-center gap-0.5 text-xs shrink-0 ${d.color}`}>

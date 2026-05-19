@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { RestTimerProvider } from '@/components/ui/RestTimer'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { clearPersistedQueryCache } from '@/lib/query-client'
+import { ProfileThemeSync } from '@/lib/theme'
 import ClientList from '@/components/coaching/ClientList'
 import WorkoutLibrary from '@/components/coaching/WorkoutLibrary'
 import ProgramLibrary from '@/components/coaching/ProgramLibrary'
@@ -49,19 +50,19 @@ const sectionTone: Record<Section, { active: string; activeIcon: string; mobileA
   home: {
     // Slate keeps Today visually neutral — it's the hub, not a side of
     // the coach/trainee duality, so it doesn't borrow either color.
-    active: 'bg-slate-100 text-slate-900',
-    activeIcon: 'text-slate-700',
-    mobileActive: 'bg-slate-100 text-slate-900',
+    active: 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100',
+    activeIcon: 'text-slate-700 dark:text-slate-300',
+    mobileActive: 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100',
   },
   coaching: {
-    active: 'bg-indigo-50 text-indigo-700',
-    activeIcon: 'text-indigo-500',
-    mobileActive: 'bg-indigo-50 text-indigo-700',
+    active: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200',
+    activeIcon: 'text-indigo-500 dark:text-indigo-300',
+    mobileActive: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200',
   },
   training: {
-    active: 'bg-emerald-50 text-emerald-700',
-    activeIcon: 'text-emerald-500',
-    mobileActive: 'bg-emerald-50 text-emerald-700',
+    active: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200',
+    activeIcon: 'text-emerald-500 dark:text-emerald-300',
+    mobileActive: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200',
   },
 }
 
@@ -174,7 +175,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           setMobileMenuOpen(false)
         }}
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-          isActive ? tone.active : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          isActive ? tone.active : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
         }`}
       >
         <span className={isActive ? tone.activeIcon : 'text-slate-400'}>{tab.icon}</span>
@@ -191,15 +192,18 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
   return (
     <RestTimerProvider userId={user.id}>
     <AuthGuard />
-    <div className="min-h-screen bg-slate-50">
+    {/* Pull profile.theme into the in-memory ThemeProvider on mount so
+        a theme set on another device flips this device on next load. */}
+    <ProfileThemeSync profileTheme={profile.theme} />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <div className="flex">
         {/* Sidebar (desktop) */}
-        <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-slate-200">
-          <div className="h-16 flex items-center gap-2.5 px-6 border-b border-slate-100">
+        <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700">
+          <div className="h-16 flex items-center gap-2.5 px-6 border-b border-slate-100 dark:border-slate-800">
             <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center">
               <Dumbbell size={16} className="text-white" />
             </div>
-            <span className="text-lg font-bold text-slate-900 tracking-tight">CoachFlow</span>
+            <span className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">CoachFlow</span>
           </div>
 
           <nav className="flex-1 px-3 py-6 space-y-6 overflow-y-auto">
@@ -207,24 +211,24 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
               {HOME_TABS.map(t => renderNavButton(t))}
             </div>
             <div>
-              <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+              <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
                 Coaching
               </p>
               <div className="space-y-1">{coachingTabs.map(t => renderNavButton(t))}</div>
             </div>
             <div>
-              <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+              <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
                 Training
               </p>
               <div className="space-y-1">{trainingTabs.map(t => renderNavButton(t))}</div>
             </div>
           </nav>
 
-          <div className="border-t border-slate-100 p-4 flex items-center gap-3">
+          <div className="border-t border-slate-100 dark:border-slate-800 p-4 flex items-center gap-3">
             <Avatar name={profile.full_name} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate">{profile.full_name}</p>
-              <p className="text-xs text-slate-500 truncate">{profile.email}</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{profile.full_name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{profile.email}</p>
             </div>
             <IconButton
               onClick={() => {
@@ -243,12 +247,12 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
 
         {/* Mobile header — title only. Navigation is the bottom tab bar +
             "More" drawer; the old top hamburger is gone. */}
-        <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-40">
+        <div className="md:hidden fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 z-40">
           <div className="flex items-center gap-2.5 px-4 h-14">
             <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
               <Dumbbell size={14} className="text-white" />
             </div>
-            <span className="text-base font-semibold text-slate-900 truncate">
+            <span className="text-base font-semibold text-slate-900 dark:text-slate-100 truncate">
               {activeTabLabel}
             </span>
           </div>
@@ -266,19 +270,19 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           />
           {/* Slide-in panel */}
           <aside
-            className={`md:hidden fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white border-r border-slate-200 z-50 flex flex-col shadow-xl transition-transform duration-200 ease-out ${
+            className={`md:hidden fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 z-50 flex flex-col shadow-xl transition-transform duration-200 ease-out ${
               mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
             }`}
             role="dialog"
             aria-label="Navigation menu"
             aria-hidden={!mobileMenuOpen}
           >
-              <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100">
+              <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2.5">
                   <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                     <Dumbbell size={16} className="text-white" />
                   </div>
-                  <span className="text-lg font-bold text-slate-900 tracking-tight">CoachFlow</span>
+                  <span className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">CoachFlow</span>
                 </div>
                 <IconButton
                   onClick={() => setMobileMenuOpen(false)}
@@ -293,19 +297,19 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                   {HOME_TABS.map(t => renderNavButton(t))}
                 </div>
                 <div>
-                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
                     Coaching
                   </p>
                   <div className="space-y-1">{coachingTabs.map(t => renderNavButton(t))}</div>
                 </div>
                 <div>
-                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
                     Training
                   </p>
                   <div className="space-y-1">{trainingTabs.map(t => renderNavButton(t))}</div>
                 </div>
                 <div>
-                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
                     Account
                   </p>
                   <div className="space-y-1">
@@ -317,8 +321,8 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                       }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                         activeTab === 'settings'
-                          ? 'bg-slate-100 text-slate-900'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
                       }`}
                     >
                       <span
@@ -334,11 +338,11 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                 </div>
               </nav>
 
-              <div className="border-t border-slate-100 p-4 flex items-center gap-3">
+              <div className="border-t border-slate-100 dark:border-slate-800 p-4 flex items-center gap-3">
                 <Avatar name={profile.full_name} size="sm" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{profile.full_name}</p>
-                  <p className="text-xs text-slate-500 truncate">{profile.email}</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{profile.full_name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{profile.email}</p>
                 </div>
                 <IconButton onClick={handleLogout} aria-label="Logout">
                   <LogOut size={16} />
@@ -378,8 +382,8 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
               active={activeTab === 'assigned-workouts'}
               mounted={mountedTabs.has('assigned-workouts')}
             >
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-8">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">
                   Coached by
                 </p>
                 {loadingCoach ? (
@@ -394,16 +398,16 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                   <div className="flex items-center gap-3">
                     <Avatar name={coach.full_name} tone="success" />
                     <div>
-                      <p className="font-medium text-slate-900 text-sm">{coach.full_name}</p>
-                      <p className="text-xs text-slate-500">{coach.email}</p>
+                      <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">{coach.full_name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{coach.email}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
                     <Avatar name={profile.full_name} tone="success" />
                     <div>
-                      <p className="font-medium text-slate-900 text-sm">Self-coached</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">Self-coached</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         You can assign workouts and meal plans to yourself, or use an invite link to connect with a coach.
                       </p>
                     </div>
@@ -438,7 +442,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
             "More" tab) holds coaching tabs + history. Hidden on desktop where
             the sidebar already covers everything. */}
         <nav
-          className="md:hidden fixed left-0 right-0 bottom-0 z-30 bg-white border-t border-slate-200 grid grid-cols-4"
+          className="md:hidden fixed left-0 right-0 bottom-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 grid grid-cols-4"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           aria-label="Primary"
         >
@@ -457,7 +461,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                 onClick={() => setActiveTab(item.key)}
                 aria-current={isActive ? 'page' : undefined}
                 className={`h-14 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
-                  isActive ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-900'
+                  isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
                 {item.icon}
@@ -482,7 +486,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                 aria-current={moreActive ? 'page' : undefined}
                 aria-haspopup="menu"
                 className={`h-14 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
-                  moreActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'
+                  moreActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
                 <Menu size={20} />

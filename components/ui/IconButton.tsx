@@ -8,8 +8,12 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const toneClasses: Record<Tone, string> = {
-  neutral: 'text-slate-400 hover:text-slate-700 hover:bg-slate-100',
-  danger: 'text-slate-400 hover:text-red-600 hover:bg-red-50',
+  neutral:
+    'text-slate-400 hover:text-slate-700 hover:bg-slate-100 ' +
+    'dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800',
+  danger:
+    'text-slate-400 hover:text-red-600 hover:bg-red-50 ' +
+    'dark:text-slate-500 dark:hover:text-red-400 dark:hover:bg-red-950/40',
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(

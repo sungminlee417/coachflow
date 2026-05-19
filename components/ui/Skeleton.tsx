@@ -14,7 +14,7 @@ export function Skeleton({ className = '' }: SkeletonProps) {
 /** A card-shaped skeleton matching the workout / meal-plan / program library grid. */
 export function CardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
       <div className="flex items-start justify-between gap-2 mb-3">
         <Skeleton className="h-4 w-2/3" />
         <Skeleton className="h-4 w-14 rounded-full" />
@@ -34,7 +34,7 @@ export function CardSkeleton() {
 /** A row-shaped skeleton for list items (clients, etc.). */
 export function ListRowSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3">
       <Skeleton className="h-10 w-10 rounded-full shrink-0" />
       <div className="flex-1 min-w-0">
         <Skeleton className="h-4 w-1/3 mb-2" />
@@ -89,7 +89,7 @@ export function ClientGridSkeleton({ count = 6 }: { count?: number }) {
  */
 export function InviteCodeRowSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
         <Skeleton className="h-7 w-28 rounded-lg" />
         <Skeleton className="h-5 w-16 rounded-full" />
@@ -122,7 +122,7 @@ export function InviteCodeListSkeleton({ count = 3 }: { count?: number }) {
  */
 export function AssignmentCardSkeleton({ withChips = false }: { withChips?: boolean }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
       <Skeleton className="h-5 w-1/3 mb-2" />
       <Skeleton className="h-3 w-2/3 mb-4" />
       {withChips ? (
@@ -144,7 +144,7 @@ export function AssignmentCardSkeleton({ withChips = false }: { withChips?: bool
  */
 export function AssignedItemRowSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between gap-3">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
         <div className="flex-1 min-w-0">
@@ -163,7 +163,7 @@ export function AssignedItemRowSkeleton() {
  */
 export function StatRowSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-baseline justify-between gap-3">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-baseline justify-between gap-3">
       <div className="min-w-0 flex-1">
         <Skeleton className="h-4 w-1/2 mb-1.5" />
         <Skeleton className="h-3 w-2/3" />
@@ -181,7 +181,7 @@ export function SummaryTilesSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
+        <div key={i} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-2">
           <Skeleton className="h-4 w-16 rounded-full" />
           <Skeleton className="h-6 w-12" />
           <Skeleton className="h-3 w-14" />

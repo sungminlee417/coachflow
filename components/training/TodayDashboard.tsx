@@ -64,10 +64,10 @@ export default function TodayDashboard({
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
           {dateLabel}
         </p>
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">
           {greeting}
           {firstName ? `, ${firstName}` : ''}
         </h2>

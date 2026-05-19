@@ -46,9 +46,9 @@ function ChartTooltip({ active, payload, unit }: TooltipProps) {
   return (
     <div className="bg-slate-900 text-white text-xs font-medium rounded-md px-2.5 py-1.5 shadow-lg whitespace-nowrap tabular-nums">
       <div>
-        {roundMacro(point.weight)} <span className="font-normal text-slate-300">{unit}</span>
+        {roundMacro(point.weight)} <span className="font-normal text-slate-300 dark:text-slate-600">{unit}</span>
       </div>
-      <div className="text-[10px] text-slate-300 font-normal">
+      <div className="text-[10px] text-slate-300 dark:text-slate-600 font-normal">
         {formatDate(point.recorded_at)}
       </div>
     </div>
@@ -83,23 +83,23 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
   const avg = weights.reduce((s, w) => s + w, 0) / weights.length
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 min-w-0">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 min-w-0">
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
             Progress
           </p>
-          <p className="text-xs text-slate-500 tabular-nums mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums mt-1">
             {formatDate(first.recorded_at)} – {formatDate(last.recorded_at)}
           </p>
         </div>
         <div
           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums border ${
             trendingDown
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
               : trendingUp
-                ? 'bg-red-50 text-red-700 border-red-200'
-                : 'bg-slate-50 text-slate-600 border-slate-200'
+                ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
+                : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
           }`}
         >
           <span aria-hidden>{trendingDown ? '↓' : trendingUp ? '↑' : '→'}</span>
@@ -172,19 +172,19 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
         </ResponsiveContainer>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100">
+      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
         {[
           { label: 'Lowest', value: minWeight },
           { label: 'Average', value: avg },
           { label: 'Highest', value: maxWeight },
         ].map(s => (
           <div key={s.label} className="text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
               {s.label}
             </p>
-            <p className="text-sm font-semibold text-slate-900 tabular-nums mt-0.5">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums mt-0.5">
               {roundMacro(s.value)}
-              <span className="text-slate-400 font-normal text-[10px] ml-1">{weightUnit}</span>
+              <span className="text-slate-400 dark:text-slate-500 font-normal text-[10px] ml-1">{weightUnit}</span>
             </p>
           </div>
         ))}

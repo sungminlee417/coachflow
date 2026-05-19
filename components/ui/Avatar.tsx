@@ -7,8 +7,8 @@ interface AvatarProps {
 }
 
 const toneClasses: Record<Tone, string> = {
-  brand: 'bg-indigo-100 text-indigo-600',
-  success: 'bg-emerald-100 text-emerald-600',
+  brand: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300',
+  success: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300',
 }
 
 const sizeClasses = {

@@ -13,8 +13,18 @@ import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
-import { Settings as SettingsIcon, KeyRound, ToggleRight } from 'lucide-react'
+import {
+  Settings as SettingsIcon,
+  KeyRound,
+  ToggleRight,
+  Monitor,
+  Moon,
+  Sun,
+  Palette,
+} from 'lucide-react'
 import { useProfile, useUpdateProfile } from '@/lib/hooks/use-profile'
+import { useTheme } from '@/lib/theme'
+import type { ThemePreference } from '@/lib/types'
 
 interface SettingsViewProps {
   userId: string
@@ -25,20 +35,85 @@ export default function SettingsView({ userId, email }: SettingsViewProps) {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+        <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">
           <SettingsIcon size={18} />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Settings</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Your account and how the app behaves.
           </p>
         </div>
       </header>
 
+      <AppearanceSection userId={userId} />
       <PreferencesSection userId={userId} />
       <AccountSection email={email} />
     </div>
+  )
+}
+
+// ── Appearance ──────────────────────────────────────────────────────────
+
+function AppearanceSection({ userId }: { userId: string }) {
+  const { theme, setTheme } = useTheme()
+  const update = useUpdateProfile(userId)
+
+  const choose = (next: ThemePreference) => {
+    // Local first — the <html> class flips immediately so the UI reacts
+    // before the network round-trip. The mutation patches the profile
+    // cache optimistically; on error it rolls back the cache, but we
+    // intentionally don't revert the visual theme — the user explicitly
+    // picked it, and a transient sync failure shouldn't undo their UX
+    // choice on this device. Next reload of an unsynced device will
+    // pull the canonical value from the profile.
+    setTheme(next)
+    update.mutate(
+      { theme: next },
+      { onError: () => showToast('Theme saved on this device only', 'error') }
+    )
+  }
+
+  const options: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+    { value: 'system', label: 'System', icon: Monitor },
+    { value: 'light', label: 'Light', icon: Sun },
+    { value: 'dark', label: 'Dark', icon: Moon },
+  ]
+
+  return (
+    <SectionCard
+      icon={Palette}
+      title="Appearance"
+      description="Light, dark, or follow your device."
+    >
+      <div
+        role="radiogroup"
+        aria-label="Theme"
+        className="grid grid-cols-3 gap-2"
+      >
+        {options.map(opt => {
+          const Icon = opt.icon
+          const active = theme === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => choose(opt.value)}
+              className={`flex flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-xs font-medium transition-colors cursor-pointer ${
+                active
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-500/15 dark:text-indigo-200'
+                  : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <Icon size={18} />
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+    </SectionCard>
   )
 }
 
@@ -54,14 +129,14 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+    <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
       <div className="flex items-start gap-3 mb-5">
-        <div className="h-9 w-9 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center shrink-0">
+        <div className="h-9 w-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0">
           <Icon size={16} />
         </div>
         <div className="min-w-0">
-          <h3 className="font-semibold text-slate-900">{title}</h3>
-          <p className="text-xs text-slate-500">{description}</p>
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
         </div>
       </div>
       {children}
@@ -93,7 +168,7 @@ function PreferencesSection({ userId }: { userId: string }) {
       title="Preferences"
       description="Hide things you don't use."
     >
-      <div className="divide-y divide-slate-100 -my-2">
+      <div className="divide-y divide-slate-100 dark:divide-slate-800 -my-2">
         <ToggleRow
           label="Rest timer"
           description="Show a countdown after marking a set complete."
@@ -133,8 +208,8 @@ function ToggleRow({
       }`}
     >
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-900">{label}</p>
-        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{description}</p>
       </div>
       <button
         type="button"
@@ -144,11 +219,11 @@ function ToggleRow({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-6 w-10 shrink-0 rounded-full transition-colors cursor-pointer ${
-          checked ? 'bg-indigo-600' : 'bg-slate-300'
+          checked ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
         } ${disabled ? 'cursor-default' : ''}`}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white dark:bg-slate-900 shadow transition-transform ${
             checked ? 'translate-x-[1.125rem]' : 'translate-x-0.5'
           }`}
         />

@@ -69,8 +69,8 @@ export default function ClientList({ coachId }: ClientListProps) {
       <div>
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Clients</h2>
-            <p className="text-sm text-slate-400 mt-1">Loading clients…</p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Clients</h2>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Loading clients…</p>
           </div>
         </div>
         <ClientGridSkeleton count={6} />
@@ -93,7 +93,7 @@ export default function ClientList({ coachId }: ClientListProps) {
       <div>
         <button
           onClick={() => setShowInvites(false)}
-          className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 mb-6 cursor-pointer"
+          className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 mb-6 cursor-pointer"
         >
           ← Back to Clients
         </button>
@@ -106,8 +106,8 @@ export default function ClientList({ coachId }: ClientListProps) {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">My Clients</h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">My Clients</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             {clients.length} {clients.length === 1 ? 'client' : 'clients'}
           </p>
         </div>
@@ -151,7 +151,7 @@ export default function ClientList({ coachId }: ClientListProps) {
             </div>
           )}
           {visibleClients.length === 0 ? (
-            <p className="text-sm text-slate-500 italic py-6 text-center">
+            <p className="text-sm text-slate-500 dark:text-slate-400 italic py-6 text-center">
               No clients match &ldquo;{query}&rdquo;.
             </p>
           ) : (
@@ -160,22 +160,22 @@ export default function ClientList({ coachId }: ClientListProps) {
             <button
               key={client.id}
               onClick={() => setSelectedClient(client)}
-              className="bg-white rounded-xl border border-slate-200 p-5 hover:border-indigo-200 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all text-left w-full cursor-pointer group"
+              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:border-indigo-200 dark:hover:border-indigo-800 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all text-left w-full cursor-pointer group"
             >
               <div className="flex items-center gap-3">
                 <Avatar name={client.full_name} />
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-slate-900 truncate">{client.full_name}</h3>
-                  <p className="text-sm text-slate-500 truncate">{client.email}</p>
+                  <h3 className="font-medium text-slate-900 dark:text-slate-100 truncate">{client.full_name}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{client.email}</p>
                   {client.started_at && (
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                       Joined {formatDate(client.started_at)}
                     </p>
                   )}
                 </div>
                 <ChevronRight
                   size={16}
-                  className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0"
+                  className="text-slate-300 dark:text-slate-600 group-hover:text-indigo-500 transition-colors shrink-0"
                 />
               </div>
             </button>

@@ -33,7 +33,15 @@ export function useProfile(userId: string) {
 }
 
 type ProfilePatch = Partial<
-  Pick<Profile, 'rest_timer_enabled' | 'show_streak_card' | 'full_name' | 'weight_unit' | 'length_unit'>
+  Pick<
+    Profile,
+    | 'rest_timer_enabled'
+    | 'show_streak_card'
+    | 'full_name'
+    | 'weight_unit'
+    | 'length_unit'
+    | 'theme'
+  >
 >
 
 export function useUpdateProfile(userId: string) {

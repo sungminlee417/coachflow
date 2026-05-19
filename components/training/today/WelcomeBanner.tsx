@@ -44,38 +44,38 @@ export function WelcomeBanner({
   if (!show) return null
 
   return (
-    <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">
+    <div className="rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50 to-white p-5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
         Welcome
       </p>
-      <h3 className="text-lg font-bold text-slate-900 mt-1">
+      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
         Let&rsquo;s get you set up
       </h3>
-      <p className="text-sm text-slate-600 mt-1">
+      <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
         Every CoachFlow account can coach and train. Pick where to start:
       </p>
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
         <button
           type="button"
           onClick={() => onNavigate('my-workouts')}
-          className="text-left rounded-xl border border-slate-200 bg-white p-3 hover:border-indigo-300 transition-colors cursor-pointer"
+          className="text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 hover:border-indigo-300 transition-colors cursor-pointer"
         >
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             Build a workout
           </p>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Make a template you can assign to yourself or a client.
           </p>
         </button>
         <button
           type="button"
           onClick={() => onNavigate('my-clients')}
-          className="text-left rounded-xl border border-slate-200 bg-white p-3 hover:border-indigo-300 transition-colors cursor-pointer"
+          className="text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 hover:border-indigo-300 transition-colors cursor-pointer"
         >
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             Invite a client
           </p>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Generate a code to bring someone you coach onto the app.
           </p>
         </button>

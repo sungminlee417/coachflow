@@ -75,11 +75,11 @@ export function DatePicker({
         id={id}
         type="button"
         onClick={() => setOpen(o => !o)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors cursor-pointer ${
-          value ? 'text-slate-900' : 'text-slate-400'
+        className={`w-full flex items-center gap-2 px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-900 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors cursor-pointer ${
+          value ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'
         }`}
       >
-        <Calendar size={16} className="text-slate-400 shrink-0" />
+        <Calendar size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
         <span className="flex-1 text-left truncate">
           {value ? formatPretty(value) : placeholder}
         </span>
@@ -91,7 +91,7 @@ export function DatePicker({
               e.stopPropagation()
               onChange('')
             }}
-            className="text-slate-400 hover:text-slate-700 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
           >
             <X size={14} />
           </span>
@@ -100,7 +100,7 @@ export function DatePicker({
 
       {open && (
         <div
-          className="absolute z-50 mt-2 bg-white rounded-xl border border-slate-200 shadow-xl p-3 left-0"
+          className="absolute z-50 mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl p-3 left-0"
           style={
             {
               animation: 'popIn 0.15s ease-out',

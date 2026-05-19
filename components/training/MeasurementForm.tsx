@@ -128,9 +128,9 @@ export default function MeasurementForm({
           />
         </Field>
 
-        <p className="text-[10px] text-slate-400">
-          All measurements are <span className="font-semibold text-slate-600">circumference</span>
-          {' '}in <span className="font-semibold text-slate-600">{lengthUnit}</span>
+        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+          All measurements are <span className="font-semibold text-slate-600 dark:text-slate-300">circumference</span>
+          {' '}in <span className="font-semibold text-slate-600 dark:text-slate-300">{lengthUnit}</span>
           {lengthUnit === 'in' ? ' — pick the whole inches and the fraction.' : '.'}
         </p>
 
@@ -140,12 +140,12 @@ export default function MeasurementForm({
             return (
               <div key={key} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <label className="text-sm text-slate-700">{label}</label>
+                  <label className="text-sm text-slate-700 dark:text-slate-300">{label}</label>
                   {flexedKey && (
                     <div
                       role="radiogroup"
                       aria-label={`${label} state`}
-                      className="inline-flex bg-slate-100 rounded-lg p-0.5 text-xs"
+                      className="inline-flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 text-xs"
                     >
                       <button
                         type="button"
@@ -154,8 +154,8 @@ export default function MeasurementForm({
                         onClick={() => update(flexedKey, false)}
                         className={`px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
                           !isFlexed
-                            ? 'bg-white text-slate-900 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
+                            ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                         }`}
                       >
                         Relaxed
@@ -167,8 +167,8 @@ export default function MeasurementForm({
                         onClick={() => update(flexedKey, true)}
                         className={`px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
                           isFlexed
-                            ? 'bg-white text-indigo-600 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
+                            ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                         }`}
                       >
                         Flexed
@@ -197,7 +197,7 @@ export default function MeasurementForm({
         </Field>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 pt-4 mt-2 border-t border-slate-100">
+      <div className="flex flex-wrap items-center gap-2 pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">
         <UnsavedBadge visible={isDirty && !saving} />
         <div className="flex-1" />
         <Button variant="secondary" onClick={requestClose}>

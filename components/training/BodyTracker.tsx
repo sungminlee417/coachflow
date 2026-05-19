@@ -17,8 +17,8 @@ export default function BodyTracker({ profile: initialProfile }: BodyTrackerProp
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">Measurements</h2>
-        <p className="text-sm text-slate-500 mt-1 mb-4">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Measurements</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">
           Track your weight daily and your circumference over time
         </p>
         <UnitToggle

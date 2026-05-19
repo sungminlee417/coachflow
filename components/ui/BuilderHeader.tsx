@@ -20,7 +20,7 @@ export function BuilderHeader({
       <IconButton onClick={onBack} aria-label="Go back">
         <ArrowLeft size={18} />
       </IconButton>
-      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+      <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h2>
     </div>
   )
 }

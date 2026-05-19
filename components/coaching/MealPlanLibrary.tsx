@@ -271,8 +271,8 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
       <div>
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Meal Plan Library</h2>
-            <p className="text-sm text-slate-400 mt-1">Loading meal plans…</p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Meal Plan Library</h2>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Loading meal plans…</p>
           </div>
         </div>
         <CardGridSkeleton count={6} />
@@ -302,8 +302,8 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
 
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Meal Plans</h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Meal Plans</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             {plans.length} {plans.length === 1 ? 'meal plan' : 'meal plans'}
           </p>
         </div>
@@ -342,7 +342,7 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
             </div>
           )}
           {visiblePlans.length === 0 ? (
-            <p className="text-sm text-slate-500 italic py-6 text-center">
+            <p className="text-sm text-slate-500 dark:text-slate-400 italic py-6 text-center">
               No meal plans match &ldquo;{query}&rdquo;.
             </p>
           ) : (
@@ -350,20 +350,20 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
               {visiblePlans.map(plan => (
             <div
               key={plan.id}
-              className="bg-white rounded-xl border border-slate-200 p-5 transition-all hover:border-emerald-200 hover:shadow-md hover:-translate-y-0.5"
+              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-5 transition-all hover:border-emerald-200 dark:hover:border-emerald-800 hover:shadow-md hover:-translate-y-0.5"
             >
               <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-slate-900">{plan.name}</h3>
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100">{plan.name}</h3>
                 {plan.is_template && (
-                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-50 text-purple-600 border border-purple-200 rounded-full">
+                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800 rounded-full">
                     Template
                   </span>
                 )}
               </div>
               {plan.description && (
-                <p className="text-sm text-slate-500 mb-3 line-clamp-2">{plan.description}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">{plan.description}</p>
               )}
-              <p className="text-xs text-slate-400 mb-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
                 {plan.meal_count} {plan.meal_count === 1 ? 'meal' : 'meals'}
               </p>
               <div className="flex gap-2">

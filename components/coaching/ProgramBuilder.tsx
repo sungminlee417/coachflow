@@ -282,14 +282,14 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
             type="checkbox"
             checked={isTemplate}
             onChange={e => setIsTemplate(e.target.checked)}
-            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+            className="h-4 w-4 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 border-slate-300 dark:border-slate-600 rounded cursor-pointer"
           />
-          <span className="text-sm text-slate-700">Save as template</span>
+          <span className="text-sm text-slate-700 dark:text-slate-300">Save as template</span>
         </label>
       </BuilderCard>
 
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
           Workouts
         </h3>
         <Button variant="success" size="sm" onClick={() => setShowPicker(true)}>
@@ -307,22 +307,22 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
           className="space-y-2"
           renderItem={(m, idx, dragProps) => (
             <div
-              className={`bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3 ${
+              className={`bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex items-center gap-3 ${
                 dragProps.isDragging ? 'shadow-lg' : ''
               }`}
             >
               <DragHandle {...dragProps} />
-              <span className="text-xs font-semibold text-slate-400 tabular-nums w-6">
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 tabular-nums w-6">
                 {idx + 1}.
               </span>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-slate-900 truncate">{m.name}</p>
-                <p className="text-xs text-slate-500 truncate">
+                <p className="font-medium text-slate-900 dark:text-slate-100 truncate">{m.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                   {m.exercise_count} {m.exercise_count === 1 ? 'exercise' : 'exercises'}
                   {m.cycle_length && m.cycle_position && (
                     <>
                       {' · '}
-                      <span className="text-indigo-600 font-medium tabular-nums">
+                      <span className="text-indigo-600 dark:text-indigo-400 font-medium tabular-nums">
                         Day {m.cycle_position} of {m.cycle_length}
                       </span>
                     </>
@@ -370,7 +370,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
           <div className="relative">
             <Search
               size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
             />
             <Input
               value={pickerQuery}
@@ -381,7 +381,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
             />
           </div>
           {pickerCandidates.length === 0 ? (
-            <p className="text-sm text-slate-400 italic py-6 text-center">
+            <p className="text-sm text-slate-400 dark:text-slate-500 italic py-6 text-center">
               {allWorkouts.length === 0
                 ? 'You don’t have any workouts yet. Create one in the Workouts tab first.'
                 : pickerQuery.trim()
@@ -395,11 +395,11 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
                   key={w.id}
                   type="button"
                   onClick={() => addMember(w)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between gap-2"
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-between gap-2"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-slate-900 truncate">{w.name}</p>
-                    <p className="text-xs text-slate-500 truncate">
+                    <p className="font-medium text-slate-900 dark:text-slate-100 truncate">{w.name}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                       {w.exercise_count}{' '}
                       {w.exercise_count === 1 ? 'exercise' : 'exercises'}
                       {w.cycle_length && w.cycle_position && (
@@ -409,7 +409,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
                       )}
                     </p>
                   </div>
-                  <Plus size={14} className="text-emerald-600 shrink-0" />
+                  <Plus size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                 </button>
               ))}
             </div>

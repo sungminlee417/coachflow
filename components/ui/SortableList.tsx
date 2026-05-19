@@ -124,7 +124,7 @@ export function DragHandle({ attributes, listeners }: DragHandleProps) {
       {...attributes}
       {...listeners}
       aria-label="Drag to reorder"
-      className="h-8 w-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md cursor-grab active:cursor-grabbing touch-none shrink-0"
+      className="h-8 w-8 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md cursor-grab active:cursor-grabbing touch-none shrink-0"
     >
       <GripVertical size={16} />
     </button>

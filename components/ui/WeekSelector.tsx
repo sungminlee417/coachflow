@@ -21,13 +21,13 @@ interface WeekSelectorProps {
 const toneClasses = {
   brand: {
     selected: 'bg-indigo-600 text-white',
-    today: 'bg-indigo-100 text-indigo-900',
-    accent: 'text-indigo-600 hover:text-indigo-800',
+    today: 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-200',
+    accent: 'text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200',
   },
   success: {
     selected: 'bg-emerald-600 text-white',
-    today: 'bg-emerald-100 text-emerald-900',
-    accent: 'text-emerald-600 hover:text-emerald-800',
+    today: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200',
+    accent: 'text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200',
   },
 }
 
@@ -51,12 +51,12 @@ export function WeekSelector({ selectedDate, onSelect, tone = 'brand' }: WeekSel
           type="button"
           onClick={() => onSelect(shiftDateISO(selectedDate, -7))}
           aria-label="Previous week"
-          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer"
         >
           <ChevronLeft size={16} />
         </button>
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-semibold text-slate-600 tabular-nums truncate">
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 tabular-nums truncate">
             {rangeLabel}
           </span>
           {!isThisWeek && (
@@ -73,7 +73,7 @@ export function WeekSelector({ selectedDate, onSelect, tone = 'brand' }: WeekSel
           type="button"
           onClick={() => onSelect(shiftDateISO(selectedDate, 7))}
           aria-label="Next week"
-          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer"
         >
           <ChevronRight size={16} />
         </button>
@@ -98,7 +98,7 @@ export function WeekSelector({ selectedDate, onSelect, tone = 'brand' }: WeekSel
                   ? tones.selected
                   : isToday
                     ? tones.today
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               <div className="text-[10px] sm:text-xs font-medium">{DAY_NAMES[index]}</div>

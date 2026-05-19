@@ -164,7 +164,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-4">My Workouts</h2>
+      <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">My Workouts</h2>
 
       <WeekSelector selectedDate={selectedDate} onSelect={setSelectedDate} tone="brand" />
 
@@ -177,9 +177,9 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
           ))}
         </div>
       ) : assignments.length === 0 ? (
-        <div className="bg-slate-50 rounded-xl p-8 text-center">
-          <p className="text-slate-500">No workouts assigned for this day</p>
-          <p className="text-sm text-slate-400 mt-2">
+        <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-8 text-center">
+          <p className="text-slate-500 dark:text-slate-400">No workouts assigned for this day</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">
             Check other days or assign yourself one from My Workouts
           </p>
         </div>
@@ -190,7 +190,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
             return (
             <div
               key={assignment.id}
-              className="bg-white rounded-xl border border-slate-200"
+              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700"
             >
               {/* Sticky workout-name bar — keeps "Push Day" / "Pull Day" /
                   whatever visible while the trainee scrolls through the
@@ -199,14 +199,14 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                   nav; the card no longer uses `overflow-hidden` so sticky
                   can actually pin against the viewport instead of the
                   card's own box. */}
-              <div className="sticky top-14 md:top-0 z-10 bg-white rounded-t-xl px-6 pt-6 pb-3 flex items-start justify-between gap-3 border-b border-slate-100">
+              <div className="sticky top-14 md:top-0 z-10 bg-white dark:bg-slate-900 rounded-t-xl px-6 pt-6 pb-3 flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
-                  <h3 className="text-xl font-bold text-slate-900 truncate min-w-0">
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 truncate min-w-0">
                     {assignment.workout.name}
                   </h3>
                   {assignment.workout.cycle_length &&
                     assignment.workout.cycle_position && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5 tabular-nums shrink-0">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-full px-2 py-0.5 tabular-nums shrink-0">
                         Day {assignment.workout.cycle_position} / {assignment.workout.cycle_length}
                       </span>
                     )}
@@ -231,10 +231,10 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                 {(assignment.workout.description || assignment.notes) && (
                   <div className="mb-4">
                     {assignment.workout.description && (
-                      <p className="text-slate-600 text-sm">{assignment.workout.description}</p>
+                      <p className="text-slate-600 dark:text-slate-300 text-sm">{assignment.workout.description}</p>
                     )}
                     {assignment.notes && (
-                      <p className="text-indigo-600 text-sm mt-2 italic">
+                      <p className="text-indigo-600 dark:text-indigo-400 text-sm mt-2 italic">
                         Coach note: {assignment.notes}
                       </p>
                     )}
@@ -254,22 +254,22 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                   )
                   const est = estimateWorkoutSeconds(exList)
                   return (
-                    <div className="mb-3 flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-slate-500 tabular-nums">
+                    <div className="mb-3 flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                       <span>
-                        <span className="font-semibold text-slate-700">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
                           {exList.length}
                         </span>{' '}
                         {exList.length === 1 ? 'exercise' : 'exercises'}
                       </span>
-                      <span className="text-slate-300">·</span>
+                      <span className="text-slate-300 dark:text-slate-600">·</span>
                       <span>
-                        <span className="font-semibold text-slate-700">{setCount}</span>{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">{setCount}</span>{' '}
                         {setCount === 1 ? 'set' : 'sets'}
                       </span>
                       {est > 0 && (
                         <>
-                          <span className="text-slate-300">·</span>
-                          <span className="font-medium text-slate-600">
+                          <span className="text-slate-300 dark:text-slate-600">·</span>
+                          <span className="font-medium text-slate-600 dark:text-slate-300">
                             {formatEstimate(est)}
                           </span>
                         </>
@@ -283,7 +283,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                     onClick={() =>
                       setExpanded(expanded === assignment.id ? null : assignment.id)
                     }
-                    className="text-left text-indigo-600 hover:text-indigo-800 font-medium text-sm cursor-pointer"
+                    className="text-left text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 font-medium text-sm cursor-pointer"
                   >
                     {expanded === assignment.id ? '▼ Hide' : '▶ Show'} Exercises (
                     {assignment.workout.exercises?.length ?? 0})
@@ -314,7 +314,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                             return next
                           })
                         }}
-                        className="text-xs font-semibold uppercase tracking-widest text-slate-400 hover:text-slate-700 cursor-pointer"
+                        className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
                       >
                         {anyCollapsed ? 'Expand all' : 'Collapse all'}
                       </button>
@@ -355,8 +355,8 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                             key={exercise.id ?? group.startIndex}
                             className={`rounded-lg ${
                               isCardio
-                                ? 'bg-amber-50/40 border border-amber-100'
-                                : 'bg-slate-50'
+                                ? 'bg-amber-50/40 border border-amber-100 dark:border-amber-900'
+                                : 'bg-slate-50 dark:bg-slate-800'
                             }`}
                           >
                             <button
@@ -371,21 +371,21 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   sm+ the original side-by-side layout returns. */}
                               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3 sm:flex-wrap">
                                 <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
-                                  <span className="text-slate-400 shrink-0">
+                                  <span className="text-slate-400 dark:text-slate-500 shrink-0">
                                     {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                                   </span>
-                                  <span className="text-slate-500 text-sm font-medium shrink-0">
+                                  <span className="text-slate-500 dark:text-slate-400 text-sm font-medium shrink-0">
                                     {group.startIndex + 1}.
                                   </span>
                                   <span
-                                    className="font-semibold text-slate-900 wrap-break-word"
+                                    className="font-semibold text-slate-900 dark:text-slate-100 wrap-break-word"
                                     title={displayName}
                                   >
                                     {displayName}
                                   </span>
                                   {activeSub && (
                                     <span
-                                      className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5 shrink-0"
+                                      className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-full px-2 py-0.5 shrink-0"
                                       title={`Swapped from ${exercise.name}`}
                                     >
                                       <span className="text-indigo-500">↺</span>
@@ -396,7 +396,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                     </span>
                                   )}
                                   {isCardio && (
-                                    <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-px shrink-0">
+                                    <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 rounded px-1.5 py-px shrink-0">
                                       <HeartPulse size={10} />
                                       Cardio
                                     </span>
@@ -405,7 +405,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                 {(cardioSummary || (exercise.rest_seconds != null && exercise.rest_seconds > 0)) && (
                                   <div className="flex items-baseline gap-3 flex-wrap pl-6 sm:pl-0 sm:shrink-0">
                                     {cardioSummary && (
-                                      <span className="text-xs text-amber-700 whitespace-nowrap">
+                                      <span className="text-xs text-amber-700 dark:text-amber-300 whitespace-nowrap">
                                         Target:{' '}
                                         <span className="font-semibold tabular-nums">
                                           {cardioSummary}
@@ -413,7 +413,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                       </span>
                                     )}
                                     {exercise.rest_seconds != null && exercise.rest_seconds > 0 && (
-                                      <span className="text-xs text-slate-500 whitespace-nowrap">
+                                      <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                         Rest:{' '}
                                         <span className="font-medium">{exercise.rest_seconds}s</span>
                                       </span>
@@ -440,7 +440,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   </div>
                                 )}
                                 {exercise.notes && (
-                                  <p className="text-slate-600 text-sm italic mb-2">
+                                  <p className="text-slate-600 dark:text-slate-300 text-sm italic mb-2">
                                     {exercise.notes}
                                   </p>
                                 )}
@@ -517,32 +517,32 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                       <div className="flex items-baseline gap-2 min-w-0">
                                         <span
                                           className={`font-bold tabular-nums shrink-0 ${
-                                            isCardio ? 'text-amber-600' : 'text-indigo-700'
+                                            isCardio ? 'text-amber-600 dark:text-amber-400' : 'text-indigo-700 dark:text-indigo-300'
                                           }`}
                                         >
                                           {String.fromCharCode(65 + j)}
                                         </span>
                                         <span
-                                          className="font-medium text-slate-900 truncate min-w-0"
+                                          className="font-medium text-slate-900 dark:text-slate-100 truncate min-w-0"
                                           title={displayName}
                                         >
                                           {displayName}
                                         </span>
                                         {activeSub && (
                                           <span
-                                            className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-px shrink-0"
+                                            className="text-[9px] uppercase tracking-widest font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded px-1 py-px shrink-0"
                                             title={`Swapped from ${ex.name}`}
                                           >
                                             Swapped
                                           </span>
                                         )}
                                         {isCardio && firstDuration != null && (
-                                          <span className="text-amber-700 font-medium tabular-nums shrink-0">
+                                          <span className="text-amber-700 dark:text-amber-300 font-medium tabular-nums shrink-0">
                                             {formatDuration(firstDuration)}
                                           </span>
                                         )}
                                         {ex.notes && (
-                                          <span className="text-slate-500 italic truncate hidden sm:inline">
+                                          <span className="text-slate-500 dark:text-slate-400 italic truncate hidden sm:inline">
                                             &middot; {ex.notes}
                                           </span>
                                         )}

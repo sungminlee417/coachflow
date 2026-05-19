@@ -37,15 +37,15 @@ export function BodyMeasurementCard({
       {!loaded ? (
         <CardSkeletonBody lines={1} />
       ) : !latest ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           No measurements yet. Tap to record neck / waist / arms / legs.
         </p>
       ) : (
         <div className="flex items-baseline justify-between gap-2">
-          <p className="font-semibold text-slate-900">
+          <p className="font-semibold text-slate-900 dark:text-slate-100">
             Last measured
           </p>
-          <p className="text-xs text-slate-500 shrink-0">
+          <p className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
             {daysSince === 0
               ? 'Today'
               : daysSince === 1

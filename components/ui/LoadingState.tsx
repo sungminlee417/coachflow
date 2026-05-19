@@ -10,11 +10,11 @@ export function LoadingState({ label = 'Loading…', size = 'page' }: LoadingSta
   const padding = size === 'page' ? 'py-16' : 'py-6'
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-2 text-slate-400 ${padding}`}
+      className={`flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-500 ${padding}`}
       role="status"
       aria-live="polite"
     >
-      <Spinner size={20} className="text-slate-400" />
+      <Spinner size={20} className="text-slate-400 dark:text-slate-500" />
       <span className="text-xs font-medium">{label}</span>
     </div>
   )

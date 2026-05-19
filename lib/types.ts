@@ -1,5 +1,6 @@
 export type LengthUnit = 'in' | 'cm'
 export type WeightUnit = 'lbs' | 'kg'
+export type ThemePreference = 'system' | 'light' | 'dark'
 
 export interface Profile {
   id: string
@@ -14,6 +15,9 @@ export interface Profile {
   /** Settings → Preferences toggles. Default true (historical behavior). */
   rest_timer_enabled?: boolean
   show_streak_card?: boolean
+  /** Settings → Appearance. 'system' follows OS prefers-color-scheme;
+   *  'light' / 'dark' force the theme regardless of OS preference. */
+  theme?: ThemePreference
   created_at?: string
   updated_at?: string
 }

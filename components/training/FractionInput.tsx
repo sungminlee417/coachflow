@@ -81,7 +81,7 @@ export function FractionInput({ value, onChange, unit, placeholder }: FractionIn
         value={String(fraction)}
         onChange={e => setFraction(parseFloat(e.target.value))}
         aria-label="Fraction of an inch"
-        className="text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg px-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-slate-400 transition-colors"
+        className="text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-slate-400 transition-colors"
       >
         {FRACTIONS.map(f => (
           <option key={f.value} value={f.value}>
