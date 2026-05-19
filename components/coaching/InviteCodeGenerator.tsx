@@ -166,8 +166,8 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
       <div>
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Invite Codes</h2>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Loading invite codes…</p>
+            <h2 className="text-2xl font-bold text-foreground">Invite Codes</h2>
+            <p className="text-sm text-subtle mt-1">Loading invite codes…</p>
           </div>
         </div>
         <InviteCodeListSkeleton count={3} />
@@ -179,8 +179,8 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Invite Codes</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Generate invite codes to connect with new clients</p>
+          <h2 className="text-2xl font-bold text-foreground">Invite Codes</h2>
+          <p className="text-sm text-muted mt-1">Generate invite codes to connect with new clients</p>
         </div>
         <Button onClick={openGenerateModal} className="w-full sm:w-auto">
           <Plus size={16} />
@@ -213,35 +213,35 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
               const isUsable = !isRevoked && !isExpired && !isUsedUp
 
               const statusBadge = isRevoked
-                ? { label: 'Revoked', cls: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' }
+                ? { label: 'Revoked', cls: 'bg-elevated text-muted border-line' }
                 : isExpired
-                  ? { label: 'Expired', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800' }
+                  ? { label: 'Expired', cls: 'bg-amber-soft text-amber-fg border-amber-line' }
                   : isUsedUp
-                    ? { label: 'Used up', cls: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' }
-                    : { label: 'Active', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800' }
+                    ? { label: 'Used up', cls: 'bg-elevated text-muted border-line' }
+                    : { label: 'Active', cls: 'bg-emerald-soft text-emerald-fg border-emerald-line' }
 
               const expiryTone =
                 expiry.tone === 'expired'
                   ? 'text-amber-600'
                   : expiry.tone === 'soon'
                     ? 'text-amber-600'
-                    : 'text-slate-400'
+                    : 'text-subtle'
 
               return (
                 <div
                   key={invite.id}
-                  className={`bg-white dark:bg-slate-900 rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-                    isRevoked ? 'border-slate-200 dark:border-slate-700 opacity-60' : 'border-slate-200'
+                  className={`bg-surface rounded-xl border border-line p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+                    isRevoked ? 'opacity-60' : ''
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
-                    <code className={`text-sm font-mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg ${isRevoked ? 'text-slate-400 dark:text-slate-500 line-through' : 'text-slate-700 dark:text-slate-300'}`}>
+                    <code className={`text-sm font-mono bg-elevated border border-line px-3 py-1.5 rounded-lg ${isRevoked ? 'text-subtle line-through' : 'text-foreground '}`}>
                       {invite.code}
                     </code>
                     <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full border ${statusBadge.cls}`}>
                       {statusBadge.label}
                     </span>
-                    <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500">
+                    <span className="text-xs sm:text-sm text-subtle">
                       {isUnlimited
                         ? `${invite.times_used} used`
                         : `${invite.times_used}/${invite.max_uses} used`}
@@ -251,7 +251,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
                         {expiry.text}
                       </span>
                     )}
-                    <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500">
+                    <span className="text-xs sm:text-sm text-subtle">
                       Created {formatDate(invite.created_at)}
                     </span>
                   </div>
@@ -259,7 +259,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
                     {isUsable && (
                       <button
                         onClick={() => handleCopy(invite.code)}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg transition-colors cursor-pointer font-medium border border-indigo-100 dark:border-indigo-900 sm:border-transparent flex-1 sm:flex-initial"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-indigo-fg hover:bg-indigo-soft rounded-lg transition-colors cursor-pointer font-medium border border-indigo-line sm:border-transparent flex-1 sm:flex-initial"
                       >
                         <Copy size={14} />
                         Copy Link
@@ -283,7 +283,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
             <button
               type="button"
               onClick={() => setShowRevoked(s => !s)}
-              className="mt-4 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
+              className="mt-4 text-xs font-medium text-muted hover:text-foreground cursor-pointer"
             >
               {showRevoked
                 ? `Hide revoked (${revokedCount})`
@@ -300,7 +300,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
       >
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Number of uses
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -312,15 +312,15 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
                     type="button"
                     onClick={() => setUsesChoice(opt.value)}
                     className={`rounded-xl border p-3 text-center transition-colors cursor-pointer ${
-                      selected
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
-                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
+ selected
+ ? 'border-indigo-500 bg-indigo-soft '
+ : 'border-line hover:border-line '
+ }`}
                   >
-                    <div className={`text-xl font-bold ${selected ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-slate-100'}`}>
+                    <div className={`text-xl font-bold ${selected ? 'text-indigo-fg ' : 'text-foreground '}`}>
                       {opt.label}
                     </div>
-                    <div className={`text-[11px] ${selected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <div className={`text-[11px] ${selected ? 'text-indigo-fg ' : 'text-muted '}`}>
                       {opt.sublabel}
                     </div>
                   </button>
@@ -330,7 +330,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Expires in
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -342,23 +342,23 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
                     type="button"
                     onClick={() => setExpiryChoice(opt.value)}
                     className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                      selected
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
+ selected
+ ? 'border-indigo-500 bg-indigo-soft text-indigo-fg '
+ : 'border-line text-foreground hover:border-line '
+ }`}
                   >
                     {opt.label}
                   </button>
                 )
               })}
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
+            <p className="text-[11px] text-subtle mt-2">
               Tip: short-lived codes are safer if you&apos;re posting the link anywhere public.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-5 mt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex flex-wrap items-center gap-2 pt-5 mt-2 border-t border-line-subtle">
           <div className="flex-1" />
           <Button
             variant="secondary"

@@ -222,8 +222,8 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
       <div>
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Workout Library</h2>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Loading workouts…</p>
+            <h2 className="text-2xl font-bold text-foreground">Workout Library</h2>
+            <p className="text-sm text-subtle mt-1">Loading workouts…</p>
           </div>
         </div>
         <CardGridSkeleton count={6} />
@@ -255,8 +255,8 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
 
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Workout Library</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <h2 className="text-2xl font-bold text-foreground">Workout Library</h2>
+          <p className="text-sm text-muted mt-1">
             {workouts.length} {workouts.length === 1 ? 'workout' : 'workouts'}
           </p>
         </div>
@@ -298,7 +298,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
             </div>
           )}
           {visibleWorkouts.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 italic py-6 text-center">
+            <p className="text-sm text-muted italic py-6 text-center">
               No workouts match &ldquo;{query}&rdquo;.
             </p>
           ) : (
@@ -306,30 +306,30 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
           {visibleWorkouts.map(workout => (
             <div
               key={workout.id}
-              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-5 transition-all hover:border-indigo-200 dark:hover:border-indigo-800 hover:shadow-md hover:-translate-y-0.5"
+              className="bg-surface rounded-xl border border-line p-5 transition-all hover:border-indigo-line hover:shadow-md hover:-translate-y-0.5"
             >
               <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100">{workout.name}</h3>
+                <h3 className="font-semibold text-foreground">{workout.name}</h3>
                 {workout.is_template && (
-                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800 rounded-full">
+                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-soft text-purple-fg border border-purple-line rounded-full">
                     Template
                   </span>
                 )}
               </div>
               {workout.description && (
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">{workout.description}</p>
+                <p className="text-sm text-muted mb-3 line-clamp-2">{workout.description}</p>
               )}
               <div className="flex items-center gap-2 flex-wrap mb-3">
-                <p className="text-xs text-slate-400 dark:text-slate-500">
+                <p className="text-xs text-subtle">
                   {workout.exercise_count} {workout.exercise_count === 1 ? 'exercise' : 'exercises'}
                 </p>
                 {workout.cycle_length && workout.cycle_position && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-full px-2 py-0.5 tabular-nums">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-soft text-indigo-fg border border-indigo-line rounded-full px-2 py-0.5 tabular-nums">
                     {workout.cycle_length}-day · day {workout.cycle_position}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2 pt-3 border-t border-line-subtle">
                 <Button onClick={() => setAssigningWorkout(workout)} className="flex-1">
                   <Send size={16} />
                   Assign

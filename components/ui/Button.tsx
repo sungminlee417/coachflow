@@ -17,12 +17,11 @@ const base =
 const variants: Record<Variant, string> = {
   // Solid-color variants keep the same hue in dark mode — the saturated
   // brand colors carry the same meaning either way. Only the neutral
-  // "secondary" variant needs explicit dark surfaces.
+  // "secondary" variant needs theme-aware surfaces, which the semantic
+  // tokens handle automatically.
   primary: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
   success: 'bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500',
-  secondary:
-    'border border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-slate-300 ' +
-    'dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus:ring-slate-500',
+  secondary: 'border border-line text-foreground hover:bg-elevated focus:ring-line',
   danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
 }
 

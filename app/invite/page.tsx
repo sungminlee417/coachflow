@@ -36,21 +36,21 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
     const coachName = (invite?.profiles as any)?.full_name || 'a coach'
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-elevated">
         <div className="max-w-sm w-full mx-4 text-center">
           <div className="mb-8">
             <div className="inline-flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                 <Dumbbell size={16} className="text-white" />
               </div>
-              <span className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">CoachFlow</span>
+              <span className="text-lg font-bold text-foreground tracking-tight">CoachFlow</span>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-8">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">You&apos;ve been invited</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">
-              <span className="font-medium text-slate-700 dark:text-slate-300">{coachName}</span> wants to coach you on CoachFlow.
+          <div className="bg-surface rounded-xl border border-line shadow-sm p-8">
+            <h2 className="text-xl font-bold text-foreground mb-2">You&apos;ve been invited</h2>
+            <p className="text-muted text-sm mb-8">
+              <span className="font-medium text-foreground">{coachName}</span> wants to coach you on CoachFlow.
             </p>
 
             <div className="space-y-3">
@@ -62,7 +62,7 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
               </Link>
               <Link
                 href={`/signup?invite=${code}`}
-                className="flex items-center justify-center w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="flex items-center justify-center w-full px-4 py-2.5 border border-line text-foreground rounded-xl text-sm font-semibold hover:bg-elevated transition-colors cursor-pointer"
               >
                 Create an account
               </Link>

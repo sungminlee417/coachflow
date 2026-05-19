@@ -153,33 +153,33 @@ export default function ProgramAssignmentModal({
 
   return (
     <Modal open={open} title="Assign Program" onClose={onClose}>
-      <div className="mb-4 px-3 py-2 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg flex items-center gap-2">
-        <ListChecks size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-        <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium truncate">{programName}</p>
+      <div className="mb-4 px-3 py-2 bg-indigo-soft border border-indigo-line rounded-lg flex items-center gap-2">
+        <ListChecks size={16} className="text-indigo-fg shrink-0" />
+        <p className="text-sm text-indigo-fg font-medium truncate">{programName}</p>
       </div>
 
-      <div className="mb-5 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+      <div className="mb-5 px-3 py-2 bg-elevated border border-line rounded-lg">
         {loadingMembers ? (
-          <p className="text-xs text-slate-400 dark:text-slate-500">Loading workouts…</p>
+          <p className="text-xs text-subtle">Loading workouts…</p>
         ) : members.length === 0 ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+          <p className="text-xs text-muted italic">
             This program doesn’t have any workouts yet.
           </p>
         ) : (
           <>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-subtle mb-1">
               Will assign {members.length}{' '}
               {members.length === 1 ? 'workout' : 'workouts'}
             </p>
-            <ol className="text-xs text-slate-700 dark:text-slate-300 space-y-0.5">
+            <ol className="text-xs text-foreground space-y-0.5">
               {members.map((m, i) => (
                 <li key={m.workout_id} className="truncate">
-                  <span className="text-slate-400 dark:text-slate-500 mr-1 tabular-nums">{i + 1}.</span>
+                  <span className="text-subtle mr-1 tabular-nums">{i + 1}.</span>
                   {m.workout?.name ?? '(deleted workout)'}
                 </li>
               ))}
             </ol>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+            <p className="text-[10px] text-subtle mt-2">
               Workouts already assigned to this person will be left as-is.
             </p>
           </>
@@ -203,7 +203,7 @@ export default function ProgramAssignmentModal({
               placeholder="Today"
               allowClear
             />
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-[11px] text-muted mt-1">
               Cycle workouts in this program will use this anchor. Defaults to today.
             </p>
           </Field>
@@ -213,13 +213,13 @@ export default function ProgramAssignmentModal({
           <button
             type="button"
             onClick={() => setShowSchedule(!showSchedule)}
-            className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
+            className="flex items-center gap-2 text-sm text-muted hover:text-foreground cursor-pointer"
           >
             <Calendar size={14} />
             {showSchedule ? 'Hide schedule' : 'Schedule (optional)'}
           </button>
           {!showSchedule && (
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 ml-6">
+            <p className="text-xs text-subtle mt-1 ml-6">
               Active immediately, no end date. Each workout uses its own days/cycle.
             </p>
           )}

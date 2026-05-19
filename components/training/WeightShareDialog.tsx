@@ -126,7 +126,7 @@ export function WeightShareDialog({
           <div>
             <label
               htmlFor="ws-from"
-              className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide"
+              className="block text-[10px] text-muted mb-1 uppercase tracking-wide"
             >
               From
             </label>
@@ -135,7 +135,7 @@ export function WeightShareDialog({
           <div>
             <label
               htmlFor="ws-to"
-              className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide"
+              className="block text-[10px] text-muted mb-1 uppercase tracking-wide"
             >
               To
             </label>
@@ -153,7 +153,7 @@ export function WeightShareDialog({
               key={opt.days}
               type="button"
               onClick={() => setQuickRange(opt.days)}
-              className="px-3 py-2 text-xs font-medium rounded-full border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50/40 transition-colors cursor-pointer"
+              className="px-3 py-2 text-xs font-medium rounded-full border border-line text-muted hover:border-indigo-300 hover:text-indigo-fg hover:bg-indigo-50/40 transition-colors cursor-pointer"
             >
               Last {opt.label}
             </button>
@@ -161,24 +161,24 @@ export function WeightShareDialog({
         </div>
 
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-subtle mb-2">
             Preview
           </p>
-          <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 max-h-64 overflow-y-auto">
+          <div className="bg-elevated border border-line rounded-lg p-3 max-h-64 overflow-y-auto">
             {loading ? (
-              <p className="text-sm text-slate-400 dark:text-slate-500">Loading…</p>
+              <p className="text-sm text-subtle">Loading…</p>
             ) : shareText ? (
-              <pre className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+              <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed">
                 {shareText}
               </pre>
             ) : (
-              <p className="text-sm text-slate-400 dark:text-slate-500">
+              <p className="text-sm text-subtle">
                 No weight entries in this range.
               </p>
             )}
           </div>
           {shareText && (
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
+            <p className="text-[11px] text-subtle mt-2">
               {logs.length} {logs.length === 1 ? 'entry' : 'entries'}
             </p>
           )}
@@ -187,7 +187,7 @@ export function WeightShareDialog({
 
       {/* On phones the two actions stack to full-width tap targets; on
           sm+ they sit inline on the right where the modal is centered. */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-4 mt-2 border-t border-line-subtle">
         <div className="hidden sm:block sm:flex-1" />
         <Button
           variant="secondary"

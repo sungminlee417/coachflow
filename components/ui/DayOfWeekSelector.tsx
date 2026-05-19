@@ -39,10 +39,10 @@ export function DayOfWeekSelector({ value, onChange }: DayOfWeekSelectorProps) {
             aria-pressed={active}
             title={d.full}
             className={`h-8 w-8 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
-              active
-                ? 'bg-indigo-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
+ active
+ ? 'bg-indigo-600 text-white'
+ : 'bg-elevated text-muted hover:bg-elevated '
+ }`}
           >
             {d.short}
           </button>
@@ -51,7 +51,7 @@ export function DayOfWeekSelector({ value, onChange }: DayOfWeekSelectorProps) {
       <button
         type="button"
         onClick={() => onChange(allSelected ? [] : ([0, 1, 2, 3, 4, 5, 6] as DayOfWeek[]))}
-        className="ml-2 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer underline-offset-2 hover:underline"
+        className="ml-2 text-xs text-muted hover:text-foreground cursor-pointer underline-offset-2 hover:underline"
       >
         {allSelected ? 'Clear' : 'Every day'}
       </button>

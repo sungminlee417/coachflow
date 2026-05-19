@@ -25,7 +25,7 @@ export function LibrarySearch({
     <div className={`relative ${className}`}>
       <Search
         size={14}
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none"
+        className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none"
       />
       <Input
         value={value}
@@ -39,7 +39,7 @@ export function LibrarySearch({
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md text-subtle hover:text-foreground hover:bg-elevated transition-colors cursor-pointer"
         >
           <X size={12} />
         </button>

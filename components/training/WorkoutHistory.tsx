@@ -171,8 +171,8 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
   if (loading) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">Progress</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+        <h2 className="text-2xl font-bold text-foreground mb-1">Progress</h2>
+        <p className="text-sm text-muted mb-6">
           Personal records and lifetime stats from every set you&rsquo;ve logged.
         </p>
         <div className="mb-6">
@@ -189,8 +189,8 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">Progress</h2>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+      <h2 className="text-2xl font-bold text-foreground mb-1">Progress</h2>
+      <p className="text-sm text-muted mb-6">
         Personal records and lifetime stats from every set you&rsquo;ve logged.
       </p>
 
@@ -250,7 +250,7 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
             return (
               <div
                 key={s.key}
-                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors"
+                className="bg-surface rounded-xl border border-line p-4 hover:border-indigo-line transition-colors"
               >
                 {/* Grid (not flex-wrap) so the right-side stat keeps its
                     column even when the exercise name is long — flex-wrap
@@ -259,19 +259,19 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 items-start">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                      <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate min-w-0">
+                      <h3 className="font-semibold text-foreground truncate min-w-0">
                         {s.name}
                       </h3>
                       {isCardio && (
-                        <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 rounded px-1.5 py-px shrink-0">
+                        <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-amber-fg bg-amber-strong border border-amber-line rounded px-1.5 py-px shrink-0">
                           <HeartPulse size={10} />
                           Cardio
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 tabular-nums">
+                    <p className="text-[11px] text-subtle mt-1 tabular-nums">
                       Last {formatDate(s.lastLoggedDate)}
-                      <span className="text-slate-300 dark:text-slate-600"> · </span>
+                      <span className="text-faint"> · </span>
                       {s.totalSets} {s.totalSets === 1 ? 'set' : 'sets'}
                     </p>
                   </div>
@@ -282,44 +282,44 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
                     {hasStat ? (
                       isCardio ? (
                         <>
-                          <p className="text-lg font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-tight">
+                          <p className="text-lg font-bold text-foreground tabular-nums leading-tight">
                             {formatDuration(s.longestDurationSeconds!)}
                           </p>
-                          <p className="text-[10px] uppercase tracking-widest font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                          <p className="text-[10px] uppercase tracking-widest font-semibold text-amber-fg mt-0.5">
                             Longest
                           </p>
                         </>
                       ) : (
                         <>
-                          <p className="text-lg font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-tight">
+                          <p className="text-lg font-bold text-foreground tabular-nums leading-tight">
                             {s.bestWeight}
                             {s.bestWeightReps != null && (
-                              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                              <span className="text-sm font-medium text-muted">
                                 {' × '}
                                 {s.bestWeightReps}
                               </span>
                             )}
                           </p>
-                          <p className="text-[10px] uppercase tracking-widest font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                          <p className="text-[10px] uppercase tracking-widest font-semibold text-emerald-fg mt-0.5">
                             Heaviest
                           </p>
                         </>
                       )
                     ) : (
                       <>
-                        <p className="text-lg font-bold text-slate-300 dark:text-slate-600 tabular-nums leading-tight">
+                        <p className="text-lg font-bold text-faint tabular-nums leading-tight">
                           —
                         </p>
-                        <p className="text-[10px] uppercase tracking-widest font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
+                        <p className="text-[10px] uppercase tracking-widest font-semibold text-subtle mt-0.5">
                           No PR yet
                         </p>
                       </>
                     )}
                   </div>
                   {!isCardio && s.totalVolume > 0 && (
-                    <p className="col-span-2 text-[11px] text-slate-500 dark:text-slate-400 tabular-nums pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <p className="col-span-2 text-[11px] text-muted tabular-nums pt-2 border-t border-line-subtle">
                       Total volume{' '}
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      <span className="font-semibold text-foreground">
                         {Math.round(s.totalVolume).toLocaleString()}
                       </span>
                     </p>
@@ -348,20 +348,20 @@ function SummaryTile({
   tone: 'indigo' | 'emerald' | 'purple' | 'amber'
 }) {
   const toneClasses = {
-    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-900',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900',
-    purple: 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-900',
-    amber: 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900',
+    indigo: 'bg-indigo-soft text-indigo-fg border-indigo-line',
+    emerald: 'bg-emerald-soft text-emerald-fg border-emerald-line',
+    purple: 'bg-purple-soft text-purple-fg border-purple-line',
+    amber: 'bg-amber-soft text-amber-fg border-amber-line',
   }[tone]
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+    <div className="bg-surface rounded-xl border border-line p-4">
       <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-widest border ${toneClasses}`}>
         {icon}
         {label}
       </div>
-      <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums mt-2">{value}</p>
-      <p className="text-[11px] text-slate-500 dark:text-slate-400">{sub}</p>
+      <p className="text-2xl font-bold text-foreground tabular-nums mt-2">{value}</p>
+      <p className="text-[11px] text-muted">{sub}</p>
     </div>
   )
 }
@@ -409,14 +409,14 @@ function ActivityHeatmap({ loggedDates }: { loggedDates: Set<string> }) {
   })
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+    <div className="bg-surface rounded-xl border border-line p-4">
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Activity</h3>
-        <p className="text-[10px] text-slate-400 dark:text-slate-500">Last 12 weeks</p>
+        <h3 className="text-sm font-semibold text-foreground">Activity</h3>
+        <p className="text-[10px] text-subtle">Last 12 weeks</p>
       </div>
       <div className="flex gap-1.5">
         {/* Day-of-week label column. Sunday at top to match the grid. */}
-        <div className="hidden sm:flex flex-col justify-between text-[9px] text-slate-400 dark:text-slate-500 pr-1 py-px">
+        <div className="hidden sm:flex flex-col justify-between text-[9px] text-subtle pr-1 py-px">
           <span>Sun</span>
           <span>Tue</span>
           <span>Thu</span>
@@ -437,14 +437,14 @@ function ActivityHeatmap({ loggedDates }: { loggedDates: Set<string> }) {
                       day: 'numeric',
                     })}`}
                     className={`aspect-square rounded-[3px] ${
-                      cell.logged
-                        ? 'bg-emerald-500'
-                        : 'bg-slate-100 dark:bg-slate-800'
-                    } ${
-                      cell.isToday
-                        ? 'ring-2 ring-emerald-300 ring-offset-1 ring-offset-white'
-                        : ''
-                    }`}
+ cell.logged
+ ? 'bg-emerald-500'
+ : 'bg-elevated '
+ } ${
+ cell.isToday
+ ? 'ring-2 ring-emerald-300 ring-offset-1 ring-offset-white'
+ : ''
+ }`}
                   />
                 ))}
               </div>
@@ -456,7 +456,7 @@ function ActivityHeatmap({ loggedDates }: { loggedDates: Set<string> }) {
             {monthLabels.map((m, i) => (
               <div
                 key={i}
-                className="text-[9px] text-slate-400 dark:text-slate-500 flex-1 text-center tabular-nums"
+                className="text-[9px] text-subtle flex-1 text-center tabular-nums"
               >
                 {m}
               </div>

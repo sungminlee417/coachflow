@@ -67,17 +67,6 @@ interface MealPlanAssignmentRow {
   meal_plan: MealPlanJoinedRow | MealPlanJoinedRow[] | null
 }
 
-/**
- * `start_date.is.null,start_date.lte.{date}` and `end_date.is.null,end_date.gte.{date}`
- * are the two `.or()` filters Supabase needs to express "active on this day"
- * across nullable open-ended ranges. Centralized so every assignment view
- * applies them identically.
- */
-const applyDateWindow = <Q extends { or: (s: string) => Q }>(query: Q, dateISO: string): Q =>
-  query
-    .or(`start_date.is.null,start_date.lte.${dateISO}`)
-    .or(`end_date.is.null,end_date.gte.${dateISO}`)
-
 const matchesWeekday = (
   scheduled: DayOfWeek[] | null | undefined,
   weekday: number
@@ -118,22 +107,15 @@ export async function fetchActiveWorkoutAssignments(
   clientId: string,
   dateISO: string
 ): Promise<WorkoutAssignment[]> {
-  const base = supabase
-    .from('workout_assignments')
-    .select(`
-      id, start_date, end_date, completed, completed_at, notes, coach_id, cycle_anchor_date,
-      workout:workout_id (
-        id, name, description, days_of_week, cycle_length, cycle_position,
-        exercises (
-          id, name, exercise_type, sets, reps, weight, rest_seconds, notes, order_index, pair_with_next, cardio_subtype,
-          exercise_sets ( id, set_number, target_reps, target_duration_seconds, notes, target_speed, target_incline, target_resistance ),
-          exercise_alternatives ( id, name, order_index )
-        )
-      )
-    `)
-    .eq('client_id', clientId)
-
-  const { data, error } = await applyDateWindow(base, dateISO)
+  // The fetch goes through a SECURITY DEFINER RPC (migration 27) so the
+  // deep join `workout_assignments → workouts → exercises → exercise_sets`
+  // can run without RLS cost on every joined table. The RPC returns a
+  // JSONB array in the exact shape the previous PostgREST embed did, so
+  // the mapping below is unchanged.
+  const { data, error } = await supabase.rpc('get_active_workout_assignments', {
+    p_client_id: clientId,
+    p_date: dateISO,
+  })
   if (error) throw error
 
   const weekday = weekdayOf(dateISO)
@@ -227,25 +209,13 @@ export async function fetchActiveMealPlanAssignments(
   clientId: string,
   dateISO: string
 ): Promise<MealPlanAssignment[]> {
-  const base = supabase
-    .from('meal_plan_assignments')
-    .select(`
-      id, start_date, end_date, notes, coach_id,
-      meal_plan:meal_plan_id (
-        id, name, description,
-        meals (
-          id, meal_type, name, description, days_of_week, time, order_index,
-          foods (
-            id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index,
-            ingredients ( id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index ),
-            food_alternatives ( id, name, quantity, calories, protein_grams, carbs_grams, fat_grams, order_index )
-          )
-        )
-      )
-    `)
-    .eq('client_id', clientId)
-
-  const { data, error } = await applyDateWindow(base, dateISO)
+  // Same RPC pattern as the workout side — see migration 27. The
+  // returned JSONB matches the previous PostgREST embed shape exactly,
+  // so the mapping below is unchanged.
+  const { data, error } = await supabase.rpc('get_active_meal_plan_assignments', {
+    p_client_id: clientId,
+    p_date: dateISO,
+  })
   if (error) throw error
 
   const weekday = weekdayOf(dateISO)

@@ -175,8 +175,8 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
       <div>
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Programs</h2>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Loading programs…</p>
+            <h2 className="text-2xl font-bold text-foreground">Programs</h2>
+            <p className="text-sm text-subtle mt-1">Loading programs…</p>
           </div>
         </div>
         <CardGridSkeleton count={3} />
@@ -206,8 +206,8 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
 
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Programs</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <h2 className="text-2xl font-bold text-foreground">Programs</h2>
+          <p className="text-sm text-muted mt-1">
             {programs.length} {programs.length === 1 ? 'program' : 'programs'}
           </p>
         </div>
@@ -256,7 +256,7 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
             </div>
           )}
           {visiblePrograms.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 italic py-6 text-center">
+            <p className="text-sm text-muted italic py-6 text-center">
               No programs match &ldquo;{query}&rdquo;.
             </p>
           ) : (
@@ -264,20 +264,20 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
               {visiblePrograms.map(p => (
             <div
               key={p.id}
-              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-5 transition-all hover:border-indigo-200 dark:hover:border-indigo-800 hover:shadow-md hover:-translate-y-0.5"
+              className="bg-surface rounded-xl border border-line p-5 transition-all hover:border-indigo-line hover:shadow-md hover:-translate-y-0.5"
             >
               <div className="flex justify-between items-start mb-2 gap-2">
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100">{p.name}</h3>
+                <h3 className="font-semibold text-foreground">{p.name}</h3>
                 {p.is_template && (
-                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800 rounded-full">
+                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-soft text-purple-fg border border-purple-line rounded-full">
                     Template
                   </span>
                 )}
               </div>
               {p.description && (
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">{p.description}</p>
+                <p className="text-sm text-muted mb-3 line-clamp-2">{p.description}</p>
               )}
-              <p className="text-xs text-slate-400 dark:text-slate-500 mb-4 tabular-nums">
+              <p className="text-xs text-subtle mb-4 tabular-nums">
                 {p.workout_count} {p.workout_count === 1 ? 'workout' : 'workouts'}
               </p>
               <div className="flex gap-2">

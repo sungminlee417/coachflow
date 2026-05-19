@@ -63,8 +63,8 @@ export function AssigneePicker({
   if (loading) {
     return (
       <div className="space-y-1.5">
-        <div className="h-4 w-20 bg-slate-200/70 rounded animate-pulse" />
-        <div className="h-10 bg-slate-200/70 rounded-lg animate-pulse" />
+        <div className="h-4 w-20 bg-line/70 rounded animate-pulse" />
+        <div className="h-10 bg-line/70 rounded-lg animate-pulse" />
       </div>
     )
   }

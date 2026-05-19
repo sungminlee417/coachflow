@@ -35,12 +35,12 @@ export default function SettingsView({ userId, email }: SettingsViewProps) {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">
+        <div className="h-10 w-10 rounded-xl bg-elevated text-foreground flex items-center justify-center">
           <SettingsIcon size={18} />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Settings</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="text-2xl font-bold text-foreground">Settings</h2>
+          <p className="text-sm text-muted">
             Your account and how the app behaves.
           </p>
         </div>
@@ -103,8 +103,8 @@ function AppearanceSection({ userId }: { userId: string }) {
               onClick={() => choose(opt.value)}
               className={`flex flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-xs font-medium transition-colors cursor-pointer ${
                 active
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-500/15 dark:text-indigo-200'
-                  : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800/60'
+                  ? 'border-indigo-500 bg-indigo-soft text-indigo-fg'
+                  : 'border-line text-muted hover:border-subtle hover:bg-elevated'
               }`}
             >
               <Icon size={18} />
@@ -129,14 +129,14 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
+    <section className="bg-surface rounded-2xl border border-line p-5 sm:p-6">
       <div className="flex items-start gap-3 mb-5">
-        <div className="h-9 w-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0">
+        <div className="h-9 w-9 rounded-xl bg-elevated text-muted flex items-center justify-center shrink-0">
           <Icon size={16} />
         </div>
         <div className="min-w-0">
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
+          <h3 className="font-semibold text-foreground">{title}</h3>
+          <p className="text-xs text-muted">{description}</p>
         </div>
       </div>
       {children}
@@ -168,7 +168,7 @@ function PreferencesSection({ userId }: { userId: string }) {
       title="Preferences"
       description="Hide things you don't use."
     >
-      <div className="divide-y divide-slate-100 dark:divide-slate-800 -my-2">
+      <div className="divide-y divide-line-subtle -my-2">
         <ToggleRow
           label="Rest timer"
           description="Show a countdown after marking a set complete."
@@ -208,8 +208,8 @@ function ToggleRow({
       }`}
     >
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{description}</p>
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-xs text-muted mt-0.5">{description}</p>
       </div>
       <button
         type="button"
@@ -219,13 +219,13 @@ function ToggleRow({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-6 w-10 shrink-0 rounded-full transition-colors cursor-pointer ${
-          checked ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
-        } ${disabled ? 'cursor-default' : ''}`}
+ checked ? 'bg-indigo-600' : 'bg-elevated '
+ } ${disabled ? 'cursor-default' : ''}`}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white dark:bg-slate-900 shadow transition-transform ${
-            checked ? 'translate-x-[1.125rem]' : 'translate-x-0.5'
-          }`}
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-transform ${
+ checked ? 'translate-x-[1.125rem]' : 'translate-x-0.5'
+ }`}
         />
       </button>
     </label>

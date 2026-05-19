@@ -94,8 +94,8 @@ export default function WorkoutAssignmentModal({
 
   return (
     <Modal open={open} title="Assign Workout" onClose={onClose}>
-      <div className="mb-5 px-3 py-2 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg">
-        <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">{workoutName}</p>
+      <div className="mb-5 px-3 py-2 bg-indigo-soft border border-indigo-line rounded-lg">
+        <p className="text-sm text-indigo-fg font-medium">{workoutName}</p>
       </div>
 
       <div className="space-y-4">
@@ -115,7 +115,7 @@ export default function WorkoutAssignmentModal({
               placeholder="Today"
               allowClear
             />
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-[11px] text-muted mt-1">
               This workout is position {cyclePosition} of {cycleLength}. It will appear on
               the date you pick (and every {cycleLength} days after). Leave as today if the
               client is starting fresh.
@@ -127,13 +127,13 @@ export default function WorkoutAssignmentModal({
           <button
             type="button"
             onClick={() => setShowSchedule(!showSchedule)}
-            className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
+            className="flex items-center gap-2 text-sm text-muted hover:text-foreground cursor-pointer"
           >
             <Calendar size={14} />
             {showSchedule ? 'Hide schedule' : 'Schedule (optional)'}
           </button>
           {!showSchedule && (
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 ml-6">
+            <p className="text-xs text-subtle mt-1 ml-6">
               Active immediately, no end date. The workout appears on its tagged days of the week.
             </p>
           )}

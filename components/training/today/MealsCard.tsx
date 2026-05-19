@@ -144,11 +144,11 @@ export function MealsCard({
       ) : (
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+            <p className="font-semibold text-foreground tabular-nums">
               {eatenCount}
-              <span className="text-slate-400 dark:text-slate-500 font-normal"> / {totalCount} eaten</span>
+              <span className="text-subtle font-normal"> / {totalCount} eaten</span>
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+            <p className="text-xs text-muted shrink-0">
               {totalCount - eatenCount === 0
                 ? 'All done'
                 : `${totalCount - eatenCount} to go`}
@@ -169,18 +169,18 @@ export function MealsCard({
                         ? `Mark ${mealDisplayName(m.name, numberByMeal.get(m.id))} not eaten`
                         : `Mark ${mealDisplayName(m.name, numberByMeal.get(m.id))} eaten`
                     }
-                    className="w-full flex items-center gap-2 text-xs text-left rounded-md px-1 py-1 -mx-1 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2 text-xs text-left rounded-md px-1 py-1 -mx-1 hover:bg-elevated transition-colors cursor-pointer"
                   >
                     <StatusDot status={status} />
                     <span
                       className={`truncate ${
-                        status === 'eaten' ? 'text-slate-400 dark:text-slate-500 line-through' : 'text-slate-700 dark:text-slate-300'
-                      }`}
+ status === 'eaten' ? 'text-subtle line-through' : 'text-foreground '
+ }`}
                     >
                       {mealDisplayName(m.name, numberByMeal.get(m.id))}
                     </span>
                     {m.time && (
-                      <span className="ml-auto text-[10px] tabular-nums text-slate-400 dark:text-slate-500 shrink-0">
+                      <span className="ml-auto text-[10px] tabular-nums text-subtle shrink-0">
                         {m.time.slice(0, 5)}
                       </span>
                     )}
@@ -189,7 +189,7 @@ export function MealsCard({
               )
             })}
             {meals.length > 5 && (
-              <li className="text-[11px] text-slate-400 dark:text-slate-500 italic px-1">
+              <li className="text-[11px] text-subtle italic px-1">
                 + {meals.length - 5} more
               </li>
             )}
@@ -210,13 +210,13 @@ function StatusDot({ status }: { status: 'eaten' | 'missed' | 'upcoming' }) {
   }
   if (status === 'missed') {
     return (
-      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 shrink-0">
+      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-strong text-amber-fg shrink-0">
         <AlertTriangle size={10} />
       </span>
     )
   }
   return (
-    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 shrink-0">
+    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-line text-subtle shrink-0">
       <Clock size={10} />
     </span>
   )

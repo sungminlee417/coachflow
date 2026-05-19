@@ -39,21 +39,21 @@ export function MacroSummary({
   className?: string
 }) {
   return (
-    <div className={`flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300 ${className}`}>
+    <div className={`flex items-center gap-3 text-xs text-muted ${className}`}>
       <span>
-        <span className="text-slate-400 dark:text-slate-500">Cal:</span>{' '}
+        <span className="text-subtle">Cal:</span>{' '}
         <span className="font-semibold">{roundMacro(macros.calories)}</span>
       </span>
       <span>
-        <span className="text-slate-400 dark:text-slate-500">P:</span>{' '}
+        <span className="text-subtle">P:</span>{' '}
         <span className="font-semibold">{roundMacro(macros.protein_grams)}g</span>
       </span>
       <span>
-        <span className="text-slate-400 dark:text-slate-500">C:</span>{' '}
+        <span className="text-subtle">C:</span>{' '}
         <span className="font-semibold">{roundMacro(macros.carbs_grams)}g</span>
       </span>
       <span>
-        <span className="text-slate-400 dark:text-slate-500">F:</span>{' '}
+        <span className="text-subtle">F:</span>{' '}
         <span className="font-semibold">{roundMacro(macros.fat_grams)}g</span>
       </span>
     </div>

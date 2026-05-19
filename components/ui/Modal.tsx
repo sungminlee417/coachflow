@@ -50,12 +50,12 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
         // `dvh` (dynamic viewport height) accounts for the mobile address
         // bar / keyboard collapsing so the modal stays usable. On phones the
         // dialog rises from the bottom; on sm+ it floats centered.
-        className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md max-h-[92dvh] flex flex-col"
+        className="bg-surface rounded-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md max-h-[92dvh] flex flex-col"
         style={{ animation: 'scaleIn 0.18s ease-out' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-between items-center px-5 sm:px-6 pt-5 sm:pt-6 pb-2">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h2>
+          <h2 className="text-lg font-bold text-foreground">{title}</h2>
           <IconButton onClick={onClose} aria-label="Close">
             <X size={18} />
           </IconButton>

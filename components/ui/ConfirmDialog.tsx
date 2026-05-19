@@ -40,7 +40,7 @@ export function ConfirmDialog({
 
   return (
     <Modal open={open} title={title} onClose={busy ? () => {} : onCancel}>
-      <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">{message}</p>
+      <p className="text-sm text-muted mb-6">{message}</p>
       <div className="flex gap-3 justify-end">
         <Button variant="secondary" onClick={onCancel} disabled={busy}>
           {cancelLabel}

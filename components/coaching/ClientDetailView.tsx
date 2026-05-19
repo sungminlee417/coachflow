@@ -220,8 +220,8 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
           </IconButton>
           <Avatar name={client.full_name} />
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{client.full_name}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{client.email}</p>
+            <h2 className="text-xl font-bold text-foreground">{client.full_name}</h2>
+            <p className="text-sm text-muted">{client.email}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -242,7 +242,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
               {workouts.length === 0 ? 'No workouts' : '+ Assign Workout'}
             </option>
             {workouts.map(w => (
-              <option key={w.id} value={w.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+              <option key={w.id} value={w.id} className="bg-surface text-foreground">
                 {w.name}
               </option>
             ))}
@@ -265,7 +265,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
               {mealPlans.length === 0 ? 'No meal plans' : '+ Assign Meal Plan'}
             </option>
             {mealPlans.map(p => (
-              <option key={p.id} value={p.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+              <option key={p.id} value={p.id} className="bg-surface text-foreground">
                 {p.name}
               </option>
             ))}
@@ -274,44 +274,44 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-8">
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{workoutAssignments.length}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Active Workouts</div>
+        <div className="bg-surface rounded-xl border border-line p-4">
+          <div className="text-2xl font-bold text-indigo-fg">{workoutAssignments.length}</div>
+          <div className="text-xs text-muted mt-0.5">Active Workouts</div>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{mealPlanAssignments.length}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Active Meal Plans</div>
+        <div className="bg-surface rounded-xl border border-line p-4">
+          <div className="text-2xl font-bold text-emerald-fg">{mealPlanAssignments.length}</div>
+          <div className="text-xs text-muted mt-0.5">Active Meal Plans</div>
         </div>
       </div>
 
       {/* Active Meal Plans */}
       <div className="flex items-center gap-2 mb-3">
         <Apple size={14} className="text-emerald-500" />
-        <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wide">
           Active Meal Plans
         </h3>
       </div>
       {mealPlanAssignments.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-6 text-center mb-8">
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-1">No meal plans assigned</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">Pick one from the &ldquo;Assign Meal Plan&rdquo; menu above</p>
+        <div className="bg-surface rounded-xl border border-line p-6 text-center mb-8">
+          <p className="text-muted text-sm mb-1">No meal plans assigned</p>
+          <p className="text-xs text-subtle">Pick one from the &ldquo;Assign Meal Plan&rdquo; menu above</p>
         </div>
       ) : (
         <div className="space-y-2 mb-8">
           {mealPlanAssignments.map(a => (
             <div
               key={a.id}
-              className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+              className="flex items-center justify-between p-4 rounded-xl border border-line bg-surface"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0">
-                  <Apple size={16} className="text-emerald-600 dark:text-emerald-400" />
+                <div className="h-9 w-9 rounded-lg bg-emerald-soft flex items-center justify-center shrink-0">
+                  <Apple size={16} className="text-emerald-fg" />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-900 dark:text-slate-100 text-sm truncate">
+                  <p className="font-medium text-foreground text-sm truncate">
                     {a.meal_plan?.name ?? 'Meal Plan'}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-xs text-muted mt-0.5">
                     {formatRange(a.start_date, a.end_date)}
                   </p>
                 </div>
@@ -337,7 +337,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
       {/* Recent Workout Assignments */}
       <div className="flex items-center gap-2 mb-3">
         <Dumbbell size={14} className="text-indigo-500" />
-        <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wide">
           Active Workouts
         </h3>
       </div>
@@ -349,9 +349,9 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
           ))}
         </div>
       ) : workoutAssignments.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-6 text-center">
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-1">No workouts assigned yet</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">
+        <div className="bg-surface rounded-xl border border-line p-6 text-center">
+          <p className="text-muted text-sm mb-1">No workouts assigned yet</p>
+          <p className="text-xs text-subtle">
             Pick a workout from the menu above to assign their first one
           </p>
         </div>
@@ -360,17 +360,17 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
           {workoutAssignments.map(a => (
             <div
               key={a.id}
-              className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+              className="flex items-center justify-between p-4 rounded-xl border border-line bg-surface"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center shrink-0">
-                  <Dumbbell size={16} className="text-indigo-600 dark:text-indigo-400" />
+                <div className="h-9 w-9 rounded-lg bg-indigo-soft flex items-center justify-center shrink-0">
+                  <Dumbbell size={16} className="text-indigo-fg" />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-900 dark:text-slate-100 text-sm truncate">
+                  <p className="font-medium text-foreground text-sm truncate">
                     {a.workout?.name ?? 'Workout'}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-xs text-muted mt-0.5">
                     {formatRange(a.start_date, a.end_date)}
                   </p>
                 </div>

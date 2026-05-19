@@ -9,31 +9,182 @@
  * accidentally outrank non-dark ones at the same level. */
 @variant dark (&:where(.dark, .dark *));
 
-/* Theme tokens. These drive the few surfaces that paint *before*
- * React hydrates (body bg + text, scrollbars) — without CSS-variable
- * fallbacks here, a hard refresh would flash white before the React
- * tree applies its dark-mode classes. Tailwind utilities scattered
- * through the component tree do the rest via `dark:` variants. */
+/* ── Design tokens ────────────────────────────────────────────────────
+ * Single source of truth for the palette. Components use semantic
+ * utilities (`bg-surface`, `text-muted`) instead of literal colors
+ * paired with `dark:` variants — that means:
+ *
+ *   • One palette change updates every surface in both modes.
+ *   • New components paint correctly in dark mode without authors
+ *     remembering to add `dark:` variants.
+ *   • A third theme (sepia, AMOLED, high-contrast) is a CSS-only
+ *     change — no component edits needed.
+ *
+ * Tailwind v4 picks up `--color-*` tokens from `@theme inline { … }`
+ * and generates `bg-*`, `text-*`, `border-*` utilities for each. The
+ * `inline` keyword keeps the reference live so the cascading CSS
+ * variables (`--surface`, etc.) actually swap when `.dark` is set —
+ * without it Tailwind would bake in the light value at build time.
+ *
+ * Solid brand colors (`bg-emerald-600`, `text-white`) stay the same
+ * in both modes — they're saturated enough to read on either surface.
+ * Theme-aware variants get the `-soft` / `-strong` / `-fg` / `-line`
+ * suffixes below.
+ */
+@theme inline {
+  /* Surfaces (least → most prominent) */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+
+  /* Text (most → least prominent) */
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-faint: var(--faint);
+
+  /* Borders */
+  --color-line: var(--line);
+  --color-line-subtle: var(--line-subtle);
+
+  /* Accent tints — each color has:
+   *   -soft   : background fill (e.g. status pill bg)
+   *   -strong : stronger fill (e.g. avatar / icon bg)
+   *   -fg     : foreground text/icon on the soft fill
+   *   -fg-strong : the bolder text variant
+   *   -line   : matching border */
+  --color-emerald-soft: var(--emerald-soft);
+  --color-emerald-strong: var(--emerald-strong);
+  --color-emerald-fg: var(--emerald-fg);
+  --color-emerald-fg-strong: var(--emerald-fg-strong);
+  --color-emerald-line: var(--emerald-line);
+
+  --color-indigo-soft: var(--indigo-soft);
+  --color-indigo-strong: var(--indigo-strong);
+  --color-indigo-fg: var(--indigo-fg);
+  --color-indigo-fg-strong: var(--indigo-fg-strong);
+  --color-indigo-line: var(--indigo-line);
+
+  --color-amber-soft: var(--amber-soft);
+  --color-amber-strong: var(--amber-strong);
+  --color-amber-fg: var(--amber-fg);
+  --color-amber-fg-strong: var(--amber-fg-strong);
+  --color-amber-line: var(--amber-line);
+
+  --color-purple-soft: var(--purple-soft);
+  --color-purple-strong: var(--purple-strong);
+  --color-purple-fg: var(--purple-fg);
+  --color-purple-fg-strong: var(--purple-fg-strong);
+  --color-purple-line: var(--purple-line);
+
+  --color-red-soft: var(--red-soft);
+  --color-red-fg: var(--red-fg);
+  --color-red-line: var(--red-line);
+}
+
 :root {
-  --background: #fafafa;
-  --foreground: #0f172a;
+  /* Light theme values. Hex values match Tailwind's slate / accent
+   * scales the codebase used before the token refactor, so nothing
+   * shifts visually for existing screens. */
+  --canvas: #f8fafc; /* slate-50 */
+  --surface: #ffffff;
+  --elevated: #f1f5f9; /* slate-100 */
+
+  --foreground: #0f172a; /* slate-900 */
+  --muted: #64748b; /* slate-500 */
+  --subtle: #94a3b8; /* slate-400 */
+  --faint: #cbd5e1; /* slate-300 */
+
+  --line: #e2e8f0; /* slate-200 */
+  --line-subtle: #f1f5f9; /* slate-100 */
+
+  --emerald-soft: #ecfdf5; /* emerald-50 */
+  --emerald-strong: #d1fae5; /* emerald-100 */
+  --emerald-fg: #047857; /* emerald-700 */
+  --emerald-fg-strong: #065f46; /* emerald-800 */
+  --emerald-line: #a7f3d0; /* emerald-200 */
+
+  --indigo-soft: #eef2ff; /* indigo-50 */
+  --indigo-strong: #e0e7ff; /* indigo-100 */
+  --indigo-fg: #4338ca; /* indigo-700 */
+  --indigo-fg-strong: #3730a3; /* indigo-800 */
+  --indigo-line: #c7d2fe; /* indigo-200 */
+
+  --amber-soft: #fffbeb; /* amber-50 */
+  --amber-strong: #fef3c7; /* amber-100 */
+  --amber-fg: #b45309; /* amber-700 */
+  --amber-fg-strong: #92400e; /* amber-800 */
+  --amber-line: #fde68a; /* amber-200 */
+
+  --purple-soft: #faf5ff; /* purple-50 */
+  --purple-strong: #f3e8ff; /* purple-100 */
+  --purple-fg: #7e22ce; /* purple-700 */
+  --purple-fg-strong: #6b21a8; /* purple-800 */
+  --purple-line: #e9d5ff; /* purple-200 */
+
+  --red-soft: #fef2f2; /* red-50 */
+  --red-fg: #b91c1c; /* red-700 */
+  --red-line: #fecaca; /* red-200 */
+
+  /* Body chrome — paints before React mounts. */
+  --background: var(--canvas);
+  --foreground-css: var(--foreground);
   --scrollbar-thumb: #e2e8f0;
   --scrollbar-thumb-hover: #cbd5e1;
 }
 
 .dark {
-  /* slate-950 / slate-100 — paired so the body looks settled the
-   * moment HTML parses, before any component-level dark: classes
-   * paint over it. */
-  --background: #020617;
-  --foreground: #e2e8f0;
+  --canvas: #020617; /* slate-950 */
+  --surface: #0f172a; /* slate-900 */
+  --elevated: #1e293b; /* slate-800 */
+
+  --foreground: #f1f5f9; /* slate-100 */
+  --muted: #94a3b8; /* slate-400 */
+  --subtle: #64748b; /* slate-500 */
+  --faint: #475569; /* slate-600 */
+
+  --line: #334155; /* slate-700 */
+  --line-subtle: #1e293b; /* slate-800 */
+
+  /* Soft / line variants in dark mode are translucent so they sit
+   * gently on top of the dark surface without fighting it. */
+  --emerald-soft: rgb(2 44 34 / 0.3);
+  --emerald-strong: rgb(6 78 59 / 0.5); /* emerald-900/50 */
+  --emerald-fg: #6ee7b7; /* emerald-300 */
+  --emerald-fg-strong: #a7f3d0; /* emerald-200 */
+  --emerald-line: #065f46; /* emerald-800 */
+
+  --indigo-soft: rgb(30 27 75 / 0.3); /* indigo-950/30 */
+  --indigo-strong: rgb(49 46 129 / 0.5); /* indigo-900/50 */
+  --indigo-fg: #a5b4fc; /* indigo-300 */
+  --indigo-fg-strong: #c7d2fe; /* indigo-200 */
+  --indigo-line: #3730a3; /* indigo-800 */
+
+  --amber-soft: rgb(69 26 3 / 0.3); /* amber-950/30 */
+  --amber-strong: rgb(146 64 14 / 0.5); /* amber-800/50 */
+  --amber-fg: #fcd34d; /* amber-300 */
+  --amber-fg-strong: #fde68a; /* amber-200 */
+  --amber-line: #92400e; /* amber-800 */
+
+  --purple-soft: rgb(59 7 100 / 0.3); /* purple-950/30 */
+  --purple-strong: rgb(107 33 168 / 0.5); /* purple-800/50 */
+  --purple-fg: #d8b4fe; /* purple-300 */
+  --purple-fg-strong: #e9d5ff; /* purple-200 */
+  --purple-line: #6b21a8; /* purple-800 */
+
+  --red-soft: rgb(69 10 10 / 0.3); /* red-950/30 */
+  --red-fg: #fca5a5; /* red-300 */
+  --red-line: #991b1b; /* red-800 */
+
+  --background: var(--canvas);
+  --foreground-css: var(--foreground);
   --scrollbar-thumb: #334155;
   --scrollbar-thumb-hover: #475569;
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
+  color: var(--foreground-css);
 }
 
 html {
@@ -46,6 +197,27 @@ html {
 
 html.dark {
   color-scheme: dark;
+}
+
+/* Today-dashboard accent gradients. Each utility paints the card
+ * surface plus a tinted accent wash in the top-left corner that fades
+ * out diagonally. Both the surface and the tint resolve from CSS
+ * variables, so they swap with the theme automatically. */
+@utility card-tint-emerald {
+  background-color: var(--surface);
+  background-image: linear-gradient(135deg, var(--emerald-soft) 0%, transparent 60%);
+}
+@utility card-tint-amber {
+  background-color: var(--surface);
+  background-image: linear-gradient(135deg, var(--amber-soft) 0%, transparent 60%);
+}
+@utility card-tint-indigo {
+  background-color: var(--surface);
+  background-image: linear-gradient(135deg, var(--indigo-soft) 0%, transparent 60%);
+}
+@utility card-tint-purple {
+  background-color: var(--surface);
+  background-image: linear-gradient(135deg, var(--purple-soft) 0%, transparent 60%);
 }
 
 *:focus-visible {

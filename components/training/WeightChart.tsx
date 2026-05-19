@@ -12,7 +12,26 @@ import {
   YAxis,
 } from 'recharts'
 import { roundMacro, formatDate } from '@/lib/utils'
+import { useTheme } from '@/lib/theme'
 import type { WeightLog, WeightUnit } from '@/lib/types'
+
+// Recharts takes hex values for stroke/fill, not CSS variables — its
+// SVG attribute pipeline serializes the prop, so `var(--…)` never
+// resolves. We pick the right hex up-front based on the active theme.
+const CHART_PALETTE = {
+  light: {
+    grid: '#e2e8f0', /* slate-200 */
+    tick: '#94a3b8', /* slate-400 */
+    dotFill: '#ffffff',
+    goalLabel: '#047857', /* emerald-700 */
+  },
+  dark: {
+    grid: '#334155', /* slate-700 */
+    tick: '#64748b', /* slate-500 */
+    dotFill: '#0f172a', /* slate-900 — matches surface so the dot reads as "punched out" */
+    goalLabel: '#6ee7b7', /* emerald-300 */
+  },
+} as const
 
 interface WeightChartProps {
   logs: WeightLog[]
@@ -46,9 +65,9 @@ function ChartTooltip({ active, payload, unit }: TooltipProps) {
   return (
     <div className="bg-slate-900 text-white text-xs font-medium rounded-md px-2.5 py-1.5 shadow-lg whitespace-nowrap tabular-nums">
       <div>
-        {roundMacro(point.weight)} <span className="font-normal text-slate-300 dark:text-slate-600">{unit}</span>
+        {roundMacro(point.weight)} <span className="font-normal text-faint">{unit}</span>
       </div>
-      <div className="text-[10px] text-slate-300 dark:text-slate-600 font-normal">
+      <div className="text-[10px] text-faint font-normal">
         {formatDate(point.recorded_at)}
       </div>
     </div>
@@ -56,6 +75,8 @@ function ChartTooltip({ active, payload, unit }: TooltipProps) {
 }
 
 function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) {
+  const { resolved } = useTheme()
+  const palette = CHART_PALETTE[resolved]
   const sorted = [...logs].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
   if (sorted.length < 2) return null
 
@@ -83,24 +104,24 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
   const avg = weights.reduce((s, w) => s + w, 0) / weights.length
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 min-w-0">
+    <div className="bg-surface rounded-2xl border border-line p-4 sm:p-5 min-w-0">
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-subtle">
             Progress
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums mt-1">
+          <p className="text-xs text-muted tabular-nums mt-1">
             {formatDate(first.recorded_at)} – {formatDate(last.recorded_at)}
           </p>
         </div>
         <div
           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums border ${
-            trendingDown
-              ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-              : trendingUp
-                ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-          }`}
+ trendingDown
+ ? 'bg-emerald-soft text-emerald-fg border-emerald-line '
+ : trendingUp
+ ? 'bg-red-soft text-red-fg border-red-line '
+ : 'bg-elevated text-muted border-line '
+ }`}
         >
           <span aria-hidden>{trendingDown ? '↓' : trendingUp ? '↑' : '→'}</span>
           {deltaSign}
@@ -117,7 +138,7 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
                 <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 4" vertical={false} />
+            <CartesianGrid stroke={palette.grid} strokeDasharray="3 4" vertical={false} />
             <XAxis
               dataKey="ts"
               type="number"
@@ -126,21 +147,21 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
               tickFormatter={ts =>
                 new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               }
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              tick={{ fill: palette.tick, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: '#e2e8f0' }}
+              axisLine={{ stroke: palette.grid }}
               minTickGap={32}
             />
             <YAxis
               domain={[yMin, yMax]}
               tickFormatter={v => `${roundMacro(v as number)}`}
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              tick={{ fill: palette.tick, fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               width={40}
             />
             <Tooltip
-              cursor={{ stroke: '#94a3b8', strokeDasharray: '2 3' }}
+              cursor={{ stroke: palette.tick, strokeDasharray: '2 3' }}
               content={<ChartTooltip unit={weightUnit} />}
             />
             <Area
@@ -149,8 +170,8 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
               stroke="#4f46e5"
               strokeWidth={2.5}
               fill="url(#weightChartFill)"
-              dot={{ r: 3, stroke: '#4f46e5', strokeWidth: 2, fill: '#fff' }}
-              activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2, fill: '#4f46e5' }}
+              dot={{ r: 3, stroke: '#4f46e5', strokeWidth: 2, fill: palette.dotFill }}
+              activeDot={{ r: 5, stroke: palette.dotFill, strokeWidth: 2, fill: '#4f46e5' }}
               isAnimationActive={false}
             />
             {goal != null && Number.isFinite(goal) && goal > 0 && (
@@ -162,7 +183,7 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
                 label={{
                   value: `Goal · ${roundMacro(goal)} ${weightUnit}`,
                   position: 'insideTopRight',
-                  fill: '#047857',
+                  fill: palette.goalLabel,
                   fontSize: 10,
                   fontWeight: 600,
                 }}
@@ -172,19 +193,19 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
         </ResponsiveContainer>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-line-subtle">
         {[
           { label: 'Lowest', value: minWeight },
           { label: 'Average', value: avg },
           { label: 'Highest', value: maxWeight },
         ].map(s => (
           <div key={s.label} className="text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-subtle">
               {s.label}
             </p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums mt-0.5">
+            <p className="text-sm font-semibold text-foreground tabular-nums mt-0.5">
               {roundMacro(s.value)}
-              <span className="text-slate-400 dark:text-slate-500 font-normal text-[10px] ml-1">{weightUnit}</span>
+              <span className="text-subtle font-normal text-[10px] ml-1">{weightUnit}</span>
             </p>
           </div>
         ))}

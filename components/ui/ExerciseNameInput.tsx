@@ -118,7 +118,7 @@ export function ExerciseNameInput({
       {showDropdown && (
         <div
           role="listbox"
-          className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-72 overflow-y-auto"
+          className="absolute z-20 left-0 right-0 mt-1 bg-surface border border-line rounded-lg shadow-lg max-h-72 overflow-y-auto"
         >
           {matches.map((entry, i) => {
             const isActive = i === activeIndex
@@ -136,13 +136,13 @@ export function ExerciseNameInput({
                   pick(entry)
                 }}
                 className={`w-full text-left px-3 py-2 cursor-pointer ${
-                  isActive ? 'bg-indigo-50 dark:bg-indigo-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
+ isActive ? 'bg-indigo-soft ' : 'hover:bg-elevated '
+ }`}
               >
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                <div className="text-sm font-medium text-foreground truncate">
                   {entry.name}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                <div className="text-[11px] text-muted truncate">
                   {[entry.equipment, entry.primaryMuscles[0], entry.level]
                     .filter(Boolean)
                     .join(' · ')}

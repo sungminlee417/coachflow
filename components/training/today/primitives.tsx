@@ -8,41 +8,31 @@ import type { Dumbbell } from 'lucide-react'
 import { ArrowRight } from 'lucide-react'
 
 export const ACCENTS = {
+  // `card-tint-{accent}` paints surface + a soft accent wash in one
+  // class (defined in globals.css via @utility). Both colors resolve
+  // from CSS variables, so the theme swap is automatic.
   emerald: {
-    iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
-    // Soft tint behind the card body so the dashboard isn't a wall of
-    // identical white rectangles. In light mode it's a tiny gradient
-    // from a tinted top to white. In dark mode the dark accent tint
-    // sits on the dark card surface (slate-900) so the gradient
-    // direction inverts — accent stays at the top, slate-900 below.
-    cardBg:
-      'bg-gradient-to-br from-emerald-50/70 via-white to-white ' +
-      'dark:from-emerald-950/40 dark:via-slate-900 dark:to-slate-900',
-    border: 'border-emerald-100/80 hover:border-emerald-300 dark:border-emerald-900/60 dark:hover:border-emerald-700',
+    iconBg: 'bg-emerald-strong text-emerald-fg',
+    cardBg: 'card-tint-emerald',
+    border: 'border-emerald-line hover:border-emerald-fg',
     progress: 'bg-emerald-500',
   },
   amber: {
-    iconBg: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
-    cardBg:
-      'bg-gradient-to-br from-amber-50/70 via-white to-white ' +
-      'dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900',
-    border: 'border-amber-100/80 hover:border-amber-300 dark:border-amber-900/60 dark:hover:border-amber-700',
+    iconBg: 'bg-amber-strong text-amber-fg',
+    cardBg: 'card-tint-amber',
+    border: 'border-amber-line hover:border-amber-fg',
     progress: 'bg-amber-500',
   },
   indigo: {
-    iconBg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300',
-    cardBg:
-      'bg-gradient-to-br from-indigo-50/70 via-white to-white ' +
-      'dark:from-indigo-950/40 dark:via-slate-900 dark:to-slate-900',
-    border: 'border-indigo-100/80 hover:border-indigo-300 dark:border-indigo-900/60 dark:hover:border-indigo-700',
+    iconBg: 'bg-indigo-strong text-indigo-fg',
+    cardBg: 'card-tint-indigo',
+    border: 'border-indigo-line hover:border-indigo-fg',
     progress: 'bg-indigo-500',
   },
   purple: {
-    iconBg: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300',
-    cardBg:
-      'bg-gradient-to-br from-purple-50/70 via-white to-white ' +
-      'dark:from-purple-950/40 dark:via-slate-900 dark:to-slate-900',
-    border: 'border-purple-100/80 hover:border-purple-300 dark:border-purple-900/60 dark:hover:border-purple-700',
+    iconBg: 'bg-purple-strong text-purple-fg',
+    cardBg: 'card-tint-purple',
+    border: 'border-purple-line hover:border-purple-fg',
     progress: 'bg-purple-500',
   },
 } as const
@@ -50,10 +40,10 @@ export const ACCENTS = {
 export type Accent = keyof typeof ACCENTS
 
 export const PILL_TONES = {
-  amber: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-800',
-  emerald: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-800',
-  indigo: 'bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-200 dark:border-indigo-800',
-  purple: 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-950/30 dark:text-purple-200 dark:border-purple-800',
+  amber: 'bg-amber-soft text-amber-fg-strong border-amber-line',
+  emerald: 'bg-emerald-soft text-emerald-fg-strong border-emerald-line',
+  indigo: 'bg-indigo-soft text-indigo-fg-strong border-indigo-line',
+  purple: 'bg-purple-soft text-purple-fg-strong border-purple-line',
 } as const
 
 export type PillTone = keyof typeof PILL_TONES
@@ -98,14 +88,14 @@ export function Card({
         >
           <Icon size={16} />
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
           {label}
         </span>
         <button
           type="button"
           onClick={onClick}
           aria-label={`Open ${label}`}
-          className="ml-auto h-7 w-7 rounded-md flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-white/70 transition-colors cursor-pointer"
+          className="ml-auto h-7 w-7 rounded-md flex items-center justify-center text-subtle hover:text-foreground hover:bg-surface/70 transition-colors cursor-pointer"
         >
           <ArrowRight size={14} />
         </button>
@@ -126,7 +116,7 @@ export function ProgressBar({
 }) {
   const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0
   return (
-    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+    <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
       <div
         className={`h-full ${ACCENTS[tone].progress} transition-all`}
         style={{ width: `${pct}%` }}
@@ -141,7 +131,7 @@ export function CardSkeletonBody({ lines = 2 }: { lines?: number }) {
       {Array.from({ length: lines }).map((_, i) => (
         <div
           key={i}
-          className="h-3 bg-slate-200/70 rounded animate-pulse"
+          className="h-3 bg-line/70 rounded animate-pulse"
           style={{ width: `${[80, 60, 70, 50][i % 4]}%` }}
         />
       ))}
@@ -160,10 +150,10 @@ export function CardEmpty({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <Icon size={18} className="text-slate-300 dark:text-slate-600 mt-0.5 shrink-0" />
+      <Icon size={18} className="text-faint mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{description}</p>
+        <p className="font-medium text-foreground">{title}</p>
+        <p className="text-xs text-muted mt-0.5">{description}</p>
       </div>
     </div>
   )
@@ -171,7 +161,7 @@ export function CardEmpty({
 
 export function SectionHeader({ title }: { title: string }) {
   return (
-    <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 px-1">
+    <h3 className="text-[10px] font-bold uppercase tracking-widest text-subtle px-1">
       {title}
     </h3>
   )

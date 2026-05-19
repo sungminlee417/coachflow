@@ -162,7 +162,7 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">My Meals</h2>
+      <h2 className="text-2xl font-bold text-foreground mb-4">My Meals</h2>
 
       <WeekSelector selectedDate={selectedDate} onSelect={setSelectedDate} tone="success" />
 
@@ -171,10 +171,10 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
         {totalMealsToday > 0 && (
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border tabular-nums ${
-              eatenCountToday === totalMealsToday
-                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
+ eatenCountToday === totalMealsToday
+ ? 'bg-emerald-soft text-emerald-fg border-emerald-line '
+ : 'bg-elevated text-muted border-line '
+ }`}
             aria-live="polite"
           >
             {eatenCountToday} / {totalMealsToday} eaten
@@ -185,14 +185,14 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
       {assignments.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {macroCards.map(({ icon: Icon, label, value, suffix }) => (
-            <div key={label} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-              <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-1">
+            <div key={label} className="bg-surface rounded-xl border border-line p-4">
+              <div className="flex items-center gap-2 text-subtle mb-1">
                 <Icon size={14} />
                 <span className="text-xs font-medium">{label}</span>
               </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              <div className="text-2xl font-bold text-foreground">
                 {roundMacro(value)}
-                {suffix && <span className="text-sm text-slate-400 dark:text-slate-500 font-normal ml-1">{suffix}</span>}
+                {suffix && <span className="text-sm text-subtle font-normal ml-1">{suffix}</span>}
               </div>
             </div>
           ))}
@@ -203,15 +203,15 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
         logsLoaded &&
         !missedBannerDismissed &&
         missedMeals.length > 0 && (
-          <div className="mb-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 flex items-start gap-3">
-            <Bell size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="mb-4 rounded-xl bg-amber-soft border border-amber-line p-3 flex items-start gap-3">
+            <Bell size={16} className="text-amber-fg shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              <p className="text-sm font-semibold text-amber-fg-strong">
                 {missedMeals.length === 1
                   ? "Don't forget to log this meal"
                   : `Don't forget to log ${missedMeals.length} meals`}
               </p>
-              <ul className="text-xs text-amber-700 dark:text-amber-300 mt-1 space-y-0.5">
+              <ul className="text-xs text-amber-fg mt-1 space-y-0.5">
                 {missedMeals.map(m => (
                   <li key={m.id}>
                     <span className="font-medium">
@@ -226,7 +226,7 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
             <button
               type="button"
               onClick={() => setMissedBannerDismissed(true)}
-              className="h-7 w-7 flex items-center justify-center rounded-md text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer shrink-0"
+              className="h-7 w-7 flex items-center justify-center rounded-md text-amber-fg hover:bg-amber-strong transition-colors cursor-pointer shrink-0"
               aria-label="Dismiss reminder"
             >
               <X size={14} />
@@ -241,9 +241,9 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
           ))}
         </div>
       ) : assignments.length === 0 ? (
-        <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-8 text-center">
-          <p className="text-slate-500 dark:text-slate-400">No meal plans assigned for this day</p>
-          <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">
+        <div className="bg-elevated rounded-xl p-8 text-center">
+          <p className="text-muted">No meal plans assigned for this day</p>
+          <p className="text-sm text-subtle mt-2">
             Check other days or assign yourself one from My Meal Plans
           </p>
         </div>
@@ -252,16 +252,16 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
           {assignments.map(assignment => {
             const isOwnAssignment = assignment.coach_id === clientId
             return (
-            <div key={assignment.id} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div key={assignment.id} className="bg-surface rounded-xl border border-line overflow-hidden">
               <div className="p-6">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1">{assignment.meal_plan.name}</h3>
+                    <h3 className="text-xl font-bold text-foreground mb-1">{assignment.meal_plan.name}</h3>
                     {assignment.meal_plan.description && (
-                      <p className="text-slate-600 dark:text-slate-300 text-sm">{assignment.meal_plan.description}</p>
+                      <p className="text-muted text-sm">{assignment.meal_plan.description}</p>
                     )}
                     {assignment.notes && (
-                      <p className="text-indigo-600 dark:text-indigo-400 text-sm mt-2 italic">
+                      <p className="text-indigo-fg text-sm mt-2 italic">
                         Coach note: {assignment.notes}
                       </p>
                     )}
@@ -284,7 +284,7 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
 
                 <button
                   onClick={() => setExpanded(expanded === assignment.id ? null : assignment.id)}
-                  className="w-full text-left text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 font-medium text-sm cursor-pointer"
+                  className="w-full text-left text-emerald-fg hover:text-emerald-fg-strong font-medium text-sm cursor-pointer"
                 >
                   {expanded === assignment.id ? '▼ Hide' : '▶ Show'} Meals (
                   {assignment.meal_plan.meals.length})
@@ -299,21 +299,21 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                         <div
                           key={meal.id}
                           className={`rounded-lg p-4 transition-colors ${
-                            eaten ? 'bg-emerald-50/60 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-50 dark:bg-slate-800'
-                          }`}
+ eaten ? 'bg-emerald-50/60 border border-emerald-line ' : 'bg-elevated '
+ }`}
                         >
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="flex items-center gap-2 flex-wrap min-w-0">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-fg">
                                 {meal.meal_type}
                               </span>
                               {meal.time && (
-                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
+                                <span className="text-xs font-semibold text-foreground tabular-nums">
                                   {formatTime(meal.time)}
                                 </span>
                               )}
                               {eaten && (
-                                <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2 py-0.5">
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-fg bg-emerald-strong border border-emerald-line rounded-full px-2 py-0.5">
                                   Eaten
                                 </span>
                               )}
@@ -327,35 +327,35 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                               />
                             )}
                           </div>
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">
+                          <p className="font-semibold text-foreground">
                             {mealDisplayName(meal.name, mealNumberById.get(meal.id ?? ''))}
                           </p>
                           {meal.description && (
-                            <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">{meal.description}</p>
+                            <p className="text-sm text-muted mb-2">{meal.description}</p>
                           )}
 
                           <div className="grid grid-cols-4 gap-2 text-xs mt-2">
-                            <div className="text-slate-600 dark:text-slate-300">
-                              <span className="text-slate-400 dark:text-slate-500">Cal:</span>{' '}
+                            <div className="text-muted">
+                              <span className="text-subtle">Cal:</span>{' '}
                               <span className="font-medium">{roundMacro(mealMacros.calories)}</span>
                             </div>
-                            <div className="text-slate-600 dark:text-slate-300">
-                              <span className="text-slate-400 dark:text-slate-500">P:</span>{' '}
+                            <div className="text-muted">
+                              <span className="text-subtle">P:</span>{' '}
                               <span className="font-medium">{roundMacro(mealMacros.protein_grams)}g</span>
                             </div>
-                            <div className="text-slate-600 dark:text-slate-300">
-                              <span className="text-slate-400 dark:text-slate-500">C:</span>{' '}
+                            <div className="text-muted">
+                              <span className="text-subtle">C:</span>{' '}
                               <span className="font-medium">{roundMacro(mealMacros.carbs_grams)}g</span>
                             </div>
-                            <div className="text-slate-600 dark:text-slate-300">
-                              <span className="text-slate-400 dark:text-slate-500">F:</span>{' '}
+                            <div className="text-muted">
+                              <span className="text-subtle">F:</span>{' '}
                               <span className="font-medium">{roundMacro(mealMacros.fat_grams)}g</span>
                             </div>
                           </div>
 
                           {meal.foods && meal.foods.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+                            <div className="mt-3 pt-3 border-t border-line">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-subtle mb-2">
                                 Items
                               </p>
                               <ul className="space-y-2">
@@ -364,15 +364,15 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                                   const isRecipe = (food.ingredients?.length ?? 0) > 0
                                   return (
                                     <li key={food.id}>
-                                      <div className="text-sm text-slate-700 dark:text-slate-300 flex items-baseline justify-between gap-3">
+                                      <div className="text-sm text-foreground flex items-baseline justify-between gap-3">
                                         <span>
                                           <span className="font-medium">{food.name}</span>
                                           {!isRecipe && food.quantity && (
-                                            <span className="text-slate-500 dark:text-slate-400"> — {food.quantity}</span>
+                                            <span className="text-muted"> — {food.quantity}</span>
                                           )}
                                         </span>
                                         {(fm.calories > 0 || fm.protein_grams > 0) && (
-                                          <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                          <span className="text-xs text-subtle whitespace-nowrap">
                                             {fm.calories > 0 && `${roundMacro(fm.calories)} cal`}
                                             {fm.protein_grams > 0 &&
                                               ` · ${roundMacro(fm.protein_grams)}g P`}
@@ -380,23 +380,23 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                                         )}
                                       </div>
                                       {food.ingredients && food.ingredients.length > 0 && (
-                                        <ul className="mt-1 ml-4 pl-3 border-l-2 border-slate-200 dark:border-slate-700 space-y-0.5">
+                                        <ul className="mt-1 ml-4 pl-3 border-l-2 border-line space-y-0.5">
                                           {food.ingredients.map(ing => (
                                             <li
                                               key={ing.id}
-                                              className="text-xs text-slate-600 dark:text-slate-300 flex items-baseline justify-between gap-3"
+                                              className="text-xs text-muted flex items-baseline justify-between gap-3"
                                             >
                                               <span>
                                                 <span>{ing.name}</span>
                                                 {ing.quantity && (
-                                                  <span className="text-slate-400 dark:text-slate-500">
+                                                  <span className="text-subtle">
                                                     {' '}
                                                     — {ing.quantity}
                                                   </span>
                                                 )}
                                               </span>
                                               {(ing.calories != null || ing.protein_grams != null) && (
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                                <span className="text-[10px] text-subtle whitespace-nowrap">
                                                   {ing.calories != null &&
                                                     `${roundMacro(ing.calories)} cal`}
                                                   {ing.protein_grams != null &&
@@ -408,7 +408,7 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                                         </ul>
                                       )}
                                       {food.alternatives && food.alternatives.length > 0 && (
-                                        <ul className="mt-1 ml-4 pl-3 border-l-2 border-emerald-200 dark:border-emerald-800 space-y-0.5">
+                                        <ul className="mt-1 ml-4 pl-3 border-l-2 border-emerald-line space-y-0.5">
                                           {food.alternatives.map((alt, i) => {
                                             const macroBits: string[] = []
                                             if (alt.calories != null && alt.calories > 0)
@@ -418,19 +418,19 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                                             return (
                                               <li
                                                 key={alt.id ?? i}
-                                                className="text-xs text-slate-600 dark:text-slate-300 flex items-baseline justify-between gap-3"
+                                                className="text-xs text-muted flex items-baseline justify-between gap-3"
                                               >
                                                 <span>
-                                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 mr-1.5">
+                                                  <span className="text-[9px] font-semibold uppercase tracking-widest text-emerald-fg mr-1.5">
                                                     or
                                                   </span>
                                                   <span className="font-medium">{alt.name}</span>
                                                   {alt.quantity && (
-                                                    <span className="text-slate-400 dark:text-slate-500"> — {alt.quantity}</span>
+                                                    <span className="text-subtle"> — {alt.quantity}</span>
                                                   )}
                                                 </span>
                                                 {macroBits.length > 0 && (
-                                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                                  <span className="text-[10px] text-subtle whitespace-nowrap">
                                                     {macroBits.join(' · ')}
                                                   </span>
                                                 )}

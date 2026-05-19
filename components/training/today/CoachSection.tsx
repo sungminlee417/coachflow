@@ -74,7 +74,7 @@ export function CoachSection({
     return (
       <section className="space-y-3">
         <SectionHeader title="Coaching" />
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+        <div className="bg-surface rounded-2xl border border-line p-5">
           <CardSkeletonBody lines={2} />
         </div>
       </section>
@@ -95,21 +95,21 @@ export function CoachSection({
         <button
           type="button"
           onClick={() => onNavigate('my-workouts')}
-          className="w-full text-left bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 p-5 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors cursor-pointer"
+          className="w-full text-left bg-surface rounded-2xl border border-dashed border-line p-5 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-xl bg-elevated text-muted flex items-center justify-center">
               <Dumbbell size={16} />
             </div>
             <div className="min-w-0">
-              <p className="font-medium text-slate-700 dark:text-slate-300">
+              <p className="font-medium text-foreground">
                 Build your first workout
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-muted mt-0.5">
                 Coach yourself or invite a client — same tools either way.
               </p>
             </div>
-            <ArrowRight size={14} className="ml-auto text-slate-300 dark:text-slate-600" />
+            <ArrowRight size={14} className="ml-auto text-faint" />
           </div>
         </button>
       </section>
@@ -126,14 +126,14 @@ export function CoachSection({
         onClick={() => onNavigate('my-clients')}
       >
         <div className="flex items-baseline justify-between gap-2">
-          <p className="font-semibold text-slate-900 dark:text-slate-100">
+          <p className="font-semibold text-foreground">
             <span className="text-2xl tabular-nums">{counts.clients}</span>
-            <span className="text-sm text-slate-500 dark:text-slate-400 font-normal">
+            <span className="text-sm text-muted font-normal">
               {' '}
               {counts.clients === 1 ? 'client' : 'clients'}
             </span>
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+          <p className="text-xs text-muted shrink-0">
             {counts.clients === 0 ? 'Invite to start' : 'Manage'}
           </p>
         </div>
@@ -177,13 +177,13 @@ function LibraryTile({
     <button
       type="button"
       onClick={onClick}
-      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-3 hover:border-indigo-200 dark:hover:border-indigo-800 hover:shadow-sm transition-all cursor-pointer text-left"
+      className="bg-surface rounded-xl border border-line p-3 hover:border-indigo-line hover:shadow-sm transition-all cursor-pointer text-left"
     >
-      <Icon size={14} className="text-slate-400 dark:text-slate-500 mb-1.5" />
-      <p className="text-lg font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-tight">
+      <Icon size={14} className="text-subtle mb-1.5" />
+      <p className="text-lg font-bold text-foreground tabular-nums leading-tight">
         {count}
       </p>
-      <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-0.5">
+      <p className="text-[10px] font-medium uppercase tracking-widest text-subtle mt-0.5">
         {label}
       </p>
     </button>

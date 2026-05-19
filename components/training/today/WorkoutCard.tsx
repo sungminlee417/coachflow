@@ -143,10 +143,10 @@ export function WorkoutCard({
       ) : (
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-semibold text-slate-900 dark:text-slate-100 truncate min-w-0">
+            <p className="font-semibold text-foreground truncate min-w-0">
               {assignments.map(a => a.workout.name).join(' · ')}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 shrink-0 tabular-nums">
+            <p className="text-xs text-muted shrink-0 tabular-nums">
               {summary?.completedSets ?? 0}/{summary?.totalSets ?? 0} sets
             </p>
           </div>
@@ -159,7 +159,7 @@ export function WorkoutCard({
             .map((note, i) => (
               <p
                 key={i}
-                className="text-xs text-indigo-700 dark:text-indigo-300 bg-indigo-50/60 border border-indigo-100 dark:border-indigo-900 rounded-md px-2 py-1.5 italic"
+                className="text-xs text-indigo-fg bg-indigo-50/60 border border-indigo-line rounded-md px-2 py-1.5 italic"
               >
                 <span className="font-semibold not-italic">Coach:</span> {note}
               </p>
@@ -191,14 +191,14 @@ export function WorkoutCard({
             // The next thing to do is a cardio exercise or superset
             // round, which the inline mini-logger doesn't handle. Point
             // the user at the full view via the Open button.
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+            <p className="text-xs text-muted truncate">
               Next:{' '}
-              <span className="font-medium text-slate-700 dark:text-slate-300">{summary.nextExercise}</span>
-              <span className="ml-1 text-slate-400 dark:text-slate-500">— open to log</span>
+              <span className="font-medium text-foreground">{summary.nextExercise}</span>
+              <span className="ml-1 text-subtle">— open to log</span>
             </p>
           ) : null}
           {summary && summary.totalSets > 0 && summary.completedSets >= summary.totalSets && (
-            <p className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900 rounded-full px-2 py-0.5">
+            <p className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-fg bg-emerald-soft border border-emerald-line rounded-full px-2 py-0.5">
               <Check size={12} /> Done for the day
             </p>
           )}
@@ -325,14 +325,14 @@ function NextSetMiniLogger({
   return (
     <div
       className={`rounded-xl border p-2.5 mt-1 ${
-        isCardio
-          ? 'bg-amber-50/40 border-amber-100 dark:border-amber-900'
-          : 'bg-emerald-50/40 border-emerald-100 dark:border-emerald-900'
-      }`}
+ isCardio
+ ? 'bg-amber-50/40 border-amber-line '
+ : 'bg-emerald-50/40 border-emerald-line '
+ }`}
     >
-      <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate">
-        <span className="font-semibold text-slate-900 dark:text-slate-100">{exerciseName}</span>
-        <span className="text-slate-400 dark:text-slate-500">
+      <p className="text-[11px] text-muted truncate">
+        <span className="font-semibold text-foreground">{exerciseName}</span>
+        <span className="text-subtle">
           {' · '}
           {isCardio
             ? totalSets > 1
@@ -342,13 +342,13 @@ function NextSetMiniLogger({
           {!isCardio && targetReps && (
             <>
               {' · '}target{' '}
-              <span className="font-medium text-slate-600 dark:text-slate-300">{targetReps}</span>
+              <span className="font-medium text-muted">{targetReps}</span>
             </>
           )}
           {isCardio && cardioTargetLabel && (
             <>
               {' · '}target{' '}
-              <span className="font-medium text-slate-600 dark:text-slate-300 tabular-nums">
+              <span className="font-medium text-muted tabular-nums">
                 {cardioTargetLabel}
               </span>
             </>

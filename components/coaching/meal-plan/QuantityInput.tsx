@@ -142,7 +142,7 @@ function UnitCombobox({
       />
       {showDropdown && (
         <ul
-          className="absolute right-0 top-full mt-1 min-w-full max-h-56 overflow-y-auto bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700 shadow-lg z-20 text-xs"
+          className="absolute right-0 top-full mt-1 min-w-full max-h-56 overflow-y-auto bg-surface rounded-md border border-line shadow-lg z-20 text-xs"
           role="listbox"
         >
           {suggestions.map((u, i) => (
@@ -156,8 +156,8 @@ function UnitCombobox({
                 }}
                 onMouseEnter={() => setHighlight(i)}
                 className={`w-full text-left px-2.5 py-1.5 cursor-pointer ${
-                  i === highlight ? 'bg-emerald-50 dark:bg-emerald-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
+ i === highlight ? 'bg-emerald-soft ' : 'hover:bg-elevated '
+ }`}
               >
                 {u}
               </button>

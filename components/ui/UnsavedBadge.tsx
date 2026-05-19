@@ -10,7 +10,7 @@ export function UnsavedBadge({ visible }: UnsavedBadgeProps) {
       // a "Save X" primary button, so giving the badge ~140px for the
       // full "Unsaved changes" text squished everything else. On sm+
       // we have room for the full word.
-      className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2 py-1 rounded-full whitespace-nowrap shrink-0"
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-fg bg-amber-soft border border-amber-line px-2 py-1 rounded-full whitespace-nowrap shrink-0"
       aria-label="Unsaved changes"
       title="Unsaved changes"
     >

@@ -45,7 +45,7 @@ export function IngredientRow({
   //          left after the input's px-3 padding.
   // Desktop (md+): everything in one tight 12-col row.
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-md p-1.5 border border-slate-200 dark:border-slate-700 md:grid md:grid-cols-12 md:gap-1.5 md:items-center space-y-1.5 md:space-y-0">
+    <div className="bg-surface rounded-md p-1.5 border border-line md:grid md:grid-cols-12 md:gap-1.5 md:items-center space-y-1.5 md:space-y-0">
       <div className="md:col-span-4 flex items-center gap-1.5">
         <div className="flex-1 min-w-0">
           <IngredientNameField
@@ -187,7 +187,7 @@ function IngredientNameField({
         <ul
           // Absolute so the dropdown can spill out of the row's
           // overflow context. z-20 stacks above sibling rows.
-          className="absolute left-0 right-0 top-full mt-1 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700 shadow-lg z-20 text-xs"
+          className="absolute left-0 right-0 top-full mt-1 max-h-64 overflow-y-auto bg-surface rounded-md border border-line shadow-lg z-20 text-xs"
           role="listbox"
         >
           {suggestions.map((entry, i) => (
@@ -203,13 +203,13 @@ function IngredientNameField({
                 }}
                 onMouseEnter={() => setHighlight(i)}
                 className={`w-full text-left px-2.5 py-1.5 cursor-pointer ${
-                  i === highlight ? 'bg-emerald-50 dark:bg-emerald-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
+ i === highlight ? 'bg-emerald-soft ' : 'hover:bg-elevated '
+ }`}
               >
-                <p className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                <p className="font-medium text-foreground truncate">
                   {entry.name}
                 </p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums">
+                <p className="text-[10px] text-muted mt-0.5 tabular-nums">
                   {[
                     entry.quantity || null,
                     entry.calories != null ? `${roundMacro(entry.calories)} cal` : null,

@@ -15,7 +15,7 @@ export function BuilderCard({
   className?: string
 }) {
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 ${className}`}>
+    <div className={`bg-surface rounded-xl border border-line ${className}`}>
       {children}
     </div>
   )

@@ -114,8 +114,8 @@ export function HeroStats({
   if (allZero && anyFetching) {
     return (
       <div className="flex items-center gap-2">
-        <div className="h-6 w-24 rounded-full bg-slate-200/70 animate-pulse" />
-        <div className="h-6 w-20 rounded-full bg-slate-200/70 animate-pulse" />
+        <div className="h-6 w-24 rounded-full bg-line/70 animate-pulse" />
+        <div className="h-6 w-20 rounded-full bg-line/70 animate-pulse" />
       </div>
     )
   }

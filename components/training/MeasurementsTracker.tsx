@@ -47,18 +47,18 @@ const FIELDS: FieldDef[] = [
 // The arrow + sign communicate direction; slate keeps the value-neutral.
 function deltaIndicator(current: number, previous: number) {
   const diff = current - previous
-  if (diff === 0) return { icon: Minus, text: '0', color: 'text-slate-400' }
+  if (diff === 0) return { icon: Minus, text: '0', color: 'text-subtle' }
   if (diff > 0) {
     return {
       icon: TrendingUp,
       text: `+${roundMacro(diff)}`,
-      color: 'text-slate-500',
+      color: 'text-muted',
     }
   }
   return {
     icon: TrendingDown,
     text: `${roundMacro(diff)}`,
-    color: 'text-slate-500',
+    color: 'text-muted',
   }
 }
 
@@ -114,14 +114,14 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6 space-y-4">
+      <div className="bg-surface rounded-2xl border border-line p-5 sm:p-6 space-y-4">
         <div className="flex items-center justify-between">
           <Skeleton className="h-5 w-40" />
           <Skeleton className="h-9 w-32 rounded-lg" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 space-y-2">
+            <div key={i} className="bg-elevated rounded-xl p-3 space-y-2">
               <Skeleton className="h-3 w-1/2" />
               <Skeleton className="h-5 w-3/4" />
             </div>
@@ -135,7 +135,7 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
   const previous = entries[1]
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
+    <div className="bg-surface rounded-2xl border border-line p-5 sm:p-6">
       <MeasurementForm
         open={showForm}
         userId={userId}
@@ -159,12 +159,12 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
 
       <div className="flex justify-between items-center gap-3 mb-5">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0">
-            <Ruler size={18} className="text-emerald-600 dark:text-emerald-400" />
+          <div className="h-10 w-10 rounded-xl bg-emerald-soft flex items-center justify-center shrink-0">
+            <Ruler size={18} className="text-emerald-fg" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Circumference</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+            <h3 className="text-base font-semibold text-foreground">Circumference</h3>
+            <p className="text-xs text-muted truncate">
               {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
             </p>
           </div>
@@ -195,13 +195,13 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
       ) : (
         <>
           {/* Latest snapshot with deltas vs previous entry */}
-          <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 mb-6">
+          <div className="bg-elevated rounded-xl p-4 mb-6">
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-subtle">
                 Latest &middot; {formatDate(latest.recorded_at)}
               </p>
               {previous && (
-                <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                <p className="text-[10px] text-subtle">
                   vs. {formatDate(previous.recorded_at)}
                 </p>
               )}
@@ -217,15 +217,15 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
                 return (
                   <div
                     key={key}
-                    className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 min-w-0"
+                    className="bg-surface rounded-lg border border-line px-3 py-2.5 min-w-0"
                   >
                     {/* Label row — truncates cleanly on narrow phones.
                         The (flexed/relaxed) tag is its own span so it doesn't
                         eat the label's available width when it's not there. */}
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    <p className="text-[11px] text-muted truncate">
                       {label}
                       {flexedKey && (
-                        <span className="ml-1 text-[9px] text-slate-400 dark:text-slate-500">
+                        <span className="ml-1 text-[9px] text-subtle">
                           ({isFlexed ? 'flexed' : 'relaxed'})
                         </span>
                       )}
@@ -235,9 +235,9 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
                         is forced narrow on small screens — value never gets
                         pushed onto a second line, delta never wraps. */}
                     <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-baseline">
-                      <p className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums whitespace-nowrap min-w-0 truncate">
+                      <p className="text-lg sm:text-xl font-semibold text-foreground tabular-nums whitespace-nowrap min-w-0 truncate">
                         {formatLength(value, lengthUnit)}
-                        <span className="text-[10px] sm:text-xs font-normal text-slate-400 dark:text-slate-500 ml-1">
+                        <span className="text-[10px] sm:text-xs font-normal text-subtle ml-1">
                           {lengthUnit}
                         </span>
                       </p>
@@ -255,7 +255,7 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
               })}
             </div>
             {latest.notes && (
-              <p className="text-sm text-slate-600 dark:text-slate-300 italic mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-sm text-muted italic mt-4 pt-4 border-t border-line-subtle">
                 {latest.notes}
               </p>
             )}
@@ -266,10 +266,10 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
               list of past entries read as visually distinct tiers, not the
               same surface stacked twice. */}
           <div className="flex items-baseline justify-between mb-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-subtle">
               History
             </p>
-            <p className="text-[10px] tabular-nums text-slate-400 dark:text-slate-500">
+            <p className="text-[10px] tabular-nums text-subtle">
               {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
             </p>
           </div>
@@ -277,7 +277,7 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
             {historyRows.map(({ entry, filledCount, summary }) => (
               <div
                 key={entry.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors rounded-lg flex items-center gap-1 group"
+                className="bg-surface border border-line hover:border-indigo-line transition-colors rounded-lg flex items-center gap-1 group"
               >
                 <button
                   type="button"
@@ -289,19 +289,19 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
                   aria-label={`Edit measurement for ${formatDate(entry.recorded_at)}`}
                 >
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-slate-900 dark:text-slate-100 text-sm tabular-nums">
+                    <p className="font-medium text-foreground text-sm tabular-nums">
                       {formatDate(entry.recorded_at)}
                     </p>
-                    <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-2 py-px tabular-nums">
+                    <span className="text-[10px] font-semibold text-muted bg-elevated border border-line rounded-full px-2 py-px tabular-nums">
                       {filledCount} {filledCount === 1 ? 'measurement' : 'measurements'}
                     </span>
                     <Pencil
                       size={11}
-                      className="text-slate-300 dark:text-slate-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                      className="text-faint sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     />
                   </div>
                   {summary && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{summary}</p>
+                    <p className="text-xs text-muted mt-1 truncate">{summary}</p>
                   )}
                 </button>
                 <div className="pr-2 shrink-0">

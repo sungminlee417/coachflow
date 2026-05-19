@@ -632,14 +632,14 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
             type="checkbox"
             checked={isTemplate}
             onChange={e => setIsTemplate(e.target.checked)}
-            className="h-4 w-4 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 border-slate-300 dark:border-slate-600 rounded cursor-pointer"
+            className="h-4 w-4 text-indigo-fg focus:ring-indigo-500 border-line rounded cursor-pointer"
           />
-          <span className="text-sm text-slate-700 dark:text-slate-300">Save as template</span>
+          <span className="text-sm text-foreground">Save as template</span>
         </label>
       </BuilderCard>
 
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Meals</h3>
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wide">Meals</h3>
         <Button variant="success" size="sm" onClick={addMeal}>
           <Plus size={14} />
           Add Meal
@@ -651,36 +651,36 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
           meal lists — coaches almost always plan against a calorie/protein
           target, and the previous design made you scroll back up to check. */}
       {meals.length > 0 && (
-        <div className="sticky top-14 md:top-0 z-20 -mx-4 px-4 sm:mx-0 sm:px-0 mb-3 bg-slate-50/95 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 shadow-sm">
+        <div className="sticky top-14 md:top-0 z-20 -mx-4 px-4 sm:mx-0 sm:px-0 mb-3 bg-canvas/95 backdrop-blur-sm">
+          <div className="bg-surface border border-line rounded-xl px-3 py-2 shadow-sm">
             <div className="flex items-baseline justify-between gap-2 flex-wrap">
               <div className="flex items-baseline gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-subtle">
                   {dailyTotals.uniform ? 'Daily' : 'Daily range'}
                 </span>
-                <span className="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                <span className="text-base font-bold text-foreground tabular-nums">
                   {dailyTotals.uniform
                     ? Math.round(dailyTotals.maxCals)
                     : `${Math.round(dailyTotals.minCals)}–${Math.round(dailyTotals.maxCals)}`}
                 </span>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">cal</span>
+                <span className="text-[11px] text-subtle font-medium">cal</span>
               </div>
               <div className="flex items-baseline gap-2.5 text-[11px] tabular-nums">
-                <span className="text-slate-600 dark:text-slate-300">
+                <span className="text-muted">
                   P{' '}
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  <span className="font-semibold text-foreground">
                     {roundMacro(dailyTotals.heaviest.protein_grams)}
                   </span>
                 </span>
-                <span className="text-slate-600 dark:text-slate-300">
+                <span className="text-muted">
                   C{' '}
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  <span className="font-semibold text-foreground">
                     {roundMacro(dailyTotals.heaviest.carbs_grams)}
                   </span>
                 </span>
-                <span className="text-slate-600 dark:text-slate-300">
+                <span className="text-muted">
                   F{' '}
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  <span className="font-semibold text-foreground">
                     {roundMacro(dailyTotals.heaviest.fat_grams)}
                   </span>
                 </span>
@@ -710,19 +710,19 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
                   cluster here so Mon-Thu and Fri versions of the same meal are
                   visibly siblings, not sequential "Meal 8 / Meal 9". */}
               <div className="flex items-baseline gap-2 mb-2 px-1 flex-wrap">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-fg">
                   {slot.meal_type}
                 </span>
                 {slot.time ? (
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
+                  <span className="text-xs font-semibold text-foreground tabular-nums">
                     {formatTime(slot.time)}
                   </span>
                 ) : (
-                  <span className="text-[10px] uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                  <span className="text-[10px] uppercase tracking-widest text-subtle">
                     No time set
                   </span>
                 )}
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto tabular-nums">
+                <span className="text-[10px] text-subtle ml-auto tabular-nums">
                   {slot.meals.length}{' '}
                   {slot.meals.length === 1 ? 'option' : 'options'}
                 </span>

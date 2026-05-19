@@ -229,9 +229,9 @@ function RestTimerBar() {
         className="fixed left-3 right-3 z-40 bottom-[calc(env(safe-area-inset-bottom)+4rem)] sm:left-auto sm:right-4 sm:max-w-sm sm:bottom-4 pointer-events-none"
         aria-label="Rest timer launcher"
       >
-        <div className="pointer-events-auto rounded-2xl shadow-lg border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 px-3 py-2 flex items-center gap-2">
-          <Timer size={14} className="text-slate-400 dark:text-slate-500 shrink-0" />
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 shrink-0">
+        <div className="pointer-events-auto rounded-2xl shadow-lg border bg-surface border-line px-3 py-2 flex items-center gap-2">
+          <Timer size={14} className="text-subtle shrink-0" />
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-subtle shrink-0">
             Rest
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -240,7 +240,7 @@ function RestTimerBar() {
                 key={sec}
                 type="button"
                 onClick={() => start(sec)}
-                className="text-xs font-semibold tabular-nums px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+                className="text-xs font-semibold tabular-nums px-2 py-1 rounded-md bg-elevated hover:bg-indigo-soft hover:text-indigo-fg transition-colors cursor-pointer"
               >
                 {formatPresetLabel(sec)}
               </button>
@@ -250,7 +250,7 @@ function RestTimerBar() {
             type="button"
             onClick={() => setLauncherDismissed(true)}
             aria-label="Hide rest timer launcher"
-            className="ml-auto h-6 w-6 flex items-center justify-center rounded-md text-slate-300 dark:text-slate-600 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            className="ml-auto h-6 w-6 flex items-center justify-center rounded-md text-faint hover:text-foreground hover:bg-elevated transition-colors cursor-pointer shrink-0"
           >
             <X size={14} />
           </button>

@@ -68,7 +68,7 @@ export function StreakCard({
       {streak === null ? (
         <CardSkeletonBody lines={1} />
       ) : streak === 0 ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-muted">
           Log a workout today to start a streak.
         </p>
       ) : (
@@ -77,13 +77,13 @@ export function StreakCard({
         // and looked squished. Big number on top, supporting label
         // below, week count as a small footer pill.
         <div>
-          <p className="font-semibold text-slate-900 dark:text-slate-100 leading-none">
+          <p className="font-semibold text-foreground leading-none">
             <span className="text-3xl tabular-nums">{streak}</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-normal ml-1">
+            <span className="text-xs text-muted font-normal ml-1">
               {streak === 1 ? 'day' : 'days'}
             </span>
           </p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 tabular-nums">
+          <p className="text-[11px] text-muted mt-2 tabular-nums">
             {thisWeek}/7 this week
           </p>
         </div>

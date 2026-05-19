@@ -396,14 +396,14 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
             type="checkbox"
             checked={isTemplate}
             onChange={e => setIsTemplate(e.target.checked)}
-            className="h-4 w-4 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 border-slate-300 dark:border-slate-600 rounded cursor-pointer"
+            className="h-4 w-4 text-indigo-fg focus:ring-indigo-500 border-line rounded cursor-pointer"
           />
-          <span className="text-sm text-slate-700 dark:text-slate-300">Save as template</span>
+          <span className="text-sm text-foreground">Save as template</span>
         </label>
       </BuilderCard>
 
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Exercises</h3>
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wide">Exercises</h3>
         <Button variant="success" size="sm" onClick={addExercise}>
           <Plus size={14} />
           Add Exercise
@@ -436,11 +436,11 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
               const type: ExerciseType = exercise.exercise_type ?? 'strength'
               const isCardio = type === 'cardio'
               return (
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+              <div className="bg-surface rounded-xl border border-line p-4">
                 <div className="flex justify-between items-center mb-3 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <DragHandle {...drag} />
-                    <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                    <span className="text-xs font-semibold text-subtle uppercase tracking-wide">
                       Exercise {index + 1}
                     </span>
                   </div>
@@ -452,7 +452,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                 </div>
 
                 {/* Type toggle: Strength vs Cardio */}
-                <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 mb-3 bg-slate-50 dark:bg-slate-800">
+                <div className="inline-flex rounded-lg border border-line p-0.5 mb-3 bg-elevated">
                   {([
                     { value: 'strength' as const, label: 'Strength', Icon: Dumbbell },
                     { value: 'cardio' as const, label: 'Cardio', Icon: HeartPulse },
@@ -465,12 +465,12 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                         onClick={() => setExerciseType(index, value)}
                         aria-pressed={active}
                         className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                          active
-                            ? value === 'cardio'
-                              ? 'bg-amber-500 text-white'
-                              : 'bg-indigo-600 text-white'
-                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100'
-                        }`}
+ active
+ ? value === 'cardio'
+ ? 'bg-amber-500 text-white'
+ : 'bg-indigo-600 text-white'
+ : 'text-muted hover:text-foreground '
+ }`}
                       >
                         <Icon size={13} />
                         {label}
@@ -505,7 +505,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                     fields appear under each interval below. */}
                 {isCardio && (
                   <div className="mb-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1.5">
                       Machine
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -524,10 +524,10 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                             }
                             aria-pressed={active}
                             className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                              active
-                                ? 'bg-amber-500 text-white border-amber-500'
-                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-300 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50/40'
-                            }`}
+ active
+ ? 'bg-amber-500 text-white border-amber-500'
+ : 'border-line text-muted hover:border-amber-300 hover:text-amber-fg hover:bg-amber-50/40'
+ }`}
                           >
                             {CARDIO_LABELS[sub]}
                           </button>
@@ -538,9 +538,9 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                 )}
 
                 {/* Per-set table */}
-                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 mb-3">
+                <div className="bg-elevated rounded-lg p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                       {isCardio ? (sets.length > 1 ? 'Intervals' : 'Duration') : 'Sets'}
                     </span>
                     <div className="flex items-center gap-2">
@@ -548,7 +548,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                         <button
                           type="button"
                           onClick={() => fillSetsFromFirst(index)}
-                          className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer"
+                          className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer"
                         >
                           {isCardio ? 'Copy interval 1 to all' : 'Copy set 1 to all'}
                         </button>
@@ -556,21 +556,21 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                       <button
                         type="button"
                         onClick={() => addSet(index)}
-                        className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer"
+                        className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer"
                       >
                         {isCardio ? '+ Add interval' : '+ Add set'}
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1 px-1">
+                  <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-subtle mb-1 px-1">
                     <div className="col-span-2">{isCardio ? '#' : 'Set'}</div>
                     <div className="col-span-8">{isCardio ? 'Target time' : 'Reps'}</div>
                     <div className="col-span-2" />
                   </div>
 
                   {sets.length === 0 ? (
-                    <p className="text-xs text-slate-400 dark:text-slate-500 italic px-1 py-2">
+                    <p className="text-xs text-subtle italic px-1 py-2">
                       {isCardio
                         ? 'No duration set. Click "+ Add interval" to add one.'
                         : 'No sets yet. Click "+ Add set" to add one.'}
@@ -593,7 +593,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                         return (
                           <div key={setIndex}>
                             <div className="grid grid-cols-12 gap-2 items-center">
-                              <div className="col-span-2 text-sm font-medium text-slate-500 dark:text-slate-400 text-center">
+                              <div className="col-span-2 text-sm font-medium text-muted text-center">
                                 {s.set_number}
                               </div>
                               <div className="col-span-8">
@@ -604,14 +604,14 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                                   className="text-sm"
                                 />
                                 {showHint && (
-                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 px-1">
+                                  <p className="text-[10px] text-subtle mt-0.5 px-1">
                                     = {formatDuration(parsedSeconds)}
                                   </p>
                                 )}
                                 {isCardio &&
                                   s.target_reps.trim() !== '' &&
                                   parsedSeconds == null && (
-                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 px-1">
+                                    <p className="text-[10px] text-amber-fg mt-0.5 px-1">
                                       Couldn&rsquo;t parse — try &ldquo;20&rdquo;, &ldquo;20:30&rdquo;, or &ldquo;1h 20m&rdquo;
                                     </p>
                                   )}
@@ -635,7 +635,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                                 <div className="col-span-8 grid grid-cols-3 gap-2">
                                   {cardioFields.speed && (
                                     <div>
-                                      <label className="block text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Speed</label>
+                                      <label className="block text-[10px] text-muted mb-0.5">Speed</label>
                                       <Input
                                         value={s.target_speed ?? ''}
                                         onChange={e =>
@@ -648,7 +648,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                                   )}
                                   {cardioFields.incline && (
                                     <div>
-                                      <label className="block text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Incline %</label>
+                                      <label className="block text-[10px] text-muted mb-0.5">Incline %</label>
                                       <Input
                                         value={s.target_incline ?? ''}
                                         onChange={e =>
@@ -661,7 +661,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                                   )}
                                   {cardioFields.resistance && (
                                     <div>
-                                      <label className="block text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Resistance</label>
+                                      <label className="block text-[10px] text-muted mb-0.5">Resistance</label>
                                       <Input
                                         value={s.target_resistance ?? ''}
                                         onChange={e =>
@@ -685,7 +685,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    <label className="block text-xs text-muted mb-1">
                       {isCardio && sets.length > 1 ? 'Rest between intervals (s)' : 'Rest (seconds)'}
                     </label>
                     <Input
@@ -698,7 +698,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Notes</label>
+                    <label className="block text-xs text-muted mb-1">Notes</label>
                     <Input
                       value={exercise.notes}
                       onChange={e => updateExercise(index, 'notes', e.target.value)}
@@ -709,21 +709,21 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
 
                 {/* Alternatives — fallback exercise names the trainee can swap to
                     when the prescribed equipment isn't available. */}
-                <div className="mt-3 bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
+                <div className="mt-3 bg-elevated rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                       Alternatives
                     </span>
                     <button
                       type="button"
                       onClick={() => addAlternative(index)}
-                      className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer"
+                      className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer"
                     >
                       + Add alternative
                     </button>
                   </div>
                   {(exercise.alternatives ?? []).length === 0 ? (
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 italic px-1 py-1">
+                    <p className="text-[11px] text-subtle italic px-1 py-1">
                       None yet. Add fallbacks like &ldquo;Goblet Squat&rdquo; or &ldquo;Leg Press&rdquo;
                       so clients can swap if the equipment isn&rsquo;t available.
                     </p>
@@ -765,10 +765,10 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                     onClick={() => updateExercise(index, 'pair_with_next', !exercise.pair_with_next)}
                     aria-pressed={!!exercise.pair_with_next}
                     className={`mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${
-                      exercise.pair_with_next
-                        ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40'
-                        : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
+ exercise.pair_with_next
+ ? 'bg-indigo-soft text-indigo-fg border-indigo-line hover:bg-indigo-strong '
+ : 'bg-elevated text-muted border-line hover:bg-elevated '
+ }`}
                   >
                     <Link2 size={14} />
                     {exercise.pair_with_next
@@ -798,7 +798,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                     <span className="text-[10px] font-bold uppercase tracking-widest text-white bg-indigo-600 rounded-full px-2.5 py-1">
                       Superset
                     </span>
-                    <span className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">
+                    <span className="text-[10px] text-indigo-fg font-medium">
                       {`${group.exercises.length} exercises · performed back-to-back`}
                     </span>
                   </div>

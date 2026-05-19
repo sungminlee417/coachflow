@@ -27,7 +27,7 @@ export function MealLogToggle({
   const toggle = useToggleMealLog({ clientId: userId, date: loggedDate })
 
   if (!eaten.isSuccess && eaten.isLoading) {
-    return <div className="h-7 w-7 bg-slate-200/70 rounded-md animate-pulse" />
+    return <div className="h-7 w-7 bg-line/70 rounded-md animate-pulse" />
   }
   const completed = eaten.data?.has(mealId) ?? false
 
@@ -47,10 +47,10 @@ export function MealLogToggle({
       aria-label={completed ? 'Mark meal not eaten' : 'Mark meal eaten'}
       aria-pressed={completed}
       className={`h-7 w-7 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
-        completed
-          ? 'bg-emerald-500 border-emerald-500 text-white'
-          : 'border-slate-300 dark:border-slate-600 text-transparent hover:border-slate-400'
-      }`}
+ completed
+ ? 'bg-emerald-500 border-emerald-500 text-white'
+ : 'border-line text-transparent hover:border-subtle'
+ }`}
     >
       <Check size={14} />
     </button>

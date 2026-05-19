@@ -87,7 +87,7 @@ export function MealCard({
 }) {
   const mealMacros = computeMealMacros(meal)
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+    <div className="bg-surface rounded-xl border border-line p-4">
       <div className="flex justify-between items-center gap-2">
         <DragHandle {...drag} />
         <button
@@ -96,20 +96,20 @@ export function MealCard({
           className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer group"
           aria-expanded={isExpanded}
         >
-          <span className="text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-transform shrink-0">
+          <span className="text-subtle group-hover:text-foreground transition-transform shrink-0">
             {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </span>
           {meal.name ? (
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate min-w-0">
+            <span className="text-sm font-medium text-foreground truncate min-w-0">
               {meal.name}
             </span>
           ) : (
-            <span className="text-sm text-slate-400 dark:text-slate-500 italic shrink-0 pr-0.5">
+            <span className="text-sm text-subtle italic shrink-0 pr-0.5">
               Untitled meal
             </span>
           )}
           {!isExpanded && (
-            <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 ml-auto pr-2 hidden sm:inline tabular-nums">
+            <span className="text-xs text-subtle shrink-0 ml-auto pr-2 hidden sm:inline tabular-nums">
               {Math.round(mealMacros.calories)} cal
             </span>
           )}
@@ -133,7 +133,7 @@ export function MealCard({
       </div>
 
       {!isExpanded && (
-        <div className="mt-3 pl-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
+        <div className="mt-3 pl-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted">
           {meal.days_of_week.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {meal.days_of_week
@@ -142,16 +142,16 @@ export function MealCard({
                 .map(d => (
                   <span
                     key={d}
-                    className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-full text-[10px] font-semibold uppercase tracking-wide leading-none"
+                    className="px-2.5 py-1 bg-indigo-soft text-indigo-fg border border-indigo-line rounded-full text-[10px] font-semibold uppercase tracking-wide leading-none"
                   >
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]}
                   </span>
                 ))}
             </div>
           ) : (
-            <span className="text-slate-400 dark:text-slate-500 italic">Any day</span>
+            <span className="text-subtle italic">Any day</span>
           )}
-          <span className="text-slate-300 dark:text-slate-600">&middot;</span>
+          <span className="text-faint">&middot;</span>
           <span>
             {(meal.foods?.length ?? 0)}{' '}
             {(meal.foods?.length ?? 0) === 1 ? 'item' : 'items'}
@@ -162,16 +162,16 @@ export function MealCard({
       {isExpanded && (
         <div className="mt-4">
           {driftHint && (
-            <div className="mb-3 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-1.5 flex items-center gap-1.5">
+            <div className="mb-3 text-[11px] text-amber-fg bg-amber-soft border border-amber-line rounded-md px-2.5 py-1.5 flex items-center gap-1.5">
               <span className="font-semibold uppercase tracking-widest text-[9px]">
                 Will move
               </span>
-              <span className="text-slate-700 dark:text-slate-300">→ {driftHint}</span>
-              <span className="ml-auto text-[10px] text-amber-600 dark:text-amber-400">on close</span>
+              <span className="text-foreground">→ {driftHint}</span>
+              <span className="ml-auto text-[10px] text-amber-fg">on close</span>
             </div>
           )}
           <div className="mb-3">
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-2">Days</label>
+            <label className="block text-xs text-muted mb-2">Days</label>
             <DayOfWeekSelector
               value={meal.days_of_week}
               onChange={days => actions.updateMeal(index, 'days_of_week', days)}
@@ -180,7 +180,7 @@ export function MealCard({
 
           <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-3">
             <div className="md:col-span-2">
-              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Type</label>
+              <label className="block text-xs text-muted mb-1">Type</label>
               <Select
                 value={meal.meal_type}
                 onChange={e =>
@@ -196,8 +196,8 @@ export function MealCard({
               </Select>
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
-                Time <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
+              <label className="block text-xs text-muted mb-1">
+                Time <span className="text-subtle font-normal">(optional)</span>
               </label>
               <Input
                 type="time"
@@ -206,7 +206,7 @@ export function MealCard({
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Name</label>
+              <label className="block text-xs text-muted mb-1">Name</label>
               <Input
                 value={meal.name}
                 onChange={e => actions.updateMeal(index, 'name', e.target.value)}
@@ -214,7 +214,7 @@ export function MealCard({
               />
             </div>
             <div className="md:col-span-6">
-              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Description</label>
+              <label className="block text-xs text-muted mb-1">Description</label>
               <Input
                 value={meal.description}
                 onChange={e => actions.updateMeal(index, 'description', e.target.value)}
@@ -223,16 +223,16 @@ export function MealCard({
             </div>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-2 mb-3 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+          <div className="bg-elevated rounded-lg px-3 py-2 mb-3 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
               Meal totals
             </span>
             <MacroSummary macros={mealMacros} />
           </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="mt-3 pt-3 border-t border-line-subtle">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <span className="text-xs font-semibold text-muted uppercase tracking-wide">
                 Items
               </span>
               <Button variant="secondary" size="sm" onClick={() => actions.addFood(index)}>
@@ -242,7 +242,7 @@ export function MealCard({
             </div>
 
             {(meal.foods?.length ?? 0) === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+              <p className="text-xs text-subtle italic">
                 Add items to this meal. An item can be a single thing
                 (e.g. &ldquo;1 tbsp olive oil&rdquo;) or a recipe broken into ingredients.
               </p>
@@ -253,7 +253,7 @@ export function MealCard({
                   const foodMacros = computeFoodMacros(food)
                   const expanded = isFoodExpanded(foodIndex)
                   return (
-                    <div key={foodIndex} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
+                    <div key={foodIndex} className="bg-elevated rounded-lg p-3">
                       <div className="flex items-start gap-2">
                         {hasIngredients && (
                           <button
@@ -261,7 +261,7 @@ export function MealCard({
                             onClick={() => actions.toggleFoodExpanded(index, foodIndex)}
                             aria-label={expanded ? 'Collapse item' : 'Expand item'}
                             aria-expanded={expanded}
-                            className="mt-2 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer shrink-0"
+                            className="mt-2 text-subtle hover:text-foreground cursor-pointer shrink-0"
                           >
                             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                           </button>
@@ -306,7 +306,7 @@ export function MealCard({
                             ]
                           ).map(({ field, label }) => (
                             <div key={field}>
-                              <label className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">
+                              <label className="block text-[10px] text-muted mb-1">
                                 {label}
                               </label>
                               <Input
@@ -330,34 +330,34 @@ export function MealCard({
                       )}
 
                       {hasIngredients && !expanded && (
-                        <div className="mt-2 ml-6 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="mt-2 ml-6 flex items-center gap-3 text-xs text-muted">
                           <span>
                             {food.ingredients!.length}{' '}
                             {food.ingredients!.length === 1 ? 'ingredient' : 'ingredients'}
                           </span>
-                          <span className="text-slate-300 dark:text-slate-600">&middot;</span>
+                          <span className="text-faint">&middot;</span>
                           <MacroSummary macros={foodMacros} className="text-[11px]" />
                         </div>
                       )}
 
                       {hasIngredients && expanded && (
                         <>
-                          <div className="mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1.5 flex items-center justify-between flex-wrap gap-2">
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">
+                          <div className="mt-2 bg-surface border border-line rounded-md px-2 py-1.5 flex items-center justify-between flex-wrap gap-2">
+                            <span className="text-[10px] text-subtle italic">
                               Auto-calculated from ingredients
                             </span>
                             <MacroSummary macros={foodMacros} />
                           </div>
 
-                          <div className="mt-2 ml-4 pl-3 border-l-2 border-slate-200 dark:border-slate-700">
+                          <div className="mt-2 ml-4 pl-3 border-l-2 border-line">
                             <div className="flex justify-between items-center mb-1">
-                              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                              <span className="text-[10px] font-semibold text-subtle uppercase tracking-wide">
                                 Ingredients
                               </span>
                               <button
                                 type="button"
                                 onClick={() => actions.addIngredient(index, foodIndex)}
-                                className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer"
+                                className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer"
                               >
                                 + Add Ingredient
                               </button>
@@ -391,21 +391,21 @@ export function MealCard({
                         </>
                       )}
 
-                      <div className="mt-2 ml-4 pl-3 border-l-2 border-slate-200 dark:border-slate-700">
+                      <div className="mt-2 ml-4 pl-3 border-l-2 border-line">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                          <span className="text-[10px] font-semibold text-subtle uppercase tracking-wide">
                             Alternatives
                           </span>
                           <button
                             type="button"
                             onClick={() => actions.addFoodAlternative(index, foodIndex)}
-                            className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer"
+                            className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer"
                           >
                             + Add Alternative
                           </button>
                         </div>
                         {(food.alternatives ?? []).length === 0 ? (
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500 italic px-1 py-0.5">
+                          <p className="text-[10px] text-subtle italic px-1 py-0.5">
                             None yet. Add &ldquo;Greek yogurt&rdquo; or &ldquo;Cottage
                             cheese&rdquo; so clients can swap if they don&rsquo;t have
                             the original on hand.

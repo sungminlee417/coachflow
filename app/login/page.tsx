@@ -67,32 +67,32 @@ function Login() {
       </div>
 
       {/* Right panel - form */}
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-8 bg-slate-50 dark:bg-slate-800">
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-8 bg-elevated">
         <div className="max-w-sm w-full">
           <div className="lg:hidden text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-2.5 cursor-pointer">
               <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                 <Dumbbell size={16} className="text-white" />
               </div>
-              <span className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">CoachFlow</span>
+              <span className="text-lg font-bold text-foreground tracking-tight">CoachFlow</span>
             </Link>
           </div>
 
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">Welcome back</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">Sign in to your account</p>
+          <h2 className="text-2xl font-bold text-foreground mb-1">Welcome back</h2>
+          <p className="text-sm text-muted mb-8">Sign in to your account</p>
 
           <form className="space-y-4" onSubmit={handleLogin}>
             {error && (
-              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl text-sm">
+              <div className="bg-red-soft border border-red-line text-red-fg px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
                 Email
               </label>
               <div className="relative">
-                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-subtle" />
                 <input
                   id="email"
                   type="email"
@@ -100,17 +100,17 @@ function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-slate-400"
+                  className="block w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-subtle"
                   placeholder="you@example.com"
                 />
               </div>
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
                 Password
               </label>
               <div className="relative">
-                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-subtle" />
                 <input
                   id="password"
                   type="password"
@@ -118,7 +118,7 @@ function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-slate-400"
+                  className="block w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-subtle"
                   placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
                 />
               </div>
@@ -134,9 +134,9 @@ function Login() {
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
 
-            <p className="text-center text-sm text-slate-500 dark:text-slate-400 pt-2">
+            <p className="text-center text-sm text-muted pt-2">
               Don&apos;t have an account?{' '}
-              <Link href="/signup" className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 cursor-pointer">
+              <Link href="/signup" className="font-semibold text-indigo-fg hover:text-indigo-500 cursor-pointer">
                 Sign up
               </Link>
             </p>
