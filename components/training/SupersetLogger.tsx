@@ -205,6 +205,49 @@ export function SupersetLogger({
     })
   }, [persistedByExercise])
 
+  // Prefill empty inputs from last session's actuals. Same pattern as
+  // ExerciseSetLogger — only patches rows that have neither a persisted
+  // log for today nor any user-typed values, so we never clobber.
+  useEffect(() => {
+    if (priorByKey.size === 0) return
+    setRowsByExercise(prev => {
+      const next = new Map<string, RowState[]>()
+      for (const [exId, rows] of prev) {
+        const scoped = persistedByExercise.get(exId) ?? new Map<number, SetLogRow>()
+        next.set(
+          exId,
+          rows.map(r => {
+            if (scoped.get(r.set_number)) return r
+            if (
+              r.reps_performed ||
+              r.weight_performed ||
+              r.duration_input
+            ) {
+              return r
+            }
+            const prior = priorByKey.get(priorKey(exId, r.set_number))
+            if (!prior) return r
+            return {
+              ...r,
+              reps_performed:
+                prior.reps_performed != null ? String(prior.reps_performed) : '',
+              weight_performed:
+                prior.weight_performed != null
+                  ? String(prior.weight_performed)
+                  : '',
+              duration_performed_seconds: prior.duration_performed_seconds,
+              duration_input:
+                prior.duration_performed_seconds != null
+                  ? formatDuration(prior.duration_performed_seconds)
+                  : '',
+            }
+          })
+        )
+      }
+      return next
+    })
+  }, [priorByKey, persistedByExercise])
+
   const updateRow = (exerciseId: string, setNumber: number, patch: Partial<RowState>) => {
     setRowsByExercise(prev => {
       const next = new Map(prev)
@@ -249,6 +292,11 @@ export function SupersetLogger({
     }
   }
 
+  // Parses a typed duration ("20:30", "30", "1h 20m") into seconds and
+  // tidies the visible text to canonical form on blur. For an already-
+  // completed row this also persists the new value (edit-after-complete);
+  // for an unchecked row it stays local so future-date phantom rows can't
+  // accumulate.
   const commitDuration = (exerciseId: string, setNumber: number) => {
     const row = rowsByExercise.get(exerciseId)?.find(r => r.set_number === setNumber)
     if (!row) return
@@ -262,7 +310,7 @@ export function SupersetLogger({
       duration_performed_seconds: next.duration_performed_seconds,
       duration_input: next.duration_input,
     })
-    persist(next)
+    if (next.completed) persist(next)
   }
 
   const toggleComplete = async (exerciseId: string, setNumber: number) => {
@@ -297,6 +345,42 @@ export function SupersetLogger({
     }
 
     await persist(next)
+
+    // Prefill the next round's row for the same exercise — straight sets
+    // almost always repeat. Only on forward completion, only when the
+    // next row exists and is still empty (so we don't clobber the user's
+    // typed values or a row they intentionally cleared). SupersetLogger's
+    // RowState doesn't track machine-specific cardio fields (speed /
+    // incline / resistance) — those only render in the deep
+    // ExerciseSetLogger — so for cardio we only carry duration forward.
+    if (next.completed) {
+      const ex = exercises.find(e => e.id === exerciseId)
+      const isCardio = ex?.exercise_type === 'cardio'
+      const nextRow = rowsByExercise
+        .get(exerciseId)
+        ?.find(r => r.set_number === setNumber + 1)
+      if (nextRow) {
+        const isEmpty = isCardio
+          ? !nextRow.duration_input && nextRow.duration_performed_seconds == null
+          : !nextRow.weight_performed && !nextRow.reps_performed
+        if (isEmpty) {
+          if (isCardio) {
+            updateRow(exerciseId, setNumber + 1, {
+              duration_performed_seconds: next.duration_performed_seconds,
+              duration_input:
+                next.duration_performed_seconds != null
+                  ? formatDuration(next.duration_performed_seconds)
+                  : '',
+            })
+          } else {
+            updateRow(exerciseId, setNumber + 1, {
+              weight_performed: next.weight_performed,
+              reps_performed: next.reps_performed,
+            })
+          }
+        }
+      }
+    }
   }
 
   // Re-expand a round that auto-collapsed after all its rows were completed.
@@ -554,7 +638,7 @@ export function SupersetLogger({
                   <div
                     key={`${ex.id}-${setNumber}`}
                     className={`px-3 py-2.5 transition-colors ${
-                      row.completed ? 'bg-emerald-50/40' : ''
+                      row.completed ? 'bg-emerald-wash' : ''
                     }`}
                   >
                     {(priorText || preSuggestion) && (
@@ -669,10 +753,15 @@ export function SupersetLogger({
                               updateRow(ex.id!, setNumber, { weight_performed: e.target.value })
                             }
                             onBlur={() => {
+                              // Same edit-after-complete behavior as the
+                              // deep ExerciseSetLogger: blurring an
+                              // already-saved row writes the new value,
+                              // blurring an unchecked row stays local
+                              // (so future-date phantoms stay impossible).
                               const current = rowsByExercise
                                 .get(ex.id!)
                                 ?.find(r => r.set_number === setNumber)
-                              if (current) persist(current)
+                              if (current?.completed) persist(current)
                             }}
                             placeholder="weight"
                             className="text-sm py-1.5"
@@ -693,7 +782,7 @@ export function SupersetLogger({
                               const current = rowsByExercise
                                 .get(ex.id!)
                                 ?.find(r => r.set_number === setNumber)
-                              if (current) persist(current)
+                              if (current?.completed) persist(current)
                             }}
                             placeholder="reps"
                             className="text-sm py-1.5"

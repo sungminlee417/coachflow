@@ -153,7 +153,7 @@ export function WeightShareDialog({
               key={opt.days}
               type="button"
               onClick={() => setQuickRange(opt.days)}
-              className="px-3 py-2 text-xs font-medium rounded-full border border-line text-muted hover:border-indigo-300 hover:text-indigo-fg hover:bg-indigo-50/40 transition-colors cursor-pointer"
+              className="px-3 py-2 text-xs font-medium rounded-full border border-line text-muted hover:border-indigo-300 hover:text-indigo-fg hover:bg-indigo-wash transition-colors cursor-pointer"
             >
               Last {opt.label}
             </button>

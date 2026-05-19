@@ -95,7 +95,7 @@ export function CoachSection({
         <button
           type="button"
           onClick={() => onNavigate('my-workouts')}
-          className="w-full text-left bg-surface rounded-2xl border border-dashed border-line p-5 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors cursor-pointer"
+          className="w-full text-left bg-surface rounded-2xl border border-dashed border-line p-5 hover:border-indigo-300 hover:bg-indigo-wash transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-elevated text-muted flex items-center justify-center">

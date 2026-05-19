@@ -355,7 +355,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                             key={exercise.id ?? group.startIndex}
                             className={`rounded-lg ${
  isCardio
- ? 'bg-amber-50/40 border border-amber-line '
+ ? 'bg-amber-wash border border-amber-line '
  : 'bg-elevated '
  }`}
                           >
@@ -466,7 +466,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                       return (
                         <div
                           key={`group-${gi}`}
-                          className="rounded-xl border-2 border-indigo-300 bg-indigo-50/30 overflow-hidden"
+                          className="rounded-xl border-2 border-indigo-300 bg-indigo-wash overflow-hidden"
                         >
                           <button
                             type="button"

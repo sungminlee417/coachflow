@@ -19,7 +19,7 @@ export function AddItemButton({
     <button
       type="button"
       onClick={onClick}
-      className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-line text-muted hover:border-emerald-400 hover:text-emerald-fg hover:bg-emerald-50/40 transition-colors cursor-pointer text-sm font-medium"
+      className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-line text-muted hover:border-emerald-400 hover:text-emerald-fg hover:bg-emerald-wash transition-colors cursor-pointer text-sm font-medium"
     >
       <Plus size={16} />
       {label}

@@ -73,79 +73,57 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
     )
   }
 
-  // Logged in - validate and accept the invite
-  const { data: invite, error: inviteError } = await supabase
-    .from('invite_codes')
-    .select('id, coach_id, status, times_used, max_uses, expires_at, revoked_at')
-    .eq('code', code)
-    .single()
+  // Logged in — atomically validate + create the relationship + bump
+  // the invite counter via a single SECURITY DEFINER RPC. Migration 28
+  // introduced this; before that the page did the steps inline and
+  // relied on an overly-permissive UPDATE policy on `invite_codes` that
+  // Supabase's advisor flagged.
+  const { data: result, error: rpcError } = await supabase.rpc('use_invite', {
+    code,
+  })
 
-  if (inviteError || !invite) {
-    return <AcceptInvite status="error" message="Invalid invite code." />
-  }
-
-  if (invite.revoked_at) {
-    return <AcceptInvite status="error" message="This invite code has been revoked by the coach." />
-  }
-
-  if (invite.status !== 'pending') {
-    return <AcceptInvite status="error" message="This invite code has already been fully used." />
-  }
-
-  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-    return <AcceptInvite status="error" message="This invite code has expired." />
-  }
-
-  if (invite.times_used >= invite.max_uses) {
-    return <AcceptInvite status="error" message="This invite code has reached its maximum uses." />
-  }
-
-  // Check if relationship already exists
-  const { data: existing } = await supabase
-    .from('coach_client_relationships')
-    .select('id')
-    .eq('coach_id', invite.coach_id)
-    .eq('client_id', user.id)
-    .single()
-
-  if (existing) {
-    return <AcceptInvite status="error" message="You're already connected to this coach." />
-  }
-
-  // Can't be your own client
-  if (invite.coach_id === user.id) {
-    return <AcceptInvite status="error" message="You can't accept your own invite code." />
-  }
-
-  // Create relationship
-  const { error: relError } = await supabase
-    .from('coach_client_relationships')
-    .insert({
-      coach_id: invite.coach_id,
-      client_id: user.id,
-      invite_code_id: invite.id,
-    })
-
-  if (relError) {
+  if (rpcError || !result) {
     return <AcceptInvite status="error" message="Something went wrong. Please try again." />
   }
 
-  // Update invite code usage
-  const newTimesUsed = invite.times_used + 1
-  await supabase
-    .from('invite_codes')
-    .update({
-      times_used: newTimesUsed,
-      status: newTimesUsed >= invite.max_uses ? 'accepted' : 'pending',
-    })
-    .eq('id', invite.id)
+  const { status, coach_name } = result as {
+    status:
+      | 'ok'
+      | 'invalid'
+      | 'revoked'
+      | 'expired'
+      | 'fully_used'
+      | 'already_connected'
+      | 'self_code'
+      | 'unauthenticated'
+    coach_name?: string
+  }
 
-  // Get coach name for the success message
-  const { data: coachProfile } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', invite.coach_id)
-    .single()
-
-  return <AcceptInvite status="success" message={`You're now connected to ${coachProfile?.full_name || 'your coach'}!`} />
+  switch (status) {
+    case 'ok':
+      return (
+        <AcceptInvite
+          status="success"
+          message={`You're now connected to ${coach_name || 'your coach'}!`}
+        />
+      )
+    case 'invalid':
+      return <AcceptInvite status="error" message="Invalid invite code." />
+    case 'revoked':
+      return <AcceptInvite status="error" message="This invite code has been revoked by the coach." />
+    case 'expired':
+      return <AcceptInvite status="error" message="This invite code has expired." />
+    case 'fully_used':
+      return <AcceptInvite status="error" message="This invite code has reached its maximum uses." />
+    case 'already_connected':
+      return <AcceptInvite status="error" message="You're already connected to this coach." />
+    case 'self_code':
+      return <AcceptInvite status="error" message="You can't accept your own invite code." />
+    case 'unauthenticated':
+      // The branch above redirected when there was no `user`, so this
+      // should be unreachable — but a stale token could theoretically
+      // pass the cookie check and still fail the RPC. Treat as a
+      // generic error rather than crashing the page.
+      return <AcceptInvite status="error" message="Please sign in and try again." />
+  }
 }

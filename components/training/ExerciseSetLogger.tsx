@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
@@ -61,7 +61,6 @@ interface RowState {
   incline_performed: string
   resistance_performed: string
   completed: boolean
-  saving?: boolean
 }
 
 const buildInitialRows = (exercise: Exercise): RowState[] =>
@@ -231,7 +230,14 @@ export function ExerciseSetLogger({
         currentVariant
       ),
   })
-  const priorBySet = priorQuery.data ?? new Map<number, PriorPerformance>()
+  // Stable Map identity so the prefill effect's deps don't churn every
+  // render. The empty-fallback Map is built once and reused across all
+  // pre-data renders, and once data lands it follows the query cache's
+  // own reference equality.
+  const priorBySet = useMemo(
+    () => priorQuery.data ?? new Map<number, PriorPerformance>(),
+    [priorQuery.data]
+  )
 
   // Reset draft inputs when the scope changes. This is the legitimate
   // "mirror server-derived state into a mutable draft" pattern — the
@@ -274,6 +280,48 @@ export function ExerciseSetLogger({
       })
     )
   }, [persistedRows])
+
+  // Prefill empty inputs from last session's actuals. Fires whenever
+  // prior performance data arrives, but only patches a row that has:
+  //   • no persisted log for today (today already wins via the merge
+  //     effect above), AND
+  //   • no in-flight values the user has typed (so we never clobber)
+  // The Strong / Hevy pattern — your last-week's weight & reps are the
+  // single most likely values for today's set, so one tap of the
+  // checkmark completes the row without retyping.
+  useEffect(() => {
+    if (priorBySet.size === 0) return
+    setRows(prev =>
+      prev.map(r => {
+        const todaysLog = persistedRows.get(r.set_number)
+        if (todaysLog) return r
+        if (
+          r.reps_performed ||
+          r.weight_performed ||
+          r.duration_input ||
+          r.speed_performed ||
+          r.incline_performed ||
+          r.resistance_performed
+        ) {
+          return r
+        }
+        const prior = priorBySet.get(r.set_number)
+        if (!prior) return r
+        return {
+          ...r,
+          reps_performed:
+            prior.reps_performed != null ? String(prior.reps_performed) : '',
+          weight_performed:
+            prior.weight_performed != null ? String(prior.weight_performed) : '',
+          duration_performed_seconds: prior.duration_performed_seconds,
+          duration_input:
+            prior.duration_performed_seconds != null
+              ? formatDuration(prior.duration_performed_seconds)
+              : '',
+        }
+      })
+    )
+  }, [priorBySet, persistedRows])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const updateRow = (setNumber: number, patch: Partial<RowState>) => {
@@ -282,7 +330,6 @@ export function ExerciseSetLogger({
 
   const persist = async (row: RowState) => {
     if (!exercise.id) return
-    updateRow(row.set_number, { saving: true })
     const reps = row.reps_performed === '' ? null : parseFloat(row.reps_performed)
     const weight = row.weight_performed === '' ? null : parseFloat(row.weight_performed)
     const speed = row.speed_performed === '' ? null : parseFloat(row.speed_performed)
@@ -315,9 +362,14 @@ export function ExerciseSetLogger({
     } catch {
       showToast('Failed to save set', 'error')
     }
-    updateRow(row.set_number, { saving: false })
   }
 
+  // Parses the typed input ("20:30", "30", "1h 20m") into seconds and
+  // normalizes the visible text to the canonical "20:30" form on blur.
+  // For an already-completed (= already-saved) row this also persists
+  // the new value, since the user is editing a row that's in the DB.
+  // For an unchecked row it stays local — that's how we prevent phantom
+  // rows on future-date views.
   const commitDuration = (setNumber: number) => {
     const row = rows.find(r => r.set_number === setNumber)
     if (!row) return
@@ -331,7 +383,7 @@ export function ExerciseSetLogger({
       duration_performed_seconds: next.duration_performed_seconds,
       duration_input: next.duration_input,
     })
-    persist(next)
+    if (next.completed) persist(next)
   }
 
   const toggleComplete = async (setNumber: number) => {
@@ -353,6 +405,45 @@ export function ExerciseSetLogger({
       restTimer.start(exercise.rest_seconds, exercise.name)
     }
     await persist(next)
+
+    // Prefill the next set's local state from what we just persisted —
+    // straight sets almost always repeat at the same weight/reps, so a
+    // pre-populated row turns the next completion into a single tap.
+    // Only fires on forward completion (uncomplete → complete) and only
+    // when the next row is still untouched, so we never clobber values
+    // the user already typed (or a set they explicitly cleared after
+    // looking at it).
+    if (next.completed) {
+      const nextRow = rows.find(r => r.set_number === setNumber + 1)
+      if (nextRow) {
+        const isEmpty = isCardio
+          ? !nextRow.duration_input &&
+            nextRow.duration_performed_seconds == null &&
+            !nextRow.speed_performed &&
+            !nextRow.incline_performed &&
+            !nextRow.resistance_performed
+          : !nextRow.weight_performed && !nextRow.reps_performed
+        if (isEmpty) {
+          if (isCardio) {
+            updateRow(setNumber + 1, {
+              speed_performed: next.speed_performed,
+              incline_performed: next.incline_performed,
+              resistance_performed: next.resistance_performed,
+              duration_performed_seconds: next.duration_performed_seconds,
+              duration_input:
+                next.duration_performed_seconds != null
+                  ? formatDuration(next.duration_performed_seconds)
+                  : '',
+            })
+          } else {
+            updateRow(setNumber + 1, {
+              weight_performed: next.weight_performed,
+              reps_performed: next.reps_performed,
+            })
+          }
+        }
+      }
+    }
   }
 
   // Re-expand a row that auto-collapsed after completion (without unchecking).
@@ -431,7 +522,7 @@ export function ExerciseSetLogger({
         key={row.set_number}
         type="button"
         onClick={() => expandRow(row.set_number)}
-        className="w-full px-3 py-2 flex items-center gap-2 text-left bg-emerald-50/40 hover:bg-emerald-soft transition-colors cursor-pointer"
+        className="w-full px-3 py-2 flex items-center gap-2 text-left bg-emerald-wash hover:bg-emerald-soft transition-colors cursor-pointer"
         aria-expanded={false}
         aria-label={`Expand set ${row.set_number}`}
       >
@@ -463,7 +554,7 @@ export function ExerciseSetLogger({
     return (
       <div className="mt-3 bg-surface rounded-lg border border-line overflow-hidden">
         {/* Desktop column header — hidden on phones since the row already labels itself. */}
-        <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-subtle px-3 py-2 bg-amber-50/60 border-b border-amber-line">
+        <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-subtle px-3 py-2 bg-amber-wash border-b border-amber-line">
           <div className="col-span-1 text-center">{rows.length > 1 ? '#' : ''}</div>
           <div className="col-span-4">Target</div>
           <div className="col-span-6">Time</div>
@@ -489,7 +580,7 @@ export function ExerciseSetLogger({
             return (
               <div
                 key={row.set_number}
-                className={`transition-colors ${row.completed ? 'bg-emerald-50/40' : ''}`}
+                className={`transition-colors ${row.completed ? 'bg-emerald-wash' : ''}`}
               >
                 <PreSetHint
                   row={row}
@@ -574,9 +665,10 @@ export function ExerciseSetLogger({
                             onChange={e =>
                               updateRow(row.set_number, { speed_performed: e.target.value })
                             }
-                            onBlur={() =>
-                              persist(rows.find(r => r.set_number === row.set_number)!)
-                            }
+                            onBlur={() => {
+                              const current = rows.find(r => r.set_number === row.set_number)
+                              if (current?.completed) persist(current)
+                            }}
                             placeholder="0"
                             className="text-sm py-1.5"
                           />
@@ -594,9 +686,10 @@ export function ExerciseSetLogger({
                             onChange={e =>
                               updateRow(row.set_number, { incline_performed: e.target.value })
                             }
-                            onBlur={() =>
-                              persist(rows.find(r => r.set_number === row.set_number)!)
-                            }
+                            onBlur={() => {
+                              const current = rows.find(r => r.set_number === row.set_number)
+                              if (current?.completed) persist(current)
+                            }}
                             placeholder="0"
                             className="text-sm py-1.5"
                           />
@@ -614,9 +707,10 @@ export function ExerciseSetLogger({
                             onChange={e =>
                               updateRow(row.set_number, { resistance_performed: e.target.value })
                             }
-                            onBlur={() =>
-                              persist(rows.find(r => r.set_number === row.set_number)!)
-                            }
+                            onBlur={() => {
+                              const current = rows.find(r => r.set_number === row.set_number)
+                              if (current?.completed) persist(current)
+                            }}
                             placeholder="0"
                             className="text-sm py-1.5"
                           />
@@ -659,7 +753,7 @@ export function ExerciseSetLogger({
           return (
           <div
             key={row.set_number}
-            className={`transition-colors ${row.completed ? 'bg-emerald-50/40' : ''}`}
+            className={`transition-colors ${row.completed ? 'bg-emerald-wash' : ''}`}
           >
             <PreSetHint
                   row={row}
@@ -700,7 +794,15 @@ export function ExerciseSetLogger({
                       inputMode="decimal"
                       value={row.weight_performed}
                       onChange={e => updateRow(row.set_number, { weight_performed: e.target.value })}
-                      onBlur={() => persist(rows.find(r => r.set_number === row.set_number)!)}
+                      onBlur={() => {
+                        // Only persist on blur when the row is already
+                        // a saved set — editing weight/reps on a still-
+                        // unchecked set holds in local state, so a user
+                        // who accidentally tabs through a future-date
+                        // logger never writes phantom rows.
+                        const current = rows.find(r => r.set_number === row.set_number)
+                        if (current?.completed) persist(current)
+                      }}
                       placeholder="weight"
                       className="text-sm py-1.5"
                     />
@@ -717,7 +819,10 @@ export function ExerciseSetLogger({
                       inputMode="decimal"
                       value={row.reps_performed}
                       onChange={e => updateRow(row.set_number, { reps_performed: e.target.value })}
-                      onBlur={() => persist(rows.find(r => r.set_number === row.set_number)!)}
+                      onBlur={() => {
+                        const current = rows.find(r => r.set_number === row.set_number)
+                        if (current?.completed) persist(current)
+                      }}
                       placeholder="reps"
                       className="text-sm py-1.5"
                     />

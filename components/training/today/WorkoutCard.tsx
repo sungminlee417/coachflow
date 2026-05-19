@@ -159,7 +159,7 @@ export function WorkoutCard({
             .map((note, i) => (
               <p
                 key={i}
-                className="text-xs text-indigo-fg bg-indigo-50/60 border border-indigo-line rounded-md px-2 py-1.5 italic"
+                className="text-xs text-indigo-fg bg-indigo-wash border border-indigo-line rounded-md px-2 py-1.5 italic"
               >
                 <span className="font-semibold not-italic">Coach:</span> {note}
               </p>
@@ -326,8 +326,8 @@ function NextSetMiniLogger({
     <div
       className={`rounded-xl border p-2.5 mt-1 ${
  isCardio
- ? 'bg-amber-50/40 border-amber-line '
- : 'bg-emerald-50/40 border-emerald-line '
+ ? 'bg-amber-wash border-amber-line '
+ : 'bg-emerald-wash border-emerald-line '
  }`}
     >
       <p className="text-[11px] text-muted truncate">

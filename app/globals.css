@@ -80,6 +80,14 @@
   --color-red-soft: var(--red-soft);
   --color-red-fg: var(--red-fg);
   --color-red-line: var(--red-line);
+
+  /* Wash tints — very subtle accent backgrounds that read the same way
+   * over both light and dark surfaces. Use these for "this row is
+   * completed" / "this meal was eaten" / "this is a superset" kind of
+   * row-level highlights where `*-soft` would be too strong. */
+  --color-emerald-wash: var(--emerald-wash);
+  --color-amber-wash: var(--amber-wash);
+  --color-indigo-wash: var(--indigo-wash);
 }
 
 :root {
@@ -125,6 +133,13 @@
   --red-soft: #fef2f2; /* red-50 */
   --red-fg: #b91c1c; /* red-700 */
   --red-line: #fecaca; /* red-200 */
+
+  /* Subtle row washes — saturated accent at low alpha so the tint reads
+   * the same way no matter what surface sits behind. Used for completed
+   * set rows, eaten meal rows, and the superset wrapper. */
+  --emerald-wash: rgba(16, 185, 129, 0.08);
+  --amber-wash: rgba(245, 158, 11, 0.08);
+  --indigo-wash: rgba(99, 102, 241, 0.08);
 
   /* Body chrome — paints before React mounts. */
   --background: var(--canvas);
@@ -175,6 +190,12 @@
   --red-soft: rgb(69 10 10 / 0.3); /* red-950/30 */
   --red-fg: #fca5a5; /* red-300 */
   --red-line: #991b1b; /* red-800 */
+
+  /* Dark wash — slightly higher alpha than light so the tint reads with
+   * comparable presence against the slate-900 surface. */
+  --emerald-wash: rgba(16, 185, 129, 0.14);
+  --amber-wash: rgba(245, 158, 11, 0.14);
+  --indigo-wash: rgba(99, 102, 241, 0.14);
 
   --background: var(--canvas);
   --foreground-css: var(--foreground);

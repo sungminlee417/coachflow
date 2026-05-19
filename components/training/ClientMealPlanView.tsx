@@ -299,7 +299,7 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                         <div
                           key={meal.id}
                           className={`rounded-lg p-4 transition-colors ${
- eaten ? 'bg-emerald-50/60 border border-emerald-line ' : 'bg-elevated '
+ eaten ? 'bg-emerald-wash border border-emerald-line ' : 'bg-elevated '
  }`}
                         >
                           <div className="flex items-start justify-between gap-3 mb-2">

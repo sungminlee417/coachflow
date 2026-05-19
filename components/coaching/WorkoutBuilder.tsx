@@ -526,7 +526,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
                             className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
  active
  ? 'bg-amber-500 text-white border-amber-500'
- : 'border-line text-muted hover:border-amber-300 hover:text-amber-fg hover:bg-amber-50/40'
+ : 'border-line text-muted hover:border-amber-300 hover:text-amber-fg hover:bg-amber-wash'
  }`}
                           >
                             {CARDIO_LABELS[sub]}
@@ -792,7 +792,7 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
               return (
                 <div
                   key={`group-${gi}`}
-                  className="rounded-2xl border-2 border-indigo-300 bg-indigo-50/40 p-3"
+                  className="rounded-2xl border-2 border-indigo-300 bg-indigo-wash p-3"
                 >
                   <div className="flex items-center justify-between gap-2 mb-3 px-1 flex-wrap">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-white bg-indigo-600 rounded-full px-2.5 py-1">
