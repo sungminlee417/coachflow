@@ -406,26 +406,34 @@ export function ExerciseSetLogger({
     }
     await persist(next)
 
-    // Prefill the next set's local state from what we just persisted —
-    // straight sets almost always repeat at the same weight/reps, so a
+    // Prefill the next set's local state from what we just persisted.
+    // Straight sets almost always repeat at the same weight/reps, so a
     // pre-populated row turns the next completion into a single tap.
-    // Only fires on forward completion (uncomplete → complete) and only
-    // when the next row is still untouched, so we never clobber values
-    // the user already typed (or a set they explicitly cleared after
-    // looking at it).
+    //
+    // Critical: the emptiness check is done inside `setRows(prev => …)`
+    // against LATEST state, not the closure-captured `rows` at the top
+    // of toggleComplete. During the `await persist(...)` above, the
+    // merge effect and the prior-week prefill effect may have populated
+    // the next row from cache / from last-session's actuals. We must
+    // not clobber those — the user came in with values they expected
+    // to see (or values they already typed). Forward prefill only
+    // writes when the next row is truly untouched at the moment we
+    // write to it.
     if (next.completed) {
-      const nextRow = rows.find(r => r.set_number === setNumber + 1)
-      if (nextRow) {
-        const isEmpty = isCardio
-          ? !nextRow.duration_input &&
-            nextRow.duration_performed_seconds == null &&
-            !nextRow.speed_performed &&
-            !nextRow.incline_performed &&
-            !nextRow.resistance_performed
-          : !nextRow.weight_performed && !nextRow.reps_performed
-        if (isEmpty) {
+      setRows(prev =>
+        prev.map(r => {
+          if (r.set_number !== setNumber + 1) return r
+          const isEmpty = isCardio
+            ? !r.duration_input &&
+              r.duration_performed_seconds == null &&
+              !r.speed_performed &&
+              !r.incline_performed &&
+              !r.resistance_performed
+            : !r.weight_performed && !r.reps_performed
+          if (!isEmpty) return r
           if (isCardio) {
-            updateRow(setNumber + 1, {
+            return {
+              ...r,
               speed_performed: next.speed_performed,
               incline_performed: next.incline_performed,
               resistance_performed: next.resistance_performed,
@@ -434,15 +442,15 @@ export function ExerciseSetLogger({
                 next.duration_performed_seconds != null
                   ? formatDuration(next.duration_performed_seconds)
                   : '',
-            })
-          } else {
-            updateRow(setNumber + 1, {
-              weight_performed: next.weight_performed,
-              reps_performed: next.reps_performed,
-            })
+            }
           }
-        }
-      }
+          return {
+            ...r,
+            weight_performed: next.weight_performed,
+            reps_performed: next.reps_performed,
+          }
+        })
+      )
     }
   }
 

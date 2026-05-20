@@ -348,38 +348,49 @@ export function SupersetLogger({
 
     // Prefill the next round's row for the same exercise — straight sets
     // almost always repeat. Only on forward completion, only when the
-    // next row exists and is still empty (so we don't clobber the user's
-    // typed values or a row they intentionally cleared). SupersetLogger's
+    // next row is still empty (so we don't clobber the user's typed
+    // values or a row they intentionally cleared). SupersetLogger's
     // RowState doesn't track machine-specific cardio fields (speed /
     // incline / resistance) — those only render in the deep
     // ExerciseSetLogger — so for cardio we only carry duration forward.
+    //
+    // Critical: the emptiness check uses LATEST state inside the
+    // `setRowsByExercise(prev => …)` callback — not closure-captured
+    // `rowsByExercise` at the top of toggleComplete — so it sees any
+    // prior-week prefill or in-flight edits that landed during the
+    // `await persist(...)` above.
     if (next.completed) {
       const ex = exercises.find(e => e.id === exerciseId)
       const isCardio = ex?.exercise_type === 'cardio'
-      const nextRow = rowsByExercise
-        .get(exerciseId)
-        ?.find(r => r.set_number === setNumber + 1)
-      if (nextRow) {
-        const isEmpty = isCardio
-          ? !nextRow.duration_input && nextRow.duration_performed_seconds == null
-          : !nextRow.weight_performed && !nextRow.reps_performed
-        if (isEmpty) {
+      setRowsByExercise(prev => {
+        const scoped = prev.get(exerciseId)
+        if (!scoped) return prev
+        const updated = scoped.map(r => {
+          if (r.set_number !== setNumber + 1) return r
+          const isEmpty = isCardio
+            ? !r.duration_input && r.duration_performed_seconds == null
+            : !r.weight_performed && !r.reps_performed
+          if (!isEmpty) return r
           if (isCardio) {
-            updateRow(exerciseId, setNumber + 1, {
+            return {
+              ...r,
               duration_performed_seconds: next.duration_performed_seconds,
               duration_input:
                 next.duration_performed_seconds != null
                   ? formatDuration(next.duration_performed_seconds)
                   : '',
-            })
-          } else {
-            updateRow(exerciseId, setNumber + 1, {
-              weight_performed: next.weight_performed,
-              reps_performed: next.reps_performed,
-            })
+            }
           }
-        }
-      }
+          return {
+            ...r,
+            weight_performed: next.weight_performed,
+            reps_performed: next.reps_performed,
+          }
+        })
+        const out = new Map(prev)
+        out.set(exerciseId, updated)
+        return out
+      })
     }
   }
 
