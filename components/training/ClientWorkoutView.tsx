@@ -450,6 +450,14 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   exercise={exercise}
                                   loggedDate={selectedDate}
                                   currentVariant={activeSub}
+                                  onAllSetsCompleted={() =>
+                                    setCollapsedKeys(prev => {
+                                      if (prev.has(soloKey)) return prev
+                                      const next = new Set(prev)
+                                      next.add(soloKey)
+                                      return next
+                                    })
+                                  }
                                 />
                               </div>
                             )}
@@ -585,6 +593,14 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                         ] as const
                                       })
                                   )
+                                }
+                                onAllSetsCompleted={() =>
+                                  setCollapsedKeys(prev => {
+                                    if (prev.has(groupKey)) return prev
+                                    const next = new Set(prev)
+                                    next.add(groupKey)
+                                    return next
+                                  })
                                 }
                               />
                             </div>

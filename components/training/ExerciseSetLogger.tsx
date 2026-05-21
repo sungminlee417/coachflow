@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
@@ -42,6 +42,10 @@ interface ExerciseSetLoggerProps {
   /** When the trainee swapped this exercise for the day, the substitute name.
    *  Null means the original is in play. Drives variant-aware prior matching. */
   currentVariant?: string | null
+  /** Fires once when every set in this exercise transitions to completed.
+   *  The parent uses it to auto-collapse the exercise card so the trainee
+   *  doesn't have to manually fold each finished exercise as they go. */
+  onAllSetsCompleted?: () => void
 }
 
 interface RowState {
@@ -188,6 +192,7 @@ export function ExerciseSetLogger({
   exercise,
   loggedDate,
   currentVariant = null,
+  onAllSetsCompleted,
 }: ExerciseSetLoggerProps) {
   const supabase = useSupabase()
   const restTimer = useRestTimer()
@@ -238,6 +243,58 @@ export function ExerciseSetLogger({
     () => priorQuery.data ?? new Map<number, PriorPerformance>(),
     [priorQuery.data]
   )
+
+  // Fire `onAllSetsCompleted` exactly once each time the exercise
+  // transitions from "some sets still pending" to "every set done." Using
+  // a ref tracks the previous state across renders without re-firing on
+  // every render that happens to be in the all-done state. Reset on
+  // un-toggle so the next time the user completes the last set, the
+  // callback fires again.
+  const allCompletedRef = useRef(false)
+  useEffect(() => {
+    if (rows.length === 0) return
+    const allDone = rows.every(r => r.completed)
+    if (allDone && !allCompletedRef.current) {
+      allCompletedRef.current = true
+      onAllSetsCompleted?.()
+    } else if (!allDone) {
+      allCompletedRef.current = false
+    }
+  }, [rows, onAllSetsCompleted])
+
+  // Rep-range "all sets agree" summary. When every completed set on a
+  // strength exercise hit above (or fell below) the prescribed range,
+  // surface a single suggestion at the bottom of the logger so the
+  // trainee gets a coach-style "go heavier / go lighter next session"
+  // nudge without having to scan per-row hints. Cardio doesn't have
+  // a rep-range concept and is skipped. Requires ≥2 completed sets so
+  // a single fluke set doesn't trigger the suggestion.
+  const repRangeSummary = useMemo(() => {
+    if (isCardio) return null
+    const completed = rows.filter(r => r.completed)
+    if (completed.length < 2) return null
+    const feedback = completed
+      .map(r =>
+        getRepRangeFeedback(r.target_reps, r.reps_performed, r.weight_performed)
+      )
+      .filter((f): f is NonNullable<typeof f> => f !== null)
+    if (feedback.length < 2) return null
+    if (feedback.every(f => f.state === 'exceeded')) {
+      return {
+        direction: 'up' as const,
+        delta: feedback[0].delta,
+        count: completed.length,
+      }
+    }
+    if (feedback.every(f => f.state === 'undershot')) {
+      return {
+        direction: 'down' as const,
+        delta: Math.abs(feedback[0].delta),
+        count: completed.length,
+      }
+    }
+    return null
+  }, [rows, isCardio])
 
   // Reset draft inputs when the scope changes. This is the legitimate
   // "mirror server-derived state into a mutable draft" pattern — the
@@ -857,6 +914,26 @@ export function ExerciseSetLogger({
           )
         })}
       </div>
+      {repRangeSummary && (
+        <div
+          className={`px-3 py-2 border-t border-line-subtle text-[11px] font-medium flex items-center gap-1.5 ${
+            repRangeSummary.direction === 'up'
+              ? 'bg-indigo-soft text-indigo-fg'
+              : 'bg-amber-soft text-amber-fg'
+          }`}
+        >
+          {repRangeSummary.direction === 'up' ? (
+            <ArrowUp size={12} />
+          ) : (
+            <ArrowDown size={12} />
+          )}
+          <span>
+            {repRangeSummary.direction === 'up'
+              ? `All ${repRangeSummary.count} sets cleared target — try +${repRangeSummary.delta} next session`
+              : `All ${repRangeSummary.count} sets came up short — try −${repRangeSummary.delta} next session`}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

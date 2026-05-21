@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
@@ -34,6 +34,9 @@ interface SupersetLoggerProps {
    *  variant-aware prior-performance lookups so a swapped exercise compares
    *  against its own history, not the unrelated original. */
   variantByExerciseId?: Map<string, string | null>
+  /** Fires once when every set of every exercise in the superset hits
+   *  completed. The parent uses it to auto-collapse the superset card. */
+  onAllSetsCompleted?: () => void
 }
 
 // (exerciseId, setNumber) → previous-week performance.
@@ -92,6 +95,7 @@ export function SupersetLogger({
   exercises,
   loggedDate,
   variantByExerciseId,
+  onAllSetsCompleted,
 }: SupersetLoggerProps) {
   const supabase = useSupabase()
   const restTimer = useRestTimer()
@@ -247,6 +251,38 @@ export function SupersetLogger({
       return next
     })
   }, [priorByKey, persistedByExercise])
+
+  // Fire `onAllSetsCompleted` exactly once each time every row of every
+  // exercise in the superset transitions to completed. Mirrors the
+  // ExerciseSetLogger pattern — same ref-based debouncing so the parent
+  // only sees one event per all-done transition. Reset on any
+  // not-all-done observation so re-completing later fires again.
+  const allCompletedRef = useRef(false)
+  useEffect(() => {
+    if (exercises.length === 0) return
+    let allDone = true
+    let sawAnyRow = false
+    for (const ex of exercises) {
+      if (!ex.id) continue
+      const rows = rowsByExercise.get(ex.id)
+      if (!rows || rows.length === 0) {
+        allDone = false
+        break
+      }
+      sawAnyRow = true
+      if (!rows.every(r => r.completed)) {
+        allDone = false
+        break
+      }
+    }
+    if (!sawAnyRow) return
+    if (allDone && !allCompletedRef.current) {
+      allCompletedRef.current = true
+      onAllSetsCompleted?.()
+    } else if (!allDone) {
+      allCompletedRef.current = false
+    }
+  }, [rowsByExercise, exercises, onAllSetsCompleted])
 
   const updateRow = (exerciseId: string, setNumber: number, patch: Partial<RowState>) => {
     setRowsByExercise(prev => {
