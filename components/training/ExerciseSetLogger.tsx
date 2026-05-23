@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
@@ -243,24 +243,6 @@ export function ExerciseSetLogger({
     () => priorQuery.data ?? new Map<number, PriorPerformance>(),
     [priorQuery.data]
   )
-
-  // Fire `onAllSetsCompleted` exactly once each time the exercise
-  // transitions from "some sets still pending" to "every set done." Using
-  // a ref tracks the previous state across renders without re-firing on
-  // every render that happens to be in the all-done state. Reset on
-  // un-toggle so the next time the user completes the last set, the
-  // callback fires again.
-  const allCompletedRef = useRef(false)
-  useEffect(() => {
-    if (rows.length === 0) return
-    const allDone = rows.every(r => r.completed)
-    if (allDone && !allCompletedRef.current) {
-      allCompletedRef.current = true
-      onAllSetsCompleted?.()
-    } else if (!allDone) {
-      allCompletedRef.current = false
-    }
-  }, [rows, onAllSetsCompleted])
 
   // Rep-range "all sets agree" summary. When every completed set on a
   // strength exercise hit above (or fell below) the prescribed range,
@@ -508,6 +490,19 @@ export function ExerciseSetLogger({
           }
         })
       )
+
+      // If this completion just finished the last pending set in the
+      // exercise, tell the parent so it can auto-collapse the card.
+      // Driven by the user's tap (not a useEffect on `rows`) so loading
+      // an already-completed exercise from cache never re-fires this —
+      // which would cause the card to re-collapse the instant the user
+      // re-expanded it.
+      const allOthersDone = rows.every(
+        r => r.set_number === setNumber || r.completed
+      )
+      if (allOthersDone) {
+        onAllSetsCompleted?.()
+      }
     }
   }
 

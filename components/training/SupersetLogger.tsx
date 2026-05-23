@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
@@ -252,38 +252,6 @@ export function SupersetLogger({
     })
   }, [priorByKey, persistedByExercise])
 
-  // Fire `onAllSetsCompleted` exactly once each time every row of every
-  // exercise in the superset transitions to completed. Mirrors the
-  // ExerciseSetLogger pattern — same ref-based debouncing so the parent
-  // only sees one event per all-done transition. Reset on any
-  // not-all-done observation so re-completing later fires again.
-  const allCompletedRef = useRef(false)
-  useEffect(() => {
-    if (exercises.length === 0) return
-    let allDone = true
-    let sawAnyRow = false
-    for (const ex of exercises) {
-      if (!ex.id) continue
-      const rows = rowsByExercise.get(ex.id)
-      if (!rows || rows.length === 0) {
-        allDone = false
-        break
-      }
-      sawAnyRow = true
-      if (!rows.every(r => r.completed)) {
-        allDone = false
-        break
-      }
-    }
-    if (!sawAnyRow) return
-    if (allDone && !allCompletedRef.current) {
-      allCompletedRef.current = true
-      onAllSetsCompleted?.()
-    } else if (!allDone) {
-      allCompletedRef.current = false
-    }
-  }, [rowsByExercise, exercises, onAllSetsCompleted])
-
   const updateRow = (exerciseId: string, setNumber: number, patch: Partial<RowState>) => {
     setRowsByExercise(prev => {
       const next = new Map(prev)
@@ -427,6 +395,27 @@ export function SupersetLogger({
         out.set(exerciseId, updated)
         return out
       })
+
+      // If this completion just finished every row of every exercise in
+      // the superset, tell the parent so it can auto-collapse the card.
+      // Driven by the user's tap (not a useEffect on `rowsByExercise`) so
+      // loading an already-completed superset from cache never re-fires
+      // this — which would re-collapse the card the instant the user
+      // re-expanded it. The just-completed (exerciseId, setNumber) pair
+      // is treated as done in the check since closure rows still see it
+      // as pending.
+      const allOthersDone = exercises.every(ex => {
+        if (!ex.id) return true
+        const rows = rowsByExercise.get(ex.id)
+        if (!rows || rows.length === 0) return false
+        return rows.every(
+          r =>
+            (ex.id === exerciseId && r.set_number === setNumber) || r.completed
+        )
+      })
+      if (allOthersDone) {
+        onAllSetsCompleted?.()
+      }
     }
   }
 
