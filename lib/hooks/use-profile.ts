@@ -41,6 +41,7 @@ type ProfilePatch = Partial<
     | 'weight_unit'
     | 'length_unit'
     | 'theme'
+    | 'weight_program_start_date'
   >
 >
 

@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Trash2, TrendingUp, TrendingDown, Minus, Scale, Share2 } from 'lucide-react'
-import { todayISO, formatDate, roundMacro } from '@/lib/utils'
+import { todayISO, formatDate, roundMacro, weekNumberSince } from '@/lib/utils'
 import {
   useDeleteWeightLog,
   useLogWeight,
@@ -39,6 +39,11 @@ interface WeightTrackerProps {
    *  the chart upserts changes back to `profiles.weight_goal`; we keep a
    *  local copy so the dashed reference line moves immediately on save. */
   weightGoal?: number | null
+  /** Anchor date for "Week N" labels (e.g. start of the current cut /
+   *  bulk). When set, the chart draws faint dashed lines at each weekly
+   *  boundary and the share dialog tags each entry with its week.
+   *  Persisted on `profiles.weight_program_start_date`. */
+  programStart?: string | null
 }
 
 // Delta color is goal-aware. Without a goal we stay neutral — increase
@@ -65,6 +70,7 @@ export default function WeightTracker({
   userId,
   weightUnit,
   weightGoal,
+  programStart,
 }: WeightTrackerProps) {
   // All weight reads/writes flow through the shared TanStack Query
   // cache, so this view and Today's WeightCard stay in sync without
@@ -84,6 +90,11 @@ export default function WeightTracker({
   const [editingGoal, setEditingGoal] = useState(false)
   const [goalDraft, setGoalDraft] = useState('')
   const [savingGoal, setSavingGoal] = useState(false)
+  // Same pattern for the program-start anchor.
+  const [program, setProgram] = useState<string | null>(programStart ?? null)
+  const [editingProgram, setEditingProgram] = useState(false)
+  const [programDraft, setProgramDraft] = useState('')
+  const [savingProgram, setSavingProgram] = useState(false)
   const saving = logWeight.isPending
 
   const handleLog = () => {
@@ -135,6 +146,7 @@ export default function WeightTracker({
         open={showShare}
         userId={userId}
         weightUnit={weightUnit}
+        programStart={program}
         onClose={() => setShowShare(false)}
       />
 
@@ -172,7 +184,12 @@ export default function WeightTracker({
 
         {logs.length >= 2 && (
           <div className="mb-5">
-            <WeightChart logs={logs} weightUnit={weightUnit} goal={goal} />
+            <WeightChart
+              logs={logs}
+              weightUnit={weightUnit}
+              goal={goal}
+              programStart={program}
+            />
           </div>
         )}
 
@@ -271,6 +288,114 @@ export default function WeightTracker({
               <button
                 type="button"
                 onClick={() => setEditingGoal(false)}
+                className="text-subtle hover:text-foreground font-medium cursor-pointer"
+              >
+                Cancel
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* Program-start editor — same collapsed/expanded pattern as the
+            goal editor. When set, the chart marks weekly boundaries and
+            the share dialog tags each entry with a Week N. */}
+        <div className="mb-5 flex items-center gap-2 text-xs flex-wrap">
+          {!editingProgram ? (
+            <>
+              {program != null ? (
+                <p className="text-muted">
+                  Program start:{' '}
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {formatDate(program)}
+                  </span>
+                  {(() => {
+                    const today = todayISO()
+                    const wk = weekNumberSince(program, today)
+                    return wk != null ? (
+                      <span className="text-subtle ml-1.5">
+                        (Week {wk})
+                      </span>
+                    ) : null
+                  })()}
+                </p>
+              ) : (
+                <p className="text-subtle italic">No program start set</p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setProgramDraft(program ?? todayISO())
+                  setEditingProgram(true)
+                }}
+                className="text-indigo-fg hover:text-indigo-fg-strong font-medium cursor-pointer"
+              >
+                {program != null ? 'Edit' : 'Set start'}
+              </button>
+              {program != null && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setSavingProgram(true)
+                    const { error } = await supabase
+                      .from('profiles')
+                      .update({ weight_program_start_date: null })
+                      .eq('id', userId)
+                    setSavingProgram(false)
+                    if (error) {
+                      showToast('Failed to clear program start', 'error')
+                    } else {
+                      setProgram(null)
+                      showToast('Program start cleared')
+                    }
+                  }}
+                  disabled={savingProgram}
+                  className="text-subtle hover:text-red-fg font-medium cursor-pointer disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              )}
+            </>
+          ) : (
+            <form
+              onSubmit={async e => {
+                e.preventDefault()
+                if (!programDraft) {
+                  showToast('Pick a date', 'error')
+                  return
+                }
+                if (programDraft > todayISO()) {
+                  showToast(
+                    "Start date can't be in the future",
+                    'error'
+                  )
+                  return
+                }
+                setSavingProgram(true)
+                const { error } = await supabase
+                  .from('profiles')
+                  .update({ weight_program_start_date: programDraft })
+                  .eq('id', userId)
+                setSavingProgram(false)
+                if (error) {
+                  showToast('Failed to save program start', 'error')
+                  return
+                }
+                setProgram(programDraft)
+                setEditingProgram(false)
+                showToast('Program start saved')
+              }}
+              className="flex items-center gap-2 flex-wrap"
+            >
+              <label className="text-muted">Program start</label>
+              <div className="w-44">
+                <DatePicker value={programDraft} onChange={setProgramDraft} />
+              </div>
+              <Button type="submit" size="sm" loading={savingProgram}>
+                Save
+              </Button>
+              <button
+                type="button"
+                onClick={() => setEditingProgram(false)}
                 className="text-subtle hover:text-foreground font-medium cursor-pointer"
               >
                 Cancel

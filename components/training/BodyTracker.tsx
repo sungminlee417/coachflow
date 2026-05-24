@@ -32,6 +32,7 @@ export default function BodyTracker({ profile: initialProfile }: BodyTrackerProp
           userId={profile.id}
           weightUnit={profile.weight_unit ?? 'lbs'}
           weightGoal={profile.weight_goal ?? null}
+          programStart={profile.weight_program_start_date ?? null}
         />
         <MeasurementsTracker
           userId={profile.id}

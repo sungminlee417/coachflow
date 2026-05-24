@@ -12,6 +12,10 @@ export interface Profile {
   /** Optional body-weight goal; rendered as a dashed line on the weight
    *  chart. NULL = no goal set. */
   weight_goal?: number | null
+  /** Anchor date for "Week N" labels on the weight tracker. When set,
+   *  the chart marks weekly boundaries from this date and the share
+   *  dialog tags each entry with its program week. NULL = unset. */
+  weight_program_start_date?: string | null
   /** Settings → Preferences toggles. Default true (historical behavior). */
   rest_timer_enabled?: boolean
   show_streak_card?: boolean

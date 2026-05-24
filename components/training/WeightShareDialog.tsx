@@ -6,14 +6,25 @@ import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { DatePicker } from '@/components/ui/DatePicker'
-import { Share2, Copy } from 'lucide-react'
-import { formatDate, roundMacro, shiftDateISO, todayISO } from '@/lib/utils'
+import { Share2, Copy, Download } from 'lucide-react'
+import {
+  daysBetween,
+  formatDate,
+  roundMacro,
+  shiftDateISO,
+  todayISO,
+  weekNumberSince,
+} from '@/lib/utils'
 import type { WeightLog, WeightUnit } from '@/lib/types'
 
 interface WeightShareDialogProps {
   open: boolean
   userId: string
   weightUnit: WeightUnit
+  /** Optional program anchor for "Week N" labels. When set, each row in
+   *  the share text gets prefixed with its program week and the CSV
+   *  carries a `week` column. */
+  programStart?: string | null
   onClose: () => void
 }
 
@@ -21,6 +32,7 @@ export function WeightShareDialog({
   open,
   userId,
   weightUnit,
+  programStart,
   onClose,
 }: WeightShareDialogProps) {
   const supabase = useSupabase()
@@ -70,15 +82,69 @@ export function WeightShareDialog({
     }
   }, [open, userId, from, to, supabase])
 
+  // Summary stats — what a coach actually wants out of "send me your
+  // weights." Computed off the chronologically-sorted query result so
+  // first/last reflect actual range endpoints, not the date pickers.
+  const summary = useMemo(() => {
+    if (logs.length === 0) return null
+    const first = logs[0]
+    const last = logs[logs.length - 1]
+    const delta = last.weight - first.weight
+    const span = Math.max(1, daysBetween(first.recorded_at, last.recorded_at))
+    const perWeek = (delta / span) * 7
+    return {
+      first: first.weight,
+      last: last.weight,
+      delta,
+      perWeek,
+    }
+  }, [logs])
+
   const shareText = useMemo(() => {
     if (logs.length === 0) return ''
     const [lo, hi] = from <= to ? [from, to] : [to, from]
     const header = `Weight log · ${formatDate(lo)} – ${formatDate(hi)} (${weightUnit})`
-    const lines = logs.map(
-      l => `${formatDate(l.recorded_at)} — ${roundMacro(l.weight)}`
-    )
-    return [header, ...lines].join('\n')
-  }, [logs, from, to, weightUnit])
+    const summaryLine = summary
+      ? `Start ${roundMacro(summary.first)} → End ${roundMacro(summary.last)} · ` +
+        `Δ ${summary.delta >= 0 ? '+' : ''}${roundMacro(summary.delta)} ${weightUnit} · ` +
+        `${summary.perWeek >= 0 ? '+' : ''}${roundMacro(summary.perWeek)} ${weightUnit}/wk`
+      : null
+    const lines = logs.map(l => {
+      const wk = weekNumberSince(programStart ?? null, l.recorded_at)
+      const wkTag = wk != null ? `W${wk} · ` : ''
+      return `${wkTag}${formatDate(l.recorded_at)} — ${roundMacro(l.weight)}`
+    })
+    return [header, ...(summaryLine ? [summaryLine, ''] : []), ...lines].join('\n')
+  }, [logs, from, to, weightUnit, summary, programStart])
+
+  const csvText = useMemo(() => {
+    if (logs.length === 0) return ''
+    const hasWeek = !!programStart
+    const head = hasWeek
+      ? `date,weight_${weightUnit},week`
+      : `date,weight_${weightUnit}`
+    const rows = logs.map(l => {
+      const wk = weekNumberSince(programStart ?? null, l.recorded_at)
+      const base = `${l.recorded_at},${roundMacro(l.weight)}`
+      return hasWeek ? `${base},${wk ?? ''}` : base
+    })
+    return [head, ...rows].join('\n')
+  }, [logs, weightUnit, programStart])
+
+  const handleDownloadCsv = () => {
+    if (!csvText) return
+    const [lo, hi] = from <= to ? [from, to] : [to, from]
+    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `weight-log-${lo}-to-${hi}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    // Defer revoke so Safari's download trigger has time to read the blob.
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
 
   const handleShare = async () => {
     if (!shareText) return
@@ -185,10 +251,21 @@ export function WeightShareDialog({
         </div>
       </div>
 
-      {/* On phones the two actions stack to full-width tap targets; on
-          sm+ they sit inline on the right where the modal is centered. */}
+      {/* On phones the actions stack to full-width tap targets; on sm+
+          they sit inline on the right where the modal is centered. CSV
+          stays as a secondary download button — useful for trainees who
+          want to drop the data into a spreadsheet rather than a chat. */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-4 mt-2 border-t border-line-subtle">
         <div className="hidden sm:block sm:flex-1" />
+        <Button
+          variant="secondary"
+          onClick={handleDownloadCsv}
+          disabled={!csvText}
+          className="w-full sm:w-auto"
+        >
+          <Download size={14} />
+          CSV
+        </Button>
         <Button
           variant="secondary"
           onClick={handleCopy}

@@ -65,6 +65,22 @@ export const cyclePositionFor = (
   return (diff % cycleLength) + 1
 }
 
+/**
+ * Program-week index for a date relative to a start date.
+ * Week 1 = days 0–6 from the start, Week 2 = days 7–13, etc.
+ * Returns null when the date precedes the start, or when either input
+ * is missing — callers render the entry without a week tag in that case.
+ */
+export const weekNumberSince = (
+  startISO: string | null | undefined,
+  dateISO: string
+): number | null => {
+  if (!startISO) return null
+  const diff = daysBetween(startISO, dateISO)
+  if (diff < 0) return null
+  return Math.floor(diff / 7) + 1
+}
+
 export const formatDate = (
   dateString: string,
   opts?: Intl.DateTimeFormatOptions

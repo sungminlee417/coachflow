@@ -39,6 +39,10 @@ interface WeightChartProps {
   /** Optional body-weight goal. Renders as a dashed horizontal line
    *  across the chart so the trainee can see how close they are. */
   goal?: number | null
+  /** Optional program-start anchor. When set, faint dashed vertical
+   *  lines mark each weekly boundary inside the visible date range and
+   *  a "W1 / W2 …" label sits at the top of each line. */
+  programStart?: string | null
 }
 
 interface ChartPoint {
@@ -74,7 +78,12 @@ function ChartTooltip({ active, payload, unit }: TooltipProps) {
   )
 }
 
-function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) {
+function WeightChartInner({
+  logs,
+  weightUnit = 'lbs',
+  goal,
+  programStart,
+}: WeightChartProps) {
   const { resolved } = useTheme()
   const palette = CHART_PALETTE[resolved]
   const sorted = [...logs].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
@@ -94,6 +103,38 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
   const range = Math.max(maxWeight - minWeight, 1)
   const yMin = Math.floor(minWeight - range * 0.15)
   const yMax = Math.ceil(maxWeight + range * 0.15)
+
+  // Compute weekly boundary timestamps that fall inside the visible
+  // date window. Each boundary becomes a faint dashed vertical line
+  // labeled "W2", "W3", etc. — W1 is the start itself, which we skip
+  // to avoid a label hugging the chart's left edge. Capped at 26 weeks
+  // so a year-long timeline doesn't render 52 overlapping lines.
+  //
+  // `everyN` thins the LABELS (not the lines) once the boundaries
+  // would crowd. Phones can fit ~10 readable labels across the chart;
+  // beyond that we keep all the lines (visual rhythm) but only label
+  // every 2nd / 4th / etc. The lines themselves still mark every week
+  // so the eye can still count.
+  const weekMarkers: { ts: number; week: number; showLabel: boolean }[] = []
+  if (programStart) {
+    const startMs = new Date(programStart).getTime()
+    const firstMs = data[0].ts
+    const lastMs = data[data.length - 1].ts
+    if (Number.isFinite(startMs)) {
+      const WEEK_MS = 7 * 86400_000
+      const candidates: { ts: number; week: number }[] = []
+      for (let week = 2; week <= 27; week++) {
+        const ts = startMs + (week - 1) * WEEK_MS
+        if (ts < firstMs) continue
+        if (ts > lastMs) break
+        candidates.push({ ts, week })
+      }
+      const everyN = candidates.length > 16 ? 4 : candidates.length > 8 ? 2 : 1
+      for (const c of candidates) {
+        weekMarkers.push({ ...c, showLabel: c.week % everyN === 0 || everyN === 1 })
+      }
+    }
+  }
 
   const first = sorted[0]
   const last = sorted[sorted.length - 1]
@@ -189,6 +230,26 @@ function WeightChartInner({ logs, weightUnit = 'lbs', goal }: WeightChartProps) 
                 }}
               />
             )}
+            {weekMarkers.map(m => (
+              <ReferenceLine
+                key={m.ts}
+                x={m.ts}
+                stroke={palette.grid}
+                strokeDasharray="2 4"
+                strokeWidth={1}
+                label={
+                  m.showLabel
+                    ? {
+                        value: `W${m.week}`,
+                        position: 'insideTopLeft',
+                        fill: palette.tick,
+                        fontSize: 9,
+                        fontWeight: 600,
+                      }
+                    : undefined
+                }
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </div>
