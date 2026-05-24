@@ -452,11 +452,17 @@ export default function WeightTracker({
               {logs.slice(0, 10).map((log, i) => {
                 const prev = logs[i + 1]
                 const d = prev ? deltaIndicator(log.weight, prev.weight, goal) : null
+                const wk = weekNumberSince(program, log.recorded_at)
                 return (
                   <div
                     key={log.id}
                     className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-elevated group"
                   >
+                    {wk != null && (
+                      <span className="text-[10px] font-semibold tabular-nums text-indigo-fg bg-indigo-soft rounded-full px-1.5 py-0.5 shrink-0">
+                        W{wk}
+                      </span>
+                    )}
                     <span className="text-xs text-muted shrink-0 min-w-0 truncate">
                       {formatDate(log.recorded_at)}
                     </span>
