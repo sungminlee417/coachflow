@@ -60,6 +60,13 @@ export type TodayNavTarget =
   | 'my-programs'
   | 'my-meal-plans'
 
+/** Optional payload carried with a navigation. Today, only the workout
+ *  view consumes a `date`, but the shape is generic so other cards can
+ *  add context without a signature change. */
+export interface TodayNavOptions {
+  date?: string
+}
+
 export function Card({
   icon: Icon,
   label,

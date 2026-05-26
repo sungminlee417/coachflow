@@ -13,7 +13,7 @@
 
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Activity, ArrowDown, ArrowUp, Flame, Minus, TrendingUp } from 'lucide-react'
+import { Activity, ArrowDown, ArrowRight, ArrowUp, Flame, Minus, TrendingUp } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { shiftDateISO, todayISO } from '@/lib/utils'
 
@@ -64,7 +64,15 @@ function bucketLogs(
   return { workoutDays: workoutDays.size, sets, volume, meals }
 }
 
-export function WeeklySummaryCard({ clientId }: { clientId: string }) {
+export function WeeklySummaryCard({
+  clientId,
+  onOpen,
+}: {
+  clientId: string
+  /** Tap-to-open hop into the Progress view, matching the rest of the
+   *  Today dashboard's "every card is a deep link" convention. */
+  onOpen?: () => void
+}) {
   const supabase = useSupabase()
   const today = todayISO()
   const thisWeekStart = shiftDateISO(today, -6)
@@ -145,14 +153,29 @@ export function WeeklySummaryCard({ clientId }: { clientId: string }) {
     return null
   }
 
+  const Container: 'button' | 'div' = onOpen ? 'button' : 'div'
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <Container
+      {...(onOpen
+        ? {
+            type: 'button' as const,
+            onClick: onOpen,
+            'aria-label': 'Open Progress',
+          }
+        : {})}
+      className={`w-full text-left rounded-2xl border border-line bg-surface p-4 shadow-sm transition-shadow ${
+        onOpen ? 'hover:shadow-md hover:border-indigo-line cursor-pointer' : ''
+      }`}
+    >
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           <TrendingUp size={14} className="text-indigo-fg" />
           <h3 className="text-sm font-semibold text-foreground">This week</h3>
         </div>
-        <p className="text-[10px] text-subtle">vs. last 7 days</p>
+        <div className="flex items-center gap-1.5 text-[10px] text-subtle">
+          <span>vs. last 7 days</span>
+          {onOpen && <ArrowRight size={12} className="text-faint" />}
+        </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
         <StatCell
@@ -187,7 +210,7 @@ export function WeeklySummaryCard({ clientId }: { clientId: string }) {
           unit=""
         />
       </div>
-    </div>
+    </Container>
   )
 }
 

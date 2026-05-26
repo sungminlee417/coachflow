@@ -1,15 +1,19 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 // Re-exports for the mobile bottom-nav so the file can register the
 // "Today" icon without importing from this implementation file.
 import { ClipboardList, Ruler, Utensils } from 'lucide-react'
-import { todayISO } from '@/lib/utils'
+import { formatDuration, todayISO } from '@/lib/utils'
+import { showToast } from '@/components/ui/Toast'
+import { useWorkoutAssignments } from '@/lib/hooks/use-assignments'
+import { useDaySetLogs } from '@/lib/hooks/use-set-logs'
 import type { Profile } from '@/lib/types'
 import {
   greetingForHour,
   parseLocalISO,
   SectionHeader,
+  type TodayNavOptions,
   type TodayNavTarget,
 } from './today/primitives'
 import { HeroStats } from './today/HeroStats'
@@ -27,11 +31,14 @@ import { MonthlyRecapCard } from './today/MonthlyRecapCard'
 interface TodayDashboardProps {
   user: { id: string; full_name?: string | null }
   profile: Profile
-  /** Hop directly into a deep view (Workouts, Meals, Body, Clients). */
-  onNavigate: (tab: TodayNavTarget) => void
+  /** Hop directly into a deep view (Workouts, Meals, Body, Clients).
+   *  The optional `options.date` lets a card (e.g. the unfinished
+   *  workout banner) ask the destination view to jump to a specific
+   *  calendar day instead of its default. */
+  onNavigate: (tab: TodayNavTarget, options?: TodayNavOptions) => void
 }
 
-export type { TodayNavTarget }
+export type { TodayNavOptions, TodayNavTarget }
 export { ClipboardList, Utensils, Ruler }
 
 /**
@@ -52,6 +59,106 @@ export default function TodayDashboard({
   onNavigate,
 }: TodayDashboardProps) {
   const today = todayISO()
+
+  // Workout-complete celebration. Lifted up here from ClientWorkoutView so
+  // it fires regardless of WHERE the trainee logged the final set — the
+  // inline mini-logger on the Today WorkoutCard, the deep
+  // ExerciseSetLogger inside ClientWorkoutView, or the SupersetLogger.
+  // All three patch the same shared day-set-logs cache; this watcher
+  // sees the transition and fires the toast.
+  //
+  // Gating: we only celebrate when we observed an *incomplete* state at
+  // least once during this mount. Cold-loading an already-finished day
+  // never fires (no flicker), and the `celebratedKeyRef` keeps the toast
+  // to once per (date, sets-count, completion-count) signature so the
+  // user doesn't see it twice if they bounce around tabs.
+  const todayAssignmentsQuery = useWorkoutAssignments(user.id, today)
+  const todayAssignmentIds = useMemo(
+    () => (todayAssignmentsQuery.data ?? []).map(a => a.id),
+    [todayAssignmentsQuery.data]
+  )
+  const todaySetLogsQuery = useDaySetLogs({
+    clientId: user.id,
+    date: today,
+    assignmentIds: todayAssignmentIds,
+  })
+  const todayProgress = useMemo(() => {
+    const assignments = todayAssignmentsQuery.data ?? []
+    const logs = todaySetLogsQuery.data
+    let prescribedSets = 0
+    let completedSets = 0
+    let totalReps = 0
+    let totalVolume = 0
+    let totalDurationSeconds = 0
+    for (const a of assignments) {
+      for (const ex of a.workout.exercises ?? []) {
+        const prescribed = ex.exercise_sets?.length ?? ex.sets ?? 0
+        prescribedSets += prescribed
+        if (!ex.id || !logs) continue
+        for (let n = 1; n <= prescribed; n++) {
+          const row = logs.get(`${a.id}::${ex.id}::${n}`)
+          if (!row?.completed) continue
+          completedSets += 1
+          if (row.reps_performed != null) totalReps += row.reps_performed
+          if (row.weight_performed != null && row.reps_performed != null) {
+            totalVolume += row.weight_performed * row.reps_performed
+          }
+          if (row.duration_performed_seconds != null) {
+            totalDurationSeconds += row.duration_performed_seconds
+          }
+        }
+      }
+    }
+    const isComplete = prescribedSets > 0 && completedSets >= prescribedSets
+    return {
+      prescribedSets,
+      completedSets,
+      totalReps,
+      totalVolume,
+      totalDurationSeconds,
+      isComplete,
+    }
+  }, [todayAssignmentsQuery.data, todaySetLogsQuery.data])
+
+  const sawIncompleteRef = useRef(false)
+  const celebratedKeyRef = useRef<string | null>(null)
+  // Reset gates on date rollover (midnight crossing while the tab sits
+  // open) so a new day's first incomplete observation re-arms the toast.
+  useEffect(() => {
+    sawIncompleteRef.current = false
+    celebratedKeyRef.current = null
+  }, [today])
+  useEffect(() => {
+    if (todayProgress.prescribedSets === 0) return
+    if (!todayProgress.isComplete) {
+      sawIncompleteRef.current = true
+      return
+    }
+    if (!sawIncompleteRef.current) return
+    const key = `${today}::${todayProgress.prescribedSets}::${todayProgress.completedSets}`
+    if (celebratedKeyRef.current === key) return
+    celebratedKeyRef.current = key
+    const parts: string[] = [
+      `${todayProgress.completedSets} set${todayProgress.completedSets === 1 ? '' : 's'}`,
+    ]
+    if (todayProgress.totalReps > 0) parts.push(`${todayProgress.totalReps} reps`)
+    if (todayProgress.totalVolume > 0) {
+      parts.push(`${Math.round(todayProgress.totalVolume).toLocaleString()} lb volume`)
+    }
+    if (todayProgress.totalDurationSeconds > 0) {
+      parts.push(formatDuration(todayProgress.totalDurationSeconds))
+    }
+    showToast(`Workout complete · ${parts.join(' · ')}`, 'success')
+  }, [
+    today,
+    todayProgress.completedSets,
+    todayProgress.isComplete,
+    todayProgress.prescribedSets,
+    todayProgress.totalDurationSeconds,
+    todayProgress.totalReps,
+    todayProgress.totalVolume,
+  ])
+
   const firstName = (profile.full_name ?? '').split(' ')[0]?.trim() || ''
   const greeting = useMemo(() => greetingForHour(new Date().getHours()), [])
   const dateLabel = useMemo(
@@ -80,9 +187,9 @@ export default function TodayDashboard({
 
       <HeroStats clientId={user.id} loggedDate={today} />
 
-      <MonthlyRecapCard clientId={user.id} />
+      <MonthlyRecapCard clientId={user.id} onOpen={() => onNavigate('history')} />
 
-      <WeeklySummaryCard clientId={user.id} />
+      <WeeklySummaryCard clientId={user.id} onOpen={() => onNavigate('history')} />
 
       <section className="space-y-3">
         <SectionHeader title="Training" />

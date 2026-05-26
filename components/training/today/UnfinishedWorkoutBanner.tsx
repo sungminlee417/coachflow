@@ -14,7 +14,7 @@ import { useQuery } from '@tanstack/react-query'
 import { CircleAlert } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { shiftDateISO, todayISO } from '@/lib/utils'
-import type { TodayNavTarget } from './primitives'
+import type { TodayNavOptions, TodayNavTarget } from './primitives'
 
 interface AssignmentSlim {
   id: string
@@ -49,7 +49,7 @@ export function UnfinishedWorkoutBanner({
   onResume,
 }: {
   clientId: string
-  onResume: (target: TodayNavTarget) => void
+  onResume: (target: TodayNavTarget, options?: TodayNavOptions) => void
 }) {
   const supabase = useSupabase()
   const today = todayISO()
@@ -116,7 +116,7 @@ export function UnfinishedWorkoutBanner({
   return (
     <button
       type="button"
-      onClick={() => onResume('assigned-workouts')}
+      onClick={() => onResume('assigned-workouts', { date: data.date })}
       className="w-full text-left rounded-2xl border border-amber-line card-tint-amber p-4 hover:shadow-md transition-shadow cursor-pointer"
     >
       <div className="flex items-start gap-3">

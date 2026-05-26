@@ -58,7 +58,16 @@ function recapStorageKey(clientId: string, monthLabel: string): string {
   return `monthly-recap-dismissed:${clientId}:${monthLabel}`
 }
 
-export function MonthlyRecapCard({ clientId }: { clientId: string }) {
+export function MonthlyRecapCard({
+  clientId,
+  onOpen,
+}: {
+  clientId: string
+  /** Tap-to-open hop into Progress, where the trainee can dig into the
+   *  details. The X dismiss button uses `stopPropagation` so dismissing
+   *  doesn't navigate. */
+  onOpen?: () => void
+}) {
   const supabase = useSupabase()
   const today = todayISO()
   const dayOfMonth = parseInt(today.split('-')[2] ?? '0', 10)
@@ -139,8 +148,30 @@ export function MonthlyRecapCard({ clientId }: { clientId: string }) {
     }
   }
 
+  // Use a div + role=button rather than a <button> wrapper so the X
+  // dismiss control can stay a real <button> (button-in-button is invalid
+  // HTML and breaks focus). The keyboard handler covers Enter/Space the
+  // same way a real button would.
+  const interactive = !!onOpen
   return (
-    <div className="rounded-2xl border border-purple-line card-tint-purple p-4 relative shadow-sm">
+    <div
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={interactive ? onOpen : undefined}
+      onKeyDown={
+        interactive
+          ? e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onOpen?.()
+              }
+            }
+          : undefined
+      }
+      className={`rounded-2xl border border-purple-line card-tint-purple p-4 relative shadow-sm transition-shadow ${
+        interactive ? 'hover:shadow-md cursor-pointer' : ''
+      }`}
+    >
       <button
         type="button"
         onClick={handleDismiss}

@@ -18,7 +18,10 @@ import ClientWorkoutView from '@/components/training/ClientWorkoutView'
 import ClientMealPlanView from '@/components/training/ClientMealPlanView'
 import WorkoutHistory from '@/components/training/WorkoutHistory'
 import BodyTracker from '@/components/training/BodyTracker'
-import TodayDashboard, { type TodayNavTarget } from '@/components/training/TodayDashboard'
+import TodayDashboard, {
+  type TodayNavOptions,
+  type TodayNavTarget,
+} from '@/components/training/TodayDashboard'
 import SettingsView from '@/components/dashboard/SettingsView'
 import type { Profile } from '@/lib/types'
 
@@ -94,6 +97,17 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
   // than it helped (per the user's UX feedback). Bookmark `/app` and
   // you'll always come back to the hub.
   const [activeTab, setActiveTab] = useState<Tab>(DEFAULT_TAB)
+  // Pending "jump to this date" passed by Today cards (currently only
+  // the unfinished-workout banner). Lives at the dashboard level so it
+  // survives the activeTab switch and is then consumed by ClientWorkoutView.
+  const [pendingWorkoutDate, setPendingWorkoutDate] = useState<string | null>(null)
+
+  const handleTodayNavigate = (tab: TodayNavTarget, options?: TodayNavOptions) => {
+    if (options?.date && tab === 'assigned-workouts') {
+      setPendingWorkoutDate(options.date)
+    }
+    setActiveTab(tab)
+  }
 
   const [coach, setCoach] = useState<Profile | null>(null)
   const [loadingCoach, setLoadingCoach] = useState(true)
@@ -362,7 +376,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
               <TodayDashboard
                 user={user}
                 profile={profile}
-                onNavigate={(target: TodayNavTarget) => setActiveTab(target)}
+                onNavigate={handleTodayNavigate}
               />
             </TabPanel>
             <TabPanel active={activeTab === 'my-clients'} mounted={mountedTabs.has('my-clients')}>
@@ -414,7 +428,11 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                   </div>
                 )}
               </div>
-              <ClientWorkoutView clientId={user.id} />
+              <ClientWorkoutView
+                clientId={user.id}
+                requestedDate={pendingWorkoutDate}
+                onRequestedDateConsumed={() => setPendingWorkoutDate(null)}
+              />
             </TabPanel>
 
             <TabPanel

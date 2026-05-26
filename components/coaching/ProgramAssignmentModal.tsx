@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
@@ -10,6 +11,7 @@ import { DatePicker } from '@/components/ui/DatePicker'
 import { AssigneePicker } from '@/components/ui/AssigneePicker'
 import { Calendar, ListChecks, Users } from 'lucide-react'
 import { todayISO } from '@/lib/utils'
+import { queryKeys } from '@/lib/query-keys'
 
 interface ProgramAssignmentModalProps {
   open: boolean
@@ -46,6 +48,7 @@ export default function ProgramAssignmentModal({
   onClose,
 }: ProgramAssignmentModalProps) {
   const supabase = useSupabase()
+  const qc = useQueryClient()
   const [clientId, setClientId] = useState(preselectedClientId ?? '')
   const [showSchedule, setShowSchedule] = useState(false)
   const [startDate, setStartDate] = useState('')
@@ -216,6 +219,16 @@ export default function ProgramAssignmentModal({
       } catch {
         // Tracking row is non-essential for the assign itself.
       }
+
+      // Refresh every cache that depends on these new assignments. The
+      // trainee's Today/ClientWorkoutView re-derives off workoutAssignments;
+      // the coach's ClientDetailView re-derives off the same key. Without
+      // an invalidation here, an open ClientDetailView would keep showing
+      // the pre-assign list until the user navigated away and back.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.workoutAssignments.all() }),
+        qc.invalidateQueries({ queryKey: queryKeys.clients.forCoach(coachId) }),
+      ])
 
       const peopleLabel =
         targetIds.length === 1 ? '1 person' : `${targetIds.length} people`
