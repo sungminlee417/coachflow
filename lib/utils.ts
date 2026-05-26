@@ -365,6 +365,22 @@ export const parseDuration = (raw: string | null | undefined): number | null => 
  *   4830   → "1:20:30"
  *   null   → ""
  */
+/**
+ * Convert a treadmill / runner speed to a pace string ("8:30").
+ * Returns `null` for non-positive or missing input. The unit suffix is
+ * up to the caller — pace math is identical for mph→min/mi and
+ * kph→min/km because both are 60/speed.
+ */
+export const formatPace = (
+  speed: number | null | undefined
+): string | null => {
+  if (speed == null || !Number.isFinite(speed) || speed <= 0) return null
+  const totalSeconds = Math.round((60 / speed) * 60)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 export const formatDuration = (seconds: number | null | undefined): string => {
   if (seconds == null || !Number.isFinite(seconds)) return ''
   const s = Math.max(0, Math.round(seconds))

@@ -31,6 +31,11 @@ export interface Client {
   full_name: string
   email: string
   started_at?: string
+  // Most-recent activity timestamp across the client's logging tables
+  // (set_logs, meal_logs, weight_logs, body_measurements). Used by the
+  // coach's ClientList to surface inactive clients without each coach
+  // having to hover-check every profile. `null` = no logs ever.
+  last_active_date?: string | null
 }
 
 export interface Workout {

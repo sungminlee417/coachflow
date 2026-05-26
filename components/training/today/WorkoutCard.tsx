@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, Dumbbell } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
@@ -244,6 +244,19 @@ function NextSetMiniLogger({
   // Cardio path uses a single duration field — accepts the same loose
   // formats as the deep cardio logger ("20:30", "30", "1h 20m").
   const [duration, setDuration] = useState('')
+  // Empty-input shake — fired when the user tries to log with the
+  // required field blank. We restart the CSS animation by toggling the
+  // class via ref instead of remounting the input, so focus isn't lost
+  // and the next keystroke from the user has a place to land.
+  const formRef = useRef<HTMLFormElement>(null)
+  const triggerShake = () => {
+    const el = formRef.current
+    if (!el) return
+    el.classList.remove('input-shake')
+    // Force layout to restart the animation when triggered twice in a row.
+    void el.offsetWidth
+    el.classList.add('input-shake')
+  }
   const saving = saveSetLog.isPending
 
   const handleLog = async () => {
@@ -259,6 +272,7 @@ function NextSetMiniLogger({
       const w = weight === '' ? null : parseFloat(weight)
       const r = reps === '' ? null : parseFloat(reps)
       if (r == null || !Number.isFinite(r) || r <= 0) {
+        triggerShake()
         showToast('Enter reps to log this set', 'error')
         return
       }
@@ -290,6 +304,7 @@ function NextSetMiniLogger({
     // the deep view's per-machine UI.
     const parsedSeconds = parseDuration(duration)
     if (parsedSeconds == null || parsedSeconds <= 0) {
+      triggerShake()
       showToast('Enter a duration (e.g. 20 or 20:30)', 'error')
       return
     }
@@ -356,6 +371,7 @@ function NextSetMiniLogger({
         </span>
       </p>
       <form
+        ref={formRef}
         onSubmit={e => {
           // Native `<form>` so Enter on any input fires `handleLog` —
           // common reflex on mobile and desktop both.
@@ -403,9 +419,10 @@ function NextSetMiniLogger({
           type="submit"
           size="sm"
           loading={saving}
-          // Cardio uses `duration`; strength uses `reps`. Without this
-          // branch the button stays disabled forever in the cardio flow.
-          disabled={saving || (isCardio ? !duration : !reps)}
+          // Stay enabled even with empty inputs — `handleLog` validates and
+          // fires the input-shake + toast on empty. Disabling here would
+          // also block Enter-implicit-submit, swallowing the affordance.
+          disabled={saving}
           aria-label="Log set"
         >
           <Check size={14} />

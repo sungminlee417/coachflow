@@ -7,8 +7,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ClientGridSkeleton } from '@/components/ui/Skeleton'
 import { LibrarySearch } from '@/components/ui/LibrarySearch'
 import { LibrarySort, type LibrarySortMode } from '@/components/ui/LibrarySort'
-import { UserPlus, ChevronRight } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { UserPlus, ChevronRight, AlertTriangle } from 'lucide-react'
+import { formatDate, todayISO, daysBetween } from '@/lib/utils'
 import { useClients } from '@/lib/hooks/use-clients'
 import type { Client } from '@/lib/types'
 import ClientDetailView from './ClientDetailView'
@@ -16,6 +16,43 @@ import InviteCodeGenerator from './InviteCodeGenerator'
 
 interface ClientListProps {
   coachId: string
+}
+
+// Mirror of the badge tones in the Tailwind theme. Each band has its own
+// pill colour so a coach can scan the list and zero in on the at-risk
+// clients without reading any text. Thresholds: today / 1–3d / 4–7d /
+// 7d+. Past the 7-day band the badge flips to an `AlertTriangle` flag.
+function describeLastSeen(
+  lastActiveDate: string | null | undefined
+): {
+  label: string
+  tone: 'emerald' | 'amber' | 'red' | 'muted'
+  atRisk: boolean
+} {
+  if (!lastActiveDate) {
+    return { label: 'No activity yet', tone: 'muted', atRisk: true }
+  }
+  // RPC may return either a date or a timestamptz; slice to YYYY-MM-DD
+  // so `daysBetween` (which is pure date math) doesn't choke on the
+  // trailing time component.
+  const datePart = lastActiveDate.slice(0, 10)
+  const days = daysBetween(datePart, todayISO())
+  if (days <= 0) return { label: 'Active today', tone: 'emerald', atRisk: false }
+  if (days === 1) return { label: 'Active yesterday', tone: 'emerald', atRisk: false }
+  if (days <= 3) return { label: `Active ${days}d ago`, tone: 'amber', atRisk: false }
+  if (days <= 7) return { label: `Active ${days}d ago`, tone: 'amber', atRisk: false }
+  if (days <= 30) return { label: `${days}d quiet`, tone: 'red', atRisk: true }
+  return { label: 'Inactive 30d+', tone: 'red', atRisk: true }
+}
+
+const TONE_CLASSES: Record<
+  'emerald' | 'amber' | 'red' | 'muted',
+  string
+> = {
+  emerald: 'bg-emerald-soft text-emerald-fg border-emerald-line',
+  amber: 'bg-amber-soft text-amber-fg border-amber-line',
+  red: 'bg-red-soft text-red-fg border-red-line',
+  muted: 'bg-elevated text-muted border-line',
 }
 
 export default function ClientList({ coachId }: ClientListProps) {
@@ -156,30 +193,45 @@ export default function ClientList({ coachId }: ClientListProps) {
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visibleClients.map(client => (
-            <button
-              key={client.id}
-              onClick={() => setSelectedClient(client)}
-              className="bg-surface rounded-xl border border-line p-5 hover:border-indigo-line hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all text-left w-full cursor-pointer group"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar name={client.full_name} />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-foreground truncate">{client.full_name}</h3>
-                  <p className="text-sm text-muted truncate">{client.email}</p>
-                  {client.started_at && (
-                    <p className="text-xs text-subtle mt-0.5">
-                      Joined {formatDate(client.started_at)}
-                    </p>
-                  )}
-                </div>
-                <ChevronRight
-                  size={16}
-                  className="text-faint group-hover:text-indigo-500 transition-colors shrink-0"
-                />
-              </div>
-            </button>
-          ))}
+              {visibleClients.map(client => {
+                const seen = describeLastSeen(client.last_active_date)
+                return (
+                  <button
+                    key={client.id}
+                    onClick={() => setSelectedClient(client)}
+                    className={`bg-surface rounded-xl border p-5 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all text-left w-full cursor-pointer group ${
+                      seen.atRisk
+                        ? 'border-red-line/60 hover:border-red-line'
+                        : 'border-line hover:border-indigo-line'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar name={client.full_name} />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-foreground truncate">{client.full_name}</h3>
+                        <p className="text-sm text-muted truncate">{client.email}</p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-semibold border rounded-full px-1.5 py-0.5 ${TONE_CLASSES[seen.tone]}`}
+                          >
+                            {seen.atRisk && <AlertTriangle size={10} />}
+                            {seen.label}
+                          </span>
+                          {client.started_at && (
+                            <span className="text-[10px] text-subtle">
+                              · Joined {formatDate(client.started_at)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight
+                        size={16}
+                        className="text-faint group-hover:text-indigo-500 transition-colors shrink-0"
+                      />
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
         </>

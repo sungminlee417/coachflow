@@ -5,7 +5,8 @@ import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
-import { formatDuration, parseDuration } from '@/lib/utils'
+import { formatDuration, formatPace, parseDuration } from '@/lib/utils'
+import { useProfile } from '@/lib/hooks/use-profile'
 import { useQuery } from '@tanstack/react-query'
 import {
   useExerciseSetLogs,
@@ -196,6 +197,12 @@ export function ExerciseSetLogger({
 }: ExerciseSetLoggerProps) {
   const supabase = useSupabase()
   const restTimer = useRestTimer()
+  // Pace hint depends on the trainee's preferred weight unit (lbs → mph
+  // → min/mi, kg → kph → min/km). We use the same `weight_unit` field
+  // that drives the rest of the unit-aware UI; no separate setting.
+  const profileQuery = useProfile(clientId)
+  const paceUnitLabel =
+    (profileQuery.data?.weight_unit ?? 'lbs') === 'kg' ? '/km' : '/mi'
   const [rows, setRows] = useState<RowState[]>(() => buildInitialRows(exercise))
   // Set numbers the user manually re-expanded after auto-collapse fired. Reset
   // on every load and per-toggle so a fresh "complete" always auto-collapses.
@@ -688,6 +695,13 @@ export function ExerciseSetLogger({
                         value={row.duration_input}
                         onChange={e => updateRow(row.set_number, { duration_input: e.target.value })}
                         onBlur={() => commitDuration(row.set_number)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            commitDuration(row.set_number)
+                            toggleComplete(row.set_number)
+                          }
+                        }}
                         placeholder="20:30 or 30"
                         className="text-sm py-1.5"
                       />
@@ -732,6 +746,17 @@ export function ExerciseSetLogger({
                             placeholder="0"
                             className="text-sm py-1.5"
                           />
+                          {(() => {
+                            const speed = parseFloat(row.speed_performed)
+                            const pace = formatPace(Number.isFinite(speed) ? speed : null)
+                            if (!pace) return null
+                            return (
+                              <p className="mt-1 text-[10px] text-muted tabular-nums">
+                                ≈ <span className="font-semibold text-foreground">{pace}</span>
+                                <span className="text-subtle">{paceUnitLabel}</span>
+                              </p>
+                            )
+                          })()}
                         </div>
                       )}
                       {cardioFields.incline && (
@@ -863,6 +888,17 @@ export function ExerciseSetLogger({
                         const current = rows.find(r => r.set_number === row.set_number)
                         if (current?.completed) persist(current)
                       }}
+                      onKeyDown={e => {
+                        // Enter completes the set — desktop power users
+                        // can log a full exercise without leaving the
+                        // keyboard. The inputs sit inside a div (not a
+                        // form, the divide-y row layout rules that out),
+                        // so we wire keydown explicitly per input.
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          toggleComplete(row.set_number)
+                        }
+                      }}
                       placeholder="weight"
                       className="text-sm py-1.5"
                     />
@@ -882,6 +918,12 @@ export function ExerciseSetLogger({
                       onBlur={() => {
                         const current = rows.find(r => r.set_number === row.set_number)
                         if (current?.completed) persist(current)
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          toggleComplete(row.set_number)
+                        }
                       }}
                       placeholder="reps"
                       className="text-sm py-1.5"

@@ -117,6 +117,94 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
   const [saving, setSaving] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [snapshotReady, setSnapshotReady] = useState(!workout?.id)
+  // Quick-add catalog: most-frequently used exercises across the coach's
+  // other workouts so we can offer a one-tap drop-in. Loaded lazily after
+  // mount; failure is silent — the regular "Add exercise" still works.
+  const [quickAdd, setQuickAdd] = useState<
+    Array<{
+      name: string
+      exercise_type: ExerciseType
+      cardio_subtype: CardioSubtype | null
+      reps: string | null
+    }>
+  >([])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('exercises')
+          .select('name, exercise_type, cardio_subtype, reps, workout:workout_id!inner ( coach_id )')
+          .eq('workout.coach_id', coachId)
+          .limit(500)
+        if (error || cancelled) return
+        type Row = {
+          name: string | null
+          exercise_type: string | null
+          cardio_subtype: string | null
+          reps: string | null
+        }
+        const counts = new Map<
+          string,
+          { name: string; exercise_type: ExerciseType; cardio_subtype: CardioSubtype | null; reps: string | null; count: number }
+        >()
+        for (const r of (data ?? []) as unknown as Row[]) {
+          if (!r.name) continue
+          const key = r.name.toLowerCase()
+          const existing = counts.get(key)
+          if (existing) {
+            existing.count += 1
+            continue
+          }
+          counts.set(key, {
+            name: r.name,
+            exercise_type: (r.exercise_type as ExerciseType) ?? 'strength',
+            cardio_subtype: (r.cardio_subtype as CardioSubtype) ?? null,
+            reps: r.reps,
+            count: 1,
+          })
+        }
+        const sorted = Array.from(counts.values())
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 12)
+        if (!cancelled) {
+          setQuickAdd(
+            sorted.map(s => ({
+              name: s.name,
+              exercise_type: s.exercise_type,
+              cardio_subtype: s.cardio_subtype,
+              reps: s.reps,
+            }))
+          )
+        }
+      } catch {
+        // Silent — the quick-add strip is a nicety, not a requirement.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [coachId, supabase])
+
+  const addExerciseFromCatalog = (entry: (typeof quickAdd)[number]) => {
+    setExercises(prev => [
+      ...prev,
+      {
+        name: entry.name,
+        exercise_type: entry.exercise_type,
+        cardio_subtype: entry.exercise_type === 'cardio' ? entry.cardio_subtype ?? null : null,
+        sets: null,
+        reps: entry.reps ?? '',
+        weight: '',
+        rest_seconds: 60,
+        notes: '',
+        order_index: prev.length,
+        pair_with_next: false,
+        exercise_sets: [emptySet(1)],
+        _dndKey: newDndKey(),
+      },
+    ])
+  }
 
   // Pre-compute superset groupings off the exercise list. Recomputed only
   // when exercises change — otherwise unrelated re-renders (saving toggle,
@@ -409,6 +497,43 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
           Add Exercise
         </Button>
       </div>
+
+      {/* Quick-add strip: the coach's most-used exercises from their
+          existing workouts, surfaced as one-tap chips so building a new
+          workout doesn't mean re-typing every common lift. Cardio chips
+          carry the subtype through to the new row so the right machine
+          fields appear immediately. */}
+      {quickAdd.length > 0 && (
+        <div className="mb-4 rounded-lg border border-line bg-elevated p-3">
+          <div className="flex items-baseline justify-between mb-2">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-subtle">
+              Quick add
+            </h4>
+            <p className="text-[10px] text-subtle">From your other workouts</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {quickAdd.map((entry, i) => {
+              const isCardio = entry.exercise_type === 'cardio'
+              return (
+                <button
+                  key={`${entry.name}-${i}`}
+                  type="button"
+                  onClick={() => addExerciseFromCatalog(entry)}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium cursor-pointer transition-colors ${
+                    isCardio
+                      ? 'bg-amber-soft text-amber-fg border-amber-line hover:bg-amber-strong'
+                      : 'bg-surface text-foreground border-line hover:border-indigo-line hover:text-indigo-fg'
+                  }`}
+                  title={`Add ${entry.name}`}
+                >
+                  {isCardio ? <HeartPulse size={11} /> : <Plus size={11} />}
+                  <span className="truncate max-w-48">{entry.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {exercises.length === 0 ? (
         <EmptyStateCard message="No exercises yet. Add your first exercise above." />

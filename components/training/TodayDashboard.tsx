@@ -20,6 +20,9 @@ import { WeightCard } from './today/WeightCard'
 import { StreakCard } from './today/StreakCard'
 import { BodyMeasurementCard } from './today/BodyMeasurementCard'
 import { CoachSection } from './today/CoachSection'
+import { WeeklySummaryCard } from './today/WeeklySummaryCard'
+import { UnfinishedWorkoutBanner } from './today/UnfinishedWorkoutBanner'
+import { MonthlyRecapCard } from './today/MonthlyRecapCard'
 
 interface TodayDashboardProps {
   user: { id: string; full_name?: string | null }
@@ -77,8 +80,13 @@ export default function TodayDashboard({
 
       <HeroStats clientId={user.id} loggedDate={today} />
 
+      <MonthlyRecapCard clientId={user.id} />
+
+      <WeeklySummaryCard clientId={user.id} />
+
       <section className="space-y-3">
         <SectionHeader title="Training" />
+        <UnfinishedWorkoutBanner clientId={user.id} onResume={onNavigate} />
         {/* Hero rows — full-width because they pack the most info
             (next set logger, meal toggles). */}
         <WorkoutCard

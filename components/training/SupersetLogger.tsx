@@ -753,6 +753,13 @@ export function SupersetLogger({
                               updateRow(ex.id!, setNumber, { duration_input: e.target.value })
                             }
                             onBlur={() => commitDuration(ex.id!, setNumber)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                commitDuration(ex.id!, setNumber)
+                                toggleComplete(ex.id!, setNumber)
+                              }
+                            }}
                             placeholder="20:30 or 30"
                             className="text-sm py-1.5"
                           />
@@ -799,6 +806,12 @@ export function SupersetLogger({
                                 ?.find(r => r.set_number === setNumber)
                               if (current?.completed) persist(current)
                             }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                toggleComplete(ex.id!, setNumber)
+                              }
+                            }}
                             placeholder="weight"
                             className="text-sm py-1.5"
                           />
@@ -819,6 +832,12 @@ export function SupersetLogger({
                                 .get(ex.id!)
                                 ?.find(r => r.set_number === setNumber)
                               if (current?.completed) persist(current)
+                            }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                toggleComplete(ex.id!, setNumber)
+                              }
                             }}
                             placeholder="reps"
                             className="text-sm py-1.5"

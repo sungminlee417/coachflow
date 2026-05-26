@@ -285,6 +285,22 @@ html.dark {
   }
 }
 
+/* Short horizontal shake used to draw attention to a missing required
+ * input when the user tries to submit. Two cycles in 0.3s — long enough
+ * to register, short enough to not feel like a tantrum. Paired with a
+ * red border that fades back to normal so the feedback compounds
+ * (motion + color) without lingering. */
+@keyframes inputShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+.input-shake {
+  animation: inputShake 0.3s ease-in-out;
+}
+
 /* Smooth content swap on tab change */
 .tab-content {
   animation: fadeIn 0.18s ease-out;

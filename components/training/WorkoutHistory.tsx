@@ -48,6 +48,21 @@ const unwrap = <T,>(v: T | T[] | null | undefined): T | null => {
   return (v ?? null) as T | null
 }
 
+// Epley formula — the trainee-facing estimate of a 1-rep max from a
+// sub-max set. We clamp the rep range because the formula degrades fast
+// once you go past about 10 reps; better to show "—" than a number that
+// makes the trainee load weight they can't move.
+const estimateOneRepMax = (
+  weight: number | null,
+  reps: number | null
+): number | null => {
+  if (weight == null || reps == null) return null
+  if (weight <= 0 || reps <= 0) return null
+  if (reps === 1) return weight
+  if (reps > 12) return null
+  return Math.round(weight * (1 + reps / 30))
+}
+
 const EMPTY_STATS: ExerciseStats[] = []
 const EMPTY_LOGGED_DATES: Set<string> = new Set()
 
@@ -234,6 +249,11 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
         </div>
       )}
 
+      {/* Recent PRs — the 5 most recently set lifetime bests across every
+          exercise. Surfaces the "I just set a new PR" feel even when the
+          trainee scrolled past the per-exercise list. */}
+      <RecentPRsCard stats={stats} />
+
       {stats.length === 0 ? (
         <EmptyState
           icon={Trophy}
@@ -303,6 +323,18 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
                           <p className="text-[10px] uppercase tracking-widest font-semibold text-emerald-fg mt-0.5">
                             Heaviest
                           </p>
+                          {(() => {
+                            const e1rm = estimateOneRepMax(s.bestWeight, s.bestWeightReps)
+                            // Only render the chip when reps > 1 — for a true
+                            // single, the "Heaviest" line is already the 1RM
+                            // and a duplicate chip would just be noise.
+                            if (e1rm == null || (s.bestWeightReps ?? 0) <= 1) return null
+                            return (
+                              <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-fg bg-indigo-soft border border-indigo-line rounded-full px-1.5 py-px tabular-nums">
+                                e1RM <span className="font-bold">{e1rm}</span>
+                              </p>
+                            )
+                          })()}
                         </>
                       )
                     ) : (
@@ -330,6 +362,89 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+function RecentPRsCard({ stats }: { stats: ExerciseStats[] }) {
+  const recent = useMemo(() => {
+    type Row = {
+      key: string
+      name: string
+      type: 'strength' | 'cardio'
+      headline: string
+      sub: string | null
+      date: string
+    }
+    const out: Row[] = []
+    for (const s of stats) {
+      if (s.type === 'cardio') {
+        if (s.longestDurationSeconds == null || !s.longestDurationDate) continue
+        out.push({
+          key: s.key,
+          name: s.name,
+          type: 'cardio',
+          headline: formatDuration(s.longestDurationSeconds),
+          sub: 'Longest',
+          date: s.longestDurationDate,
+        })
+      } else {
+        if (s.bestWeight == null || !s.bestWeightDate) continue
+        const e1rm = estimateOneRepMax(s.bestWeight, s.bestWeightReps)
+        const headline = `${s.bestWeight}${
+          s.bestWeightReps != null ? ` × ${s.bestWeightReps}` : ''
+        }`
+        out.push({
+          key: s.key,
+          name: s.name,
+          type: 'strength',
+          headline,
+          sub: e1rm != null && (s.bestWeightReps ?? 0) > 1 ? `e1RM ${e1rm}` : null,
+          date: s.bestWeightDate,
+        })
+      }
+    }
+    out.sort((a, b) => b.date.localeCompare(a.date))
+    return out.slice(0, 5)
+  }, [stats])
+
+  if (recent.length === 0) return null
+
+  return (
+    <div className="mb-6 bg-surface rounded-xl border border-line p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Trophy size={14} className="text-amber-fg" />
+        <h3 className="text-sm font-semibold text-foreground">Recent personal records</h3>
+        <span className="text-[10px] text-subtle">· top {recent.length}</span>
+      </div>
+      <ul className="divide-y divide-line-subtle">
+        {recent.map(row => (
+          <li
+            key={row.key}
+            className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{row.name}</p>
+              <p className="text-[11px] text-subtle tabular-nums">
+                {formatDate(row.date)}
+                {row.sub && (
+                  <>
+                    <span className="text-faint"> · </span>
+                    <span className="text-indigo-fg font-semibold">{row.sub}</span>
+                  </>
+                )}
+              </p>
+            </div>
+            <p
+              className={`text-base font-bold tabular-nums shrink-0 ${
+                row.type === 'cardio' ? 'text-amber-fg' : 'text-emerald-fg'
+              }`}
+            >
+              {row.headline}
+            </p>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

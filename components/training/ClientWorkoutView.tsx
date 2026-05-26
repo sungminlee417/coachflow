@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
 import { WeekSelector } from '@/components/ui/WeekSelector'
@@ -11,6 +11,7 @@ import { ChevronDown, ChevronRight, HeartPulse, Trash2 } from 'lucide-react'
 import { AssignmentCardSkeleton } from '@/components/ui/Skeleton'
 import { formatDuration, todayISO, formatLongDate } from '@/lib/utils'
 import { useWorkoutAssignments } from '@/lib/hooks/use-assignments'
+import { useDaySetLogs } from '@/lib/hooks/use-set-logs'
 import { queryKeys } from '@/lib/query-keys'
 import type { Exercise, WorkoutAssignment } from '@/lib/types'
 import { ExerciseSetLogger } from './ExerciseSetLogger'
@@ -126,6 +127,109 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
     }
     return map
   }, [assignments])
+
+  // Day-wide set logs — shared cache with the Today WorkoutCard. We read
+  // this purely to detect the "last set of the day" transition and fire
+  // the celebration toast below; the per-exercise loggers still own the
+  // logging UI itself.
+  const assignmentIds = useMemo(() => assignments.map(a => a.id), [assignments])
+  const dayLogsQuery = useDaySetLogs({
+    clientId,
+    date: selectedDate,
+    assignmentIds,
+  })
+
+  // Aggregate prescribed vs. completed across every visible assignment.
+  // Volume + duration totals power the celebration toast copy.
+  const dayProgress = useMemo(() => {
+    let prescribedSets = 0
+    let completedSets = 0
+    let totalReps = 0
+    let totalVolume = 0
+    let totalDurationSeconds = 0
+    const logs = dayLogsQuery.data
+    for (const a of assignments) {
+      for (const ex of a.workout.exercises ?? []) {
+        const prescribed = ex.exercise_sets?.length ?? ex.sets ?? 0
+        prescribedSets += prescribed
+        if (!ex.id || !logs) continue
+        for (let n = 1; n <= prescribed; n++) {
+          const row = logs.get(`${a.id}::${ex.id}::${n}`)
+          if (row?.completed) {
+            completedSets += 1
+            if (row.reps_performed != null) totalReps += row.reps_performed
+            if (row.weight_performed != null && row.reps_performed != null) {
+              totalVolume += row.weight_performed * row.reps_performed
+            }
+            if (row.duration_performed_seconds != null) {
+              totalDurationSeconds += row.duration_performed_seconds
+            }
+          }
+        }
+      }
+    }
+    const isComplete = prescribedSets > 0 && completedSets >= prescribedSets
+    return {
+      prescribedSets,
+      completedSets,
+      totalReps,
+      totalVolume,
+      totalDurationSeconds,
+      isComplete,
+    }
+  }, [assignments, dayLogsQuery.data])
+
+  // Celebration trigger. We want to fire exactly once when the trainee
+  // completes the final set of the day, but never on cold load of an
+  // already-done workout (page reload, switching back to today). The
+  // `userTouchedRef` flips true only when an exercise/superset reports
+  // its own "all sets done" via the existing callback — i.e. the user
+  // just clicked complete — so first-paint doesn't trip the toast.
+  const userTouchedRef = useRef(false)
+  const celebratedKeyRef = useRef<string | null>(null)
+  const dayCompleteKey = `${selectedDate}::${dayProgress.prescribedSets}::${dayProgress.completedSets}`
+  // Reset the "user touched" flag when the visible day changes so
+  // switching to a different day's already-complete workout doesn't
+  // immediately fire a toast.
+  useEffect(() => {
+    userTouchedRef.current = false
+  }, [selectedDate])
+  useEffect(() => {
+    if (!dayProgress.isComplete) return
+    if (!userTouchedRef.current) return
+    if (celebratedKeyRef.current === dayCompleteKey) return
+    celebratedKeyRef.current = dayCompleteKey
+    const parts: string[] = [
+      `${dayProgress.completedSets} set${dayProgress.completedSets === 1 ? '' : 's'}`,
+    ]
+    if (dayProgress.totalReps > 0) {
+      parts.push(`${dayProgress.totalReps} reps`)
+    }
+    if (dayProgress.totalVolume > 0) {
+      parts.push(`${Math.round(dayProgress.totalVolume).toLocaleString()} lb volume`)
+    }
+    if (dayProgress.totalDurationSeconds > 0) {
+      parts.push(formatDuration(dayProgress.totalDurationSeconds))
+    }
+    showToast(`Workout complete · ${parts.join(' · ')}`, 'success')
+  }, [
+    dayCompleteKey,
+    dayProgress.completedSets,
+    dayProgress.isComplete,
+    dayProgress.totalDurationSeconds,
+    dayProgress.totalReps,
+    dayProgress.totalVolume,
+  ])
+
+  const handleAnyAllSetsCompleted = (collapseKey: string) => {
+    userTouchedRef.current = true
+    setCollapsedKeys(prev => {
+      if (prev.has(collapseKey)) return prev
+      const next = new Set(prev)
+      next.add(collapseKey)
+      return next
+    })
+  }
 
   const handleUnassign = async () => {
     if (!pendingUnassign) return
@@ -450,14 +554,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                   exercise={exercise}
                                   loggedDate={selectedDate}
                                   currentVariant={activeSub}
-                                  onAllSetsCompleted={() =>
-                                    setCollapsedKeys(prev => {
-                                      if (prev.has(soloKey)) return prev
-                                      const next = new Set(prev)
-                                      next.add(soloKey)
-                                      return next
-                                    })
-                                  }
+                                  onAllSetsCompleted={() => handleAnyAllSetsCompleted(soloKey)}
                                 />
                               </div>
                             )}
@@ -594,14 +691,7 @@ export default function ClientWorkoutView({ clientId }: ClientWorkoutViewProps) 
                                       })
                                   )
                                 }
-                                onAllSetsCompleted={() =>
-                                  setCollapsedKeys(prev => {
-                                    if (prev.has(groupKey)) return prev
-                                    const next = new Set(prev)
-                                    next.add(groupKey)
-                                    return next
-                                  })
-                                }
+                                onAllSetsCompleted={() => handleAnyAllSetsCompleted(groupKey)}
                               />
                             </div>
                           )}
