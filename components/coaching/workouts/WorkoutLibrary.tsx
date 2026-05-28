@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { LibrarySearch } from '@/components/ui/LibrarySearch'
-import { LibrarySort, sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
+import { sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
+import { LibraryFilterableGrid } from '@/components/ui/LibraryFilterableGrid'
 import { Plus, Send, Pencil, Trash2, Dumbbell, Copy } from 'lucide-react'
 import type { Workout } from '@/lib/types'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
@@ -17,7 +17,7 @@ import dynamic from 'next/dynamic'
 // the coach taps "Create / Edit", so lazy-loading keeps the dashboard's
 // initial JS chunk lean. `ssr: false` because the builder is fully client.
 const WorkoutBuilder = dynamic(() => import('./WorkoutBuilder'), { ssr: false })
-import WorkoutAssignmentModal from './WorkoutAssignmentModal'
+import WorkoutAssignmentModal from '../assignments/WorkoutAssignmentModal'
 
 interface WorkoutLibraryProps {
   coachId: string
@@ -282,27 +282,16 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
           }
         />
       ) : (
-        <>
-          {workouts.length > 4 && (
-            <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-              <LibrarySearch
-                value={query}
-                onChange={setQuery}
-                placeholder="Search workouts…"
-              />
-              <LibrarySort
-                value={sortMode}
-                onChange={setSortMode}
-                className="sm:w-48"
-              />
-            </div>
-          )}
-          {visibleWorkouts.length === 0 ? (
-            <p className="text-sm text-muted italic py-6 text-center">
-              No workouts match &ldquo;{query}&rdquo;.
-            </p>
-          ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <LibraryFilterableGrid
+          total={workouts.length}
+          visibleCount={visibleWorkouts.length}
+          query={query}
+          onQueryChange={setQuery}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
+          searchPlaceholder="Search workouts…"
+          emptyMatchLabel="workouts"
+        >
           {visibleWorkouts.map(workout => (
             <div
               key={workout.id}
@@ -356,9 +345,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
               </div>
             </div>
           ))}
-        </div>
-          )}
-        </>
+        </LibraryFilterableGrid>
       )}
     </div>
   )

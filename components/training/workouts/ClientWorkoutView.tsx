@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { useSupabase } from '@/lib/use-supabase'
 import { WeekSelector } from '@/components/ui/WeekSelector'
 import { IconButton } from '@/components/ui/IconButton'
@@ -11,11 +11,10 @@ import { ChevronDown, ChevronRight, HeartPulse, Trash2 } from 'lucide-react'
 import { AssignmentCardSkeleton } from '@/components/ui/Skeleton'
 import { formatDuration, todayISO, formatLongDate } from '@/lib/utils'
 import { useWorkoutAssignments } from '@/lib/hooks/use-assignments'
-import { queryKeys } from '@/lib/query-keys'
 import type { Exercise, WorkoutAssignment } from '@/lib/types'
-import { ExerciseSetLogger } from './ExerciseSetLogger'
-import { SubstitutionPicker } from './SubstitutionPicker'
-import { SupersetLogger } from './SupersetLogger'
+import { ExerciseSetLogger } from '../logger/ExerciseSetLogger'
+import { SubstitutionPicker } from '../logger/SubstitutionPicker'
+import { SupersetLogger } from '../logger/SupersetLogger'
 
 interface ClientWorkoutViewProps {
   clientId: string
@@ -93,7 +92,7 @@ export default function ClientWorkoutView({
   onRequestedDateConsumed,
 }: ClientWorkoutViewProps) {
   const supabase = useSupabase()
-  const qc = useQueryClient()
+  const { invalidateWorkouts } = useAssignmentSync()
   const [selectedDate, setSelectedDate] = useState(todayISO())
 
   // Honor the parent's "jump to this date" signal exactly once per
@@ -179,18 +178,17 @@ export default function ClientWorkoutView({
         .eq('id', pendingUnassign.id)
       if (error) throw error
       showToast('Workout removed')
-      await fetchAssignments()
+      // Invalidate every workoutAssignments scope (the trainee may be
+      // viewing a different day than the one we just unassigned from,
+      // and Today + the unfinished banner read separate keys). The
+      // helper also catches the weekly summary + recap via `['today']`.
+      await invalidateWorkouts()
     } catch {
       showToast('Failed to remove workout', 'error')
     } finally {
       setPendingUnassign(null)
     }
   }
-
-  const fetchAssignments = () =>
-    qc.invalidateQueries({
-      queryKey: queryKeys.workoutAssignments.forDay(clientId, selectedDate),
-    })
 
   // Reseed the substitution overrides whenever the assignments refresh — this
   // includes the per-day swap pulled by queries.ts so the chips reflect the

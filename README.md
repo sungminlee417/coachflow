@@ -154,27 +154,47 @@ coachflow/
 │   └── globals.css                 # Tokens, animations, iOS quirks
 ├── components/
 │   ├── coaching/                   # Coach-side: builders, libraries, modals
-│   │   ├── WorkoutBuilder.tsx
 │   │   ├── ScheduleSection.tsx
-│   │   ├── ProgramBuilder.tsx
-│   │   ├── MealPlanBuilder.tsx
-│   │   └── …AssignmentModal.tsx
+│   │   ├── assignments/            # Workout/MealPlan/Program assign modals
+│   │   │                           # + shared AssignmentSchedulingFields
+│   │   ├── clients/                # ClientList, ClientDetailView,
+│   │   │                           # InviteCodeGenerator
+│   │   ├── workouts/               # WorkoutBuilder, WorkoutLibrary,
+│   │   │                           # persistence.ts (diff-based save)
+│   │   ├── meal-plans/             # MealPlanBuilder, MealPlanLibrary,
+│   │   │                           # MealCard, persistence.ts
+│   │   └── programs/               # ProgramBuilder, ProgramLibrary
 │   ├── training/                   # Trainee-side: assigned views + loggers
-│   │   ├── ClientWorkoutView.tsx
-│   │   ├── ExerciseSetLogger.tsx, SupersetLogger.tsx
-│   │   ├── SubstitutionPicker.tsx
-│   │   ├── MealLogToggle.tsx
-│   │   ├── WeightChart.tsx
-│   │   └── MeasurementsTracker.tsx
-│   ├── dashboard/UnifiedDashboard.tsx
+│   │   ├── TodayDashboard.tsx
+│   │   ├── today/                  # Per-card components for Today
+│   │   ├── logger/                 # ExerciseSetLogger, SupersetLogger,
+│   │   │                           # SubstitutionPicker, SetHints (shared)
+│   │   ├── workouts/ClientWorkoutView.tsx
+│   │   ├── meals/                  # ClientMealPlanView, MealLogToggle
+│   │   ├── measurements/           # WeightTracker, WeightChart,
+│   │   │                           # WeightShareDialog, BodyTracker,
+│   │   │                           # MeasurementForm/Tracker, UnitToggle
+│   │   └── history/                # WorkoutHistory + ActivityHeatmap +
+│   │                               # SummaryTile
+│   ├── dashboard/                  # UnifiedDashboard + NavSectionList +
+│   │                               # MobileBottomNav + tabs.tsx
 │   └── ui/                         # Buttons, inputs, modal, toast, skeletons,
-│                                   # SortableList, etc.
+│                                   # SortableList, LibraryFilterableGrid, etc.
 ├── lib/
 │   ├── queries.ts                  # Centralized assignment fetchers
 │   ├── training.ts                 # buildPrescribedSets, fetchPriorPerformance,
 │   │                               # isImprovement, formatPriorHint
 │   ├── utils.ts                    # Date helpers, fraction parse/format,
-│   │                               # duration helpers, macro math
+│   │                               # duration helpers, macro math, pace
+│   ├── hooks/
+│   │   ├── use-assignment-sync.ts  # Single source for post-write cache
+│   │   │                           # invalidations across every assignment
+│   │   │                           # writer
+│   │   ├── use-clients.ts          # Roster + last-active dates (split into
+│   │   │                           # two queries for progressive paint)
+│   │   ├── use-set-logs.ts         # Day + exercise set-log queries +
+│   │   │                           # the save mutation
+│   │   └── use-*.ts                # Per-resource queries
 │   ├── use-dirty-state.ts          # Snapshot-based dirty detection
 │   ├── use-supabase.ts             # Memoized client
 │   └── supabase/                   # Browser/server/middleware clients

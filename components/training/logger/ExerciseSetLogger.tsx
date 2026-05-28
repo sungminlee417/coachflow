@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
+import { Check, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDuration, formatPace, parseDuration } from '@/lib/utils'
 import { useProfile } from '@/lib/hooks/use-profile'
 import { useQuery } from '@tanstack/react-query'
@@ -19,11 +19,10 @@ import { useRestTimer } from '@/components/ui/RestTimer'
 import {
   buildPrescribedSets,
   fetchPriorPerformance,
-  formatPriorHint,
   getRepRangeFeedback,
-  isImprovement,
   type PriorPerformance,
 } from '@/lib/training'
+import { PreSetHint, PostSetHint } from '@/components/training/logger/SetHints'
 import type { Exercise } from '@/lib/types'
 
 // Stable empty fallback so the merge effect's `[persistedRows]` dep
@@ -85,107 +84,6 @@ const buildInitialRows = (exercise: Exercise): RowState[] =>
     resistance_performed: '',
     completed: false,
   }))
-
-// Pre-set "Last: X · Try Y" hint strip. Pulled out of ExerciseSetLogger so
-// it doesn't get re-declared as a new component type on every parent render
-// (which would unmount/remount inputs and steal focus mid-edit).
-function PreSetHint({
-  row,
-  prior,
-  loaded,
-  isCardio,
-}: {
-  row: RowState
-  prior: PriorPerformance | undefined
-  loaded: boolean
-  isCardio: boolean
-}) {
-  const prev = loaded ? prior : undefined
-  if (!prev) return null
-  const last = formatPriorHint(prev, isCardio)
-  let suggestion: { direction: 'up' | 'down'; weight: number } | null = null
-  if (!isCardio) {
-    const fb = getRepRangeFeedback(
-      row.target_reps,
-      prev.reps_performed,
-      prev.weight_performed
-    )
-    if (fb && fb.state !== 'on-target' && prev.weight_performed != null) {
-      const weight = prev.weight_performed + fb.delta
-      if (weight > 0) {
-        suggestion = { direction: fb.delta > 0 ? 'up' : 'down', weight }
-      }
-    }
-  }
-  if (!last && !suggestion) return null
-  return (
-    <div className="flex items-center gap-2 text-[10px] px-3 pt-2 flex-wrap">
-      {last && (
-        <span className="text-subtle tabular-nums">
-          Last: <span className="font-medium text-muted">{last}</span>
-        </span>
-      )}
-      {suggestion && (
-        <span
-          className={`inline-flex items-center gap-1 font-medium border rounded-full px-2 py-0.5 tabular-nums ${
- suggestion.direction === 'up'
- ? 'text-indigo-fg bg-indigo-soft border-indigo-line '
- : 'text-amber-fg bg-amber-soft border-amber-line '
- }`}
-        >
-          {suggestion.direction === 'up' ? (
-            <ArrowUp size={11} />
-          ) : (
-            <ArrowDown size={11} />
-          )}
-          Try {suggestion.weight}
-        </span>
-      )}
-    </div>
-  )
-}
-
-function PostSetHint({
-  row,
-  prior,
-  loaded,
-  isCardio,
-  manuallyExpanded,
-  onCollapse,
-}: {
-  row: RowState
-  prior: PriorPerformance | undefined
-  loaded: boolean
-  isCardio: boolean
-  manuallyExpanded: Set<number>
-  onCollapse: (setNumber: number) => void
-}) {
-  const prev = loaded ? prior : undefined
-  const improved = prev ? isImprovement(row, prev, isCardio) : false
-  const showCollapse =
-    loaded && row.completed && manuallyExpanded.has(row.set_number)
-  if (!improved && !showCollapse) return null
-  return (
-    <div className="flex items-center justify-end gap-2 text-[10px] px-3 pb-1.5 flex-wrap">
-      {improved && (
-        <span className="inline-flex items-center gap-0.5 text-emerald-fg bg-emerald-soft border border-emerald-line rounded-full px-1.5 py-px font-semibold tabular-nums">
-          ↑ Beat last
-        </span>
-      )}
-      {showCollapse && (
-        <button
-          type="button"
-          onClick={() => onCollapse(row.set_number)}
-          className="inline-flex items-center gap-0.5 text-subtle hover:text-foreground cursor-pointer"
-          aria-label="Collapse this set"
-        >
-          <ChevronUp size={11} />
-          Collapse
-        </button>
-      )}
-    </div>
-  )
-}
 
 export function ExerciseSetLogger({
   clientId,
@@ -335,10 +233,19 @@ export function ExerciseSetLogger({
   // The Strong / Hevy pattern — your last-week's weight & reps are the
   // single most likely values for today's set, so one tap of the
   // checkmark completes the row without retyping.
+  //
+  // The functional setRows callback first computes whether any row
+  // would change. When nothing applies (the common case after a save —
+  // every row either has a persisted log or user-typed input), we
+  // return the *same* `prev` reference so React's bail-out kicks in
+  // and skips the re-render. This trims the ambient cost of the merge
+  // pipeline without needing a stateful guard the React-19 immutability
+  // lint disallows.
   useEffect(() => {
     if (priorBySet.size === 0) return
-    setRows(prev =>
-      prev.map(r => {
+    setRows(prev => {
+      let changed = false
+      const next = prev.map(r => {
         const todaysLog = persistedRows.get(r.set_number)
         if (todaysLog) return r
         if (
@@ -353,6 +260,7 @@ export function ExerciseSetLogger({
         }
         const prior = priorBySet.get(r.set_number)
         if (!prior) return r
+        changed = true
         return {
           ...r,
           reps_performed:
@@ -366,7 +274,8 @@ export function ExerciseSetLogger({
               : '',
         }
       })
-    )
+      return changed ? next : prev
+    })
   }, [priorBySet, persistedRows])
   /* eslint-enable react-hooks/set-state-in-effect */
 

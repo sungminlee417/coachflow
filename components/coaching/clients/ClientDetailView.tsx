@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { showToast } from '@/components/ui/Toast'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
@@ -10,8 +11,8 @@ import { AssignedItemRowSkeleton } from '@/components/ui/Skeleton'
 import { ArrowLeft, Trash2, Apple, Dumbbell } from 'lucide-react'
 import { formatDate, unwrapJoin } from '@/lib/utils'
 import type { Client } from '@/lib/types'
-import WorkoutAssignmentModal from './WorkoutAssignmentModal'
-import MealPlanAssignmentModal from './MealPlanAssignmentModal'
+import WorkoutAssignmentModal from '../assignments/WorkoutAssignmentModal'
+import MealPlanAssignmentModal from '../assignments/MealPlanAssignmentModal'
 
 interface WorkoutAssignmentRow {
   id: string
@@ -51,6 +52,7 @@ type DeleteTarget =
 
 export default function ClientDetailView({ client, coachId, onBack }: ClientDetailViewProps) {
   const supabase = useSupabase()
+  const { invalidateWorkouts, invalidateMealPlans } = useAssignmentSync()
   const [workoutAssignments, setWorkoutAssignments] = useState<WorkoutAssignmentRow[]>([])
   const [mealPlanAssignments, setMealPlanAssignments] = useState<MealPlanAssignmentRow[]>([])
   const [workouts, setWorkouts] = useState<WorkoutOption[]>([])
@@ -148,10 +150,18 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
       const { error } = await supabase.from(table).delete().eq('id', pendingDelete.id)
       if (error) throw error
       showToast('Removed')
+      // Local re-fetch keeps THIS panel snappy.
       if (pendingDelete.kind === 'workout') {
         await fetchWorkoutAssignments()
       } else {
         await fetchMealPlanAssignments()
+      }
+      // Propagate to every other reader — Today, ClientWorkoutView,
+      // ClientMealPlanView, last-seen pill on the Clients screen.
+      if (pendingDelete.kind === 'workout') {
+        await invalidateWorkouts({ coachId })
+      } else {
+        await invalidateMealPlans({ coachId })
       }
     } catch {
       showToast('Failed to remove', 'error')

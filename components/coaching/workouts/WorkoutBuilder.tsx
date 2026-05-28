@@ -8,7 +8,7 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Field, Input, Textarea } from '@/components/ui/Input'
 import { ExerciseNameInput } from '@/components/ui/ExerciseNameInput'
 import { Link2, Dumbbell, HeartPulse, ArrowUpFromLine, Plus, X } from 'lucide-react'
-import { ScheduleSection, type ScheduleMode } from './ScheduleSection'
+import { ScheduleSection, type ScheduleMode } from '../ScheduleSection'
 import { BuilderHeader } from '@/components/ui/BuilderHeader'
 import { BuilderSaveBar } from '@/components/ui/BuilderSaveBar'
 import { BuilderCard } from '@/components/ui/BuilderCard'
@@ -49,7 +49,7 @@ import {
   loadWorkoutExercises,
   saveWorkout,
   type DraftExercise,
-} from './workout/persistence'
+} from './persistence'
 const newDndKey = (): string =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()

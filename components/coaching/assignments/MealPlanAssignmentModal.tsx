@@ -2,13 +2,15 @@
 
 import { useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { Field, Textarea } from '@/components/ui/Input'
-import { DatePicker } from '@/components/ui/DatePicker'
 import { AssigneePicker } from '@/components/ui/AssigneePicker'
-import { Calendar } from 'lucide-react'
+import {
+  AssignmentSchedulingFields,
+  scheduleValue,
+} from './AssignmentSchedulingFields'
 
 interface MealPlanAssignmentModalProps {
   open: boolean
@@ -28,6 +30,7 @@ export default function MealPlanAssignmentModal({
   onClose,
 }: MealPlanAssignmentModalProps) {
   const supabase = useSupabase()
+  const { invalidateMealPlans } = useAssignmentSync()
   const [clientId, setClientId] = useState(preselectedClientId ?? '')
   const [showSchedule, setShowSchedule] = useState(false)
   const [startDate, setStartDate] = useState('')
@@ -60,8 +63,8 @@ export default function MealPlanAssignmentModal({
         meal_plan_id: mealPlanId,
         client_id: clientId,
         coach_id: coachId,
-        start_date: showSchedule && startDate ? startDate : null,
-        end_date: showSchedule && endDate ? endDate : null,
+        start_date: scheduleValue(showSchedule, startDate),
+        end_date: scheduleValue(showSchedule, endDate),
         notes,
       })
       if (error) {
@@ -72,6 +75,7 @@ export default function MealPlanAssignmentModal({
         }
         throw error
       }
+      await invalidateMealPlans({ coachId })
       showToast('Meal plan assigned successfully!')
       onClose()
     } catch {
@@ -95,53 +99,18 @@ export default function MealPlanAssignmentModal({
           preselectedClientId={preselectedClientId}
         />
 
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowSchedule(!showSchedule)}
-            className="flex items-center gap-2 text-sm text-muted hover:text-foreground cursor-pointer"
-          >
-            <Calendar size={14} />
-            {showSchedule ? 'Hide schedule' : 'Schedule (optional)'}
-          </button>
-          {!showSchedule && (
-            <p className="text-xs text-subtle mt-1 ml-6">
-              Active immediately, no end date. Meals appear on their tagged days of the week.
-            </p>
-          )}
-          {showSchedule && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Field id="mpa-start" label="Start" optional>
-                <DatePicker
-                  id="mpa-start"
-                  value={startDate}
-                  onChange={setStartDate}
-                  placeholder="Today"
-                  allowClear
-                />
-              </Field>
-              <Field id="mpa-end" label="End" optional>
-                <DatePicker
-                  id="mpa-end"
-                  value={endDate}
-                  onChange={setEndDate}
-                  placeholder="No end"
-                  allowClear
-                />
-              </Field>
-            </div>
-          )}
-        </div>
-
-        <Field id="mpa-notes" label="Notes" optional>
-          <Textarea
-            id="mpa-notes"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Any specific instructions..."
-            rows={3}
-          />
-        </Field>
+        <AssignmentSchedulingFields
+          idPrefix="mpa"
+          startDate={startDate}
+          endDate={endDate}
+          onStartChange={setStartDate}
+          onEndChange={setEndDate}
+          notes={notes}
+          onNotesChange={setNotes}
+          showSchedule={showSchedule}
+          onToggleSchedule={() => setShowSchedule(v => !v)}
+          collapsedHint="Active immediately, no end date. Meals appear on their tagged days of the week."
+        />
 
         <div className="flex gap-3 pt-2">
           <Button

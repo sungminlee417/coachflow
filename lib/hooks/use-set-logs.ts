@@ -214,6 +214,13 @@ export function useSaveSetLog() {
       // invalidate so they refetch on next mount or focus.
       qc.invalidateQueries({ queryKey: queryKeys.setLogs.lifetime(vars.clientId) })
       qc.invalidateQueries({ queryKey: queryKeys.setLogs.streak(vars.clientId) })
+      // Today dashboard queries (unfinished-workout banner, weekly
+      // summary, monthly recap) all share the `['today', ...]` prefix.
+      // Without this prefix invalidation, the banner happily kept
+      // claiming a workout was unfinished even after the trainee
+      // filled in the missing sets — the day-summary cache patches
+      // optimistically but the banner's query key didn't overlap.
+      qc.invalidateQueries({ queryKey: ['today'] })
     },
   })
 }

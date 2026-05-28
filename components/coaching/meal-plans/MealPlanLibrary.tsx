@@ -8,15 +8,15 @@ import { IconButton } from '@/components/ui/IconButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
-import { LibrarySearch } from '@/components/ui/LibrarySearch'
-import { LibrarySort, sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
+import { sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
+import { LibraryFilterableGrid } from '@/components/ui/LibraryFilterableGrid'
 import { Plus, Send, Pencil, Trash2, Apple, Copy } from 'lucide-react'
 import type { MealPlan } from '@/lib/types'
 import dynamic from 'next/dynamic'
 // Lazy-loaded — the builder is the heaviest screen in the app (~1400 LOC
 // + drag/drop) and is only mounted after the coach taps "Create / Edit".
 const MealPlanBuilder = dynamic(() => import('./MealPlanBuilder'), { ssr: false })
-import MealPlanAssignmentModal from './MealPlanAssignmentModal'
+import MealPlanAssignmentModal from '../assignments/MealPlanAssignmentModal'
 
 interface MealPlanLibraryProps {
   coachId: string
@@ -326,28 +326,17 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
           }
         />
       ) : (
-        <>
-          {plans.length > 4 && (
-            <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-              <LibrarySearch
-                value={query}
-                onChange={setQuery}
-                placeholder="Search meal plans…"
-              />
-              <LibrarySort
-                value={sortMode}
-                onChange={setSortMode}
-                className="sm:w-48"
-              />
-            </div>
-          )}
-          {visiblePlans.length === 0 ? (
-            <p className="text-sm text-muted italic py-6 text-center">
-              No meal plans match &ldquo;{query}&rdquo;.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visiblePlans.map(plan => (
+        <LibraryFilterableGrid
+          total={plans.length}
+          visibleCount={visiblePlans.length}
+          query={query}
+          onQueryChange={setQuery}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
+          searchPlaceholder="Search meal plans…"
+          emptyMatchLabel="meal plans"
+        >
+          {visiblePlans.map(plan => (
             <div
               key={plan.id}
               className="bg-surface rounded-xl border border-line p-5 transition-all hover:border-emerald-line hover:shadow-md hover:-translate-y-0.5"
@@ -393,9 +382,7 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
               </div>
             </div>
           ))}
-            </div>
-          )}
-        </>
+        </LibraryFilterableGrid>
       )}
     </div>
   )

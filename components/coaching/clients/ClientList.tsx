@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ClientGridSkeleton } from '@/components/ui/Skeleton'
-import { LibrarySearch } from '@/components/ui/LibrarySearch'
-import { LibrarySort, type LibrarySortMode } from '@/components/ui/LibrarySort'
+import { type LibrarySortMode } from '@/components/ui/LibrarySort'
+import { LibraryFilterableGrid } from '@/components/ui/LibraryFilterableGrid'
 import { UserPlus, ChevronRight, AlertTriangle } from 'lucide-react'
 import { formatDate, todayISO, daysBetween } from '@/lib/utils'
 import { useClients } from '@/lib/hooks/use-clients'
@@ -167,32 +167,21 @@ export default function ClientList({ coachId }: ClientListProps) {
           }
         />
       ) : (
-        <>
-          {clients.length > 4 && (
-            <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-              <LibrarySearch
-                value={query}
-                onChange={setQuery}
-                placeholder="Search clients by name or email…"
-              />
-              <LibrarySort
-                value={sortMode}
-                onChange={setSortMode}
-                // Templates aren't a concept for a relationship list.
-                options={[
-                  { value: 'recent', label: 'Most recent' },
-                  { value: 'alpha', label: 'A → Z' },
-                ]}
-                className="sm:w-48"
-              />
-            </div>
-          )}
-          {visibleClients.length === 0 ? (
-            <p className="text-sm text-muted italic py-6 text-center">
-              No clients match &ldquo;{query}&rdquo;.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <LibraryFilterableGrid
+          total={clients.length}
+          visibleCount={visibleClients.length}
+          query={query}
+          onQueryChange={setQuery}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
+          searchPlaceholder="Search clients by name or email…"
+          emptyMatchLabel="clients"
+          // Templates aren't a concept for a relationship list.
+          sortOptions={[
+            { value: 'recent', label: 'Most recent' },
+            { value: 'alpha', label: 'A → Z' },
+          ]}
+        >
               {visibleClients.map(client => {
                 const seen = describeLastSeen(client.last_active_date)
                 return (
@@ -232,9 +221,7 @@ export default function ClientList({ coachId }: ClientListProps) {
                   </button>
                 )
               })}
-            </div>
-          )}
-        </>
+        </LibraryFilterableGrid>
       )}
     </div>
   )

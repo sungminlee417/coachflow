@@ -6,8 +6,8 @@ import {
   useIngredientCatalog,
   type IngredientCatalogEntry,
 } from '@/lib/hooks/use-ingredient-catalog'
-import { MealCard, type MealCardActions } from './meal-plan/MealCard'
-import { loadMealPlanMeals, saveMealPlan } from './meal-plan/persistence'
+import { MealCard, type MealCardActions } from './MealCard'
+import { loadMealPlanMeals, saveMealPlan } from './persistence'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { Field, Input, Textarea } from '@/components/ui/Input'

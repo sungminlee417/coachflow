@@ -3,71 +3,30 @@
 import { useState, useEffect } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { User } from '@supabase/supabase-js'
-import { Users, Dumbbell, ClipboardList, History, ListChecks, LogOut, Apple, Utensils, Ruler, Menu, X, Home, Settings as SettingsIcon } from 'lucide-react'
+import { Dumbbell, LogOut, X, Settings as SettingsIcon } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { RestTimerProvider } from '@/components/ui/RestTimer'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { clearPersistedQueryCache } from '@/lib/query-client'
 import { ProfileThemeSync } from '@/lib/theme'
-import ClientList from '@/components/coaching/ClientList'
-import WorkoutLibrary from '@/components/coaching/WorkoutLibrary'
-import ProgramLibrary from '@/components/coaching/ProgramLibrary'
-import MealPlanLibrary from '@/components/coaching/MealPlanLibrary'
-import ClientWorkoutView from '@/components/training/ClientWorkoutView'
-import ClientMealPlanView from '@/components/training/ClientMealPlanView'
-import WorkoutHistory from '@/components/training/WorkoutHistory'
-import BodyTracker from '@/components/training/BodyTracker'
+import ClientList from '@/components/coaching/clients/ClientList'
+import WorkoutLibrary from '@/components/coaching/workouts/WorkoutLibrary'
+import ProgramLibrary from '@/components/coaching/programs/ProgramLibrary'
+import MealPlanLibrary from '@/components/coaching/meal-plans/MealPlanLibrary'
+import ClientWorkoutView from '@/components/training/workouts/ClientWorkoutView'
+import ClientMealPlanView from '@/components/training/meals/ClientMealPlanView'
+import WorkoutHistory from '@/components/training/history/WorkoutHistory'
+import BodyTracker from '@/components/training/measurements/BodyTracker'
 import TodayDashboard, {
   type TodayNavOptions,
   type TodayNavTarget,
 } from '@/components/training/TodayDashboard'
 import SettingsView from '@/components/dashboard/SettingsView'
 import type { Profile } from '@/lib/types'
-
-type Tab = 'today' | 'my-clients' | 'my-workouts' | 'my-programs' | 'my-meal-plans' | 'assigned-workouts' | 'assigned-meals' | 'measurements' | 'history' | 'settings'
-// `home` is its own section so the Today hub renders above the coaching /
-// training groups in the nav, without an "everything else" section header.
-type Section = 'home' | 'coaching' | 'training'
-
-interface TabDef {
-  key: Tab
-  label: string
-  icon: React.ReactNode
-  section: Section
-}
-
-const TABS: TabDef[] = [
-  { key: 'today', label: 'Today', icon: <Home size={16} />, section: 'home' },
-  { key: 'my-clients', label: 'My Clients', icon: <Users size={16} />, section: 'coaching' },
-  { key: 'my-workouts', label: 'My Workouts', icon: <Dumbbell size={16} />, section: 'coaching' },
-  { key: 'my-programs', label: 'My Programs', icon: <ListChecks size={16} />, section: 'coaching' },
-  { key: 'my-meal-plans', label: 'My Meal Plans', icon: <Apple size={16} />, section: 'coaching' },
-  { key: 'assigned-workouts', label: 'Assigned Workouts', icon: <ClipboardList size={16} />, section: 'training' },
-  { key: 'assigned-meals', label: 'Assigned Meals', icon: <Utensils size={16} />, section: 'training' },
-  { key: 'measurements', label: 'Measurements', icon: <Ruler size={16} />, section: 'training' },
-  { key: 'history', label: 'Progress', icon: <History size={16} />, section: 'training' },
-]
-
-const sectionTone: Record<Section, { active: string; activeIcon: string; mobileActive: string }> = {
-  home: {
-    // Slate keeps Today visually neutral — it's the hub, not a side of
-    // the coach/trainee duality, so it doesn't borrow either color.
-    active: 'bg-elevated text-foreground',
-    activeIcon: 'text-foreground',
-    mobileActive: 'bg-elevated text-foreground',
-  },
-  coaching: {
-    active: 'bg-indigo-soft text-indigo-fg',
-    activeIcon: 'text-indigo-fg',
-    mobileActive: 'bg-indigo-soft text-indigo-fg',
-  },
-  training: {
-    active: 'bg-emerald-soft text-emerald-fg',
-    activeIcon: 'text-emerald-fg',
-    mobileActive: 'bg-emerald-soft text-emerald-fg',
-  },
-}
+import { type Tab, TABS } from './tabs'
+import { NavSectionList } from './NavSectionList'
+import { MobileBottomNav } from './MobileBottomNav'
 
 interface UnifiedDashboardProps {
   user: User
@@ -78,14 +37,6 @@ interface UnifiedDashboardProps {
 // back here. Bookmark `/app` and it's the same experience as a fresh
 // sign-in.
 const DEFAULT_TAB: Tab = 'today'
-
-// TABS partitioned once at module load — both sidebar nav (desktop) and
-// the drawer (mobile) render these on every state change, and filter-on-
-// render produces a fresh array reference each time which would defeat
-// child memoization down the line.
-const HOME_TABS = TABS.filter(t => t.section === 'home')
-const COACHING_TABS = TABS.filter(t => t.section === 'coaching')
-const TRAINING_TABS = TABS.filter(t => t.section === 'training')
 
 export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProps) {
   const supabase = useSupabase()
@@ -178,30 +129,15 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
     window.location.href = '/login'
   }
 
-  const renderNavButton = (tab: TabDef) => {
-    const isActive = activeTab === tab.key
-    const tone = sectionTone[tab.section]
-    return (
-      <button
-        key={tab.key}
-        onClick={() => {
-          setActiveTab(tab.key)
-          setMobileMenuOpen(false)
-        }}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
- isActive ? tone.active : 'text-muted hover:bg-elevated hover:text-foreground '
- }`}
-      >
-        <span className={isActive ? tone.activeIcon : 'text-subtle'}>{tab.icon}</span>
-        {tab.label}
-      </button>
-    )
+  // Single nav handler shared by the desktop sidebar nav, mobile drawer
+  // nav, and mobile bottom bar. Always closes the drawer so tapping any
+  // destination dismisses it.
+  const handleSelectTab = (tab: Tab) => {
+    setActiveTab(tab)
+    setMobileMenuOpen(false)
   }
 
   const activeTabLabel = TABS.find(t => t.key === activeTab)?.label ?? ''
-
-  const coachingTabs = COACHING_TABS
-  const trainingTabs = TRAINING_TABS
 
   return (
     <RestTimerProvider userId={user.id}>
@@ -220,23 +156,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
             <span className="text-lg font-bold text-foreground tracking-tight">CoachFlow</span>
           </div>
 
-          <nav className="flex-1 px-3 py-6 space-y-6 overflow-y-auto">
-            <div className="space-y-1">
-              {HOME_TABS.map(t => renderNavButton(t))}
-            </div>
-            <div>
-              <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-subtle mb-2">
-                Coaching
-              </p>
-              <div className="space-y-1">{coachingTabs.map(t => renderNavButton(t))}</div>
-            </div>
-            <div>
-              <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-subtle mb-2">
-                Training
-              </p>
-              <div className="space-y-1">{trainingTabs.map(t => renderNavButton(t))}</div>
-            </div>
-          </nav>
+          <NavSectionList activeTab={activeTab} onSelect={handleSelectTab} />
 
           <div className="border-t border-line-subtle p-4 flex items-center gap-3">
             <Avatar name={profile.full_name} size="sm" />
@@ -245,10 +165,7 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
               <p className="text-xs text-muted truncate">{profile.email}</p>
             </div>
             <IconButton
-              onClick={() => {
-                setActiveTab('settings')
-                setMobileMenuOpen(false)
-              }}
+              onClick={() => handleSelectTab('settings')}
               aria-label="Settings"
             >
               <SettingsIcon size={16} />
@@ -306,51 +223,11 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
                 </IconButton>
               </div>
 
-              <nav className="flex-1 px-3 py-6 space-y-6 overflow-y-auto">
-                <div className="space-y-1">
-                  {HOME_TABS.map(t => renderNavButton(t))}
-                </div>
-                <div>
-                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-subtle mb-2">
-                    Coaching
-                  </p>
-                  <div className="space-y-1">{coachingTabs.map(t => renderNavButton(t))}</div>
-                </div>
-                <div>
-                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-subtle mb-2">
-                    Training
-                  </p>
-                  <div className="space-y-1">{trainingTabs.map(t => renderNavButton(t))}</div>
-                </div>
-                <div>
-                  <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-subtle mb-2">
-                    Account
-                  </p>
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('settings')
-                        setMobileMenuOpen(false)
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                        activeTab === 'settings'
-                          ? 'bg-elevated text-foreground'
-                          : 'text-muted hover:bg-elevated hover:text-foreground'
-                      }`}
-                    >
-                      <span
-                        className={
-                          activeTab === 'settings' ? 'text-foreground' : 'text-subtle'
-                        }
-                      >
-                        <SettingsIcon size={16} />
-                      </span>
-                      Settings
-                    </button>
-                  </div>
-                </div>
-              </nav>
+              <NavSectionList
+                activeTab={activeTab}
+                onSelect={handleSelectTab}
+                includeSettings
+              />
 
               <div className="border-t border-line-subtle p-4 flex items-center gap-3">
                 <Avatar name={profile.full_name} size="sm" />
@@ -456,63 +333,11 @@ export default function UnifiedDashboard({ user, profile }: UnifiedDashboardProp
           </div>
         </main>
 
-        {/* Mobile bottom tab bar — primary nav on phones. The drawer (via the
-            "More" tab) holds coaching tabs + history. Hidden on desktop where
-            the sidebar already covers everything. */}
-        <nav
-          className="md:hidden fixed left-0 right-0 bottom-0 z-30 bg-surface border-t border-line grid grid-cols-4"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-          aria-label="Primary"
-        >
-          {(
-            [
-              { key: 'today' as Tab, label: 'Today', icon: <Home size={20} /> },
-              { key: 'assigned-workouts' as Tab, label: 'Workouts', icon: <ClipboardList size={20} /> },
-              { key: 'assigned-meals' as Tab, label: 'Meals', icon: <Utensils size={20} /> },
-            ]
-          ).map(item => {
-            const isActive = activeTab === item.key
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setActiveTab(item.key)}
-                aria-current={isActive ? 'page' : undefined}
-                className={`h-14 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
- isActive ? 'text-emerald-fg ' : 'text-muted hover:text-foreground '
- }`}
-              >
-                {item.icon}
-                <span className="text-[10px] font-medium">{item.label}</span>
-              </button>
-            )
-          })}
-          {(() => {
-            // "More" is active when activeTab isn't one of the three primary
-            // mobile destinations above. Body/measurements lives in the
-            // drawer now (Today displaces it from the bottom bar), so
-            // Measurements lights up More too.
-            const moreActive = !(
-              activeTab === 'today' ||
-              activeTab === 'assigned-workouts' ||
-              activeTab === 'assigned-meals'
-            )
-            return (
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-current={moreActive ? 'page' : undefined}
-                aria-haspopup="menu"
-                className={`h-14 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
- moreActive ? 'text-indigo-fg ' : 'text-muted hover:text-foreground '
- }`}
-              >
-                <Menu size={20} />
-                <span className="text-[10px] font-medium">More</span>
-              </button>
-            )
-          })()}
-        </nav>
+        <MobileBottomNav
+          activeTab={activeTab}
+          onSelectTab={handleSelectTab}
+          onOpenDrawer={() => setMobileMenuOpen(true)}
+        />
       </div>
     </div>
     </RestTimerProvider>

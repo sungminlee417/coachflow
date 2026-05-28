@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef } from 'react'
+import dynamic from 'next/dynamic'
 // Re-exports for the mobile bottom-nav so the file can register the
 // "Today" icon without importing from this implementation file.
 import { ClipboardList, Ruler, Utensils } from 'lucide-react'
@@ -24,9 +25,20 @@ import { WeightCard } from './today/WeightCard'
 import { StreakCard } from './today/StreakCard'
 import { BodyMeasurementCard } from './today/BodyMeasurementCard'
 import { CoachSection } from './today/CoachSection'
-import { WeeklySummaryCard } from './today/WeeklySummaryCard'
 import { UnfinishedWorkoutBanner } from './today/UnfinishedWorkoutBanner'
-import { MonthlyRecapCard } from './today/MonthlyRecapCard'
+
+// Secondary cards lazy-loaded — they only matter once the trainee
+// scrolls past the active workout/meal cards, and the monthly recap is
+// only rendered during the first week of a month. Splitting them keeps
+// the Today initial JS chunk a touch leaner.
+const WeeklySummaryCard = dynamic(
+  () => import('./today/WeeklySummaryCard').then(m => m.WeeklySummaryCard),
+  { ssr: false }
+)
+const MonthlyRecapCard = dynamic(
+  () => import('./today/MonthlyRecapCard').then(m => m.MonthlyRecapCard),
+  { ssr: false }
+)
 
 interface TodayDashboardProps {
   user: { id: string; full_name?: string | null }

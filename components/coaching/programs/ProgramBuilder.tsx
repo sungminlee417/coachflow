@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -36,6 +37,7 @@ interface MemberWorkout {
 
 export default function ProgramBuilder({ coachId, program, onClose }: ProgramBuilderProps) {
   const supabase = useSupabase()
+  const { invalidateWorkouts } = useAssignmentSync()
   const [name, setName] = useState(program?.name || '')
   const [description, setDescription] = useState(program?.description || '')
   const [isTemplate, setIsTemplate] = useState(program?.is_template || false)
@@ -226,6 +228,10 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
         }
       }
 
+      // Trainees who already had this program receive the new workouts;
+      // refresh their assignment caches + Today dashboards so the fan-out
+      // shows up without a reload.
+      await invalidateWorkouts({ coachId })
       showToast(program?.id ? 'Program updated' : 'Program created')
       onClose()
     } catch {

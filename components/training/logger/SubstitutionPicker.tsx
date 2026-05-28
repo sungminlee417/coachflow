@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 
 interface SubstitutionPickerProps {
   assignmentId: string
@@ -35,6 +36,7 @@ export function SubstitutionPicker({
   onChange,
 }: SubstitutionPickerProps) {
   const supabase = useSupabase()
+  const { invalidateWorkouts } = useAssignmentSync()
   const [busy, setBusy] = useState(false)
 
   if (alternatives.length === 0 && !current) return null
@@ -67,6 +69,11 @@ export function SubstitutionPicker({
           )
         if (error) throw error
       }
+      // The Today WorkoutCard reads the substituted name off the
+      // assignment query (it's folded in via `fetchActiveWorkoutAssignments`).
+      // Without this invalidation, a swap made inside ClientWorkoutView
+      // wouldn't reflect on Today until the next focus refetch.
+      await invalidateWorkouts()
     } catch {
       onChange(previous)
       showToast('Failed to save swap', 'error')

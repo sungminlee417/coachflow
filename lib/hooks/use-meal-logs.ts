@@ -86,5 +86,11 @@ export function useToggleMealLog({ clientId, date }: UseMealLogsArgs) {
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev)
     },
+    onSuccess: () => {
+      // Today dashboard queries (weekly summary counts meals) live
+      // under the `['today', ...]` prefix; invalidate so they pick up
+      // the toggle without waiting for a window-focus refetch.
+      qc.invalidateQueries({ queryKey: ['today'] })
+    },
   })
 }

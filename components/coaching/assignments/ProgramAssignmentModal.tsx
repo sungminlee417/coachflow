@@ -1,17 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { Field, Textarea } from '@/components/ui/Input'
+import { Field } from '@/components/ui/Input'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { AssigneePicker } from '@/components/ui/AssigneePicker'
-import { Calendar, ListChecks, Users } from 'lucide-react'
+import { ListChecks, Users } from 'lucide-react'
 import { todayISO } from '@/lib/utils'
-import { queryKeys } from '@/lib/query-keys'
+import {
+  AssignmentSchedulingFields,
+  scheduleValue,
+} from './AssignmentSchedulingFields'
 
 interface ProgramAssignmentModalProps {
   open: boolean
@@ -48,7 +51,7 @@ export default function ProgramAssignmentModal({
   onClose,
 }: ProgramAssignmentModalProps) {
   const supabase = useSupabase()
-  const qc = useQueryClient()
+  const { invalidateWorkouts } = useAssignmentSync()
   const [clientId, setClientId] = useState(preselectedClientId ?? '')
   const [showSchedule, setShowSchedule] = useState(false)
   const [startDate, setStartDate] = useState('')
@@ -169,8 +172,8 @@ export default function ProgramAssignmentModal({
     }
     setAssigning(true)
     try {
-      const startVal = showSchedule && startDate ? startDate : null
-      const endVal = showSchedule && endDate ? endDate : null
+      const startVal = scheduleValue(showSchedule, startDate)
+      const endVal = scheduleValue(showSchedule, endDate)
       const anchorFallback = hasCycleMember ? cycleAnchor || todayISO() : null
 
       const workoutRows = targetIds.flatMap(targetId =>
@@ -220,15 +223,7 @@ export default function ProgramAssignmentModal({
         // Tracking row is non-essential for the assign itself.
       }
 
-      // Refresh every cache that depends on these new assignments. The
-      // trainee's Today/ClientWorkoutView re-derives off workoutAssignments;
-      // the coach's ClientDetailView re-derives off the same key. Without
-      // an invalidation here, an open ClientDetailView would keep showing
-      // the pre-assign list until the user navigated away and back.
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: queryKeys.workoutAssignments.all() }),
-        qc.invalidateQueries({ queryKey: queryKeys.clients.forCoach(coachId) }),
-      ])
+      await invalidateWorkouts({ coachId })
 
       const peopleLabel =
         targetIds.length === 1 ? '1 person' : `${targetIds.length} people`
@@ -390,68 +385,34 @@ export default function ProgramAssignmentModal({
           />
         )}
 
-        {hasCycleMember && (
-          <Field id="pa-anchor" label="Day 1 of any rotations in this program">
-            <DatePicker
-              id="pa-anchor"
-              value={cycleAnchor}
-              onChange={setCycleAnchor}
-              placeholder="Today"
-              allowClear
-            />
-            <p className="text-[11px] text-muted mt-1">
-              Cycle workouts in this program will use this anchor. Defaults to today.
-            </p>
-          </Field>
-        )}
-
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowSchedule(!showSchedule)}
-            className="flex items-center gap-2 text-sm text-muted hover:text-foreground cursor-pointer"
-          >
-            <Calendar size={14} />
-            {showSchedule ? 'Hide schedule' : 'Schedule (optional)'}
-          </button>
-          {!showSchedule && (
-            <p className="text-xs text-subtle mt-1 ml-6">
-              Active immediately, no end date. Each workout uses its own days/cycle.
-            </p>
-          )}
-          {showSchedule && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Field id="pa-start" label="Start" optional>
+        <AssignmentSchedulingFields
+          idPrefix="pa"
+          startDate={startDate}
+          endDate={endDate}
+          onStartChange={setStartDate}
+          onEndChange={setEndDate}
+          notes={notes}
+          onNotesChange={setNotes}
+          showSchedule={showSchedule}
+          onToggleSchedule={() => setShowSchedule(v => !v)}
+          collapsedHint="Active immediately, no end date. Each workout uses its own days/cycle."
+          extraAboveNotes={
+            hasCycleMember && (
+              <Field id="pa-anchor" label="Day 1 of any rotations in this program">
                 <DatePicker
-                  id="pa-start"
-                  value={startDate}
-                  onChange={setStartDate}
+                  id="pa-anchor"
+                  value={cycleAnchor}
+                  onChange={setCycleAnchor}
                   placeholder="Today"
                   allowClear
                 />
+                <p className="text-[11px] text-muted mt-1">
+                  Cycle workouts in this program will use this anchor. Defaults to today.
+                </p>
               </Field>
-              <Field id="pa-end" label="End" optional>
-                <DatePicker
-                  id="pa-end"
-                  value={endDate}
-                  onChange={setEndDate}
-                  placeholder="No end"
-                  allowClear
-                />
-              </Field>
-            </div>
-          )}
-        </div>
-
-        <Field id="pa-notes" label="Notes" optional>
-          <Textarea
-            id="pa-notes"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Any specific instructions..."
-            rows={3}
-          />
-        </Field>
+            )
+          }
+        />
 
         <div className="flex gap-3 pt-2">
           <Button

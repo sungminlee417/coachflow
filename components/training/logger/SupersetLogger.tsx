@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { Check, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
+import { Check, ChevronUp } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
 import {
   useSaveSetLog,
@@ -16,12 +16,17 @@ import { useRestTimer } from '@/components/ui/RestTimer'
 import {
   buildPrescribedSets,
   fetchPriorPerformanceBatch,
-  formatPriorHint,
-  getRepRangeFeedback,
-  isImprovement,
   type PriorPerformance,
 } from '@/lib/training'
+import { PreSetHint, PostSetHint } from '@/components/training/logger/SetHints'
 import type { Exercise } from '@/lib/types'
+
+// Module-level stable references so the per-row PostSetHint doesn't see
+// a fresh `{}` / `() => {}` on every render. Supersets don't have a
+// per-set collapse affordance (collapse is per-round), so these are
+// inert placeholders for the shared component's required props.
+const EMPTY_SET: Set<number> = new Set()
+const noopCollapse = () => {}
 
 interface SupersetLoggerProps {
   /** Trainee whose set_logs we read/write — passed to the save mutation
@@ -651,25 +656,6 @@ export function SupersetLogger({
                     : null
                   : row.target_reps || null
                 const prev = loaded ? priorByKey.get(priorKey(ex.id, setNumber)) : undefined
-                const priorText = prev ? formatPriorHint(prev, isCardio) : null
-                const improved = prev ? isImprovement(row, prev, isCardio) : false
-                // Pre-set weight suggestion based on last session's
-                // reps-vs-target outcome. Strength only — cardio has no
-                // load to adjust here.
-                let preSuggestion: { direction: 'up' | 'down'; weight: number } | null = null
-                if (!isCardio && prev) {
-                  const fb = getRepRangeFeedback(
-                    row.target_reps,
-                    prev.reps_performed,
-                    prev.weight_performed
-                  )
-                  if (fb && fb.state !== 'on-target' && prev.weight_performed != null) {
-                    const w = prev.weight_performed + fb.delta
-                    if (w > 0) {
-                      preSuggestion = { direction: fb.delta > 0 ? 'up' : 'down', weight: w }
-                    }
-                  }
-                }
                 return (
                   <div
                     key={`${ex.id}-${setNumber}`}
@@ -677,32 +663,13 @@ export function SupersetLogger({
                       row.completed ? 'bg-emerald-wash' : ''
                     }`}
                   >
-                    {(priorText || preSuggestion) && (
-                      <div className="flex items-center gap-2 text-[10px] mb-1.5 flex-wrap">
-                        {priorText && (
-                          <span className="text-subtle tabular-nums">
-                            Last:{' '}
-                            <span className="font-medium text-muted">{priorText}</span>
-                          </span>
-                        )}
-                        {preSuggestion && (
-                          <span
-                            className={`inline-flex items-center gap-1 font-medium border rounded-full px-2 py-0.5 tabular-nums ${
- preSuggestion.direction === 'up'
- ? 'text-indigo-fg bg-indigo-soft border-indigo-line '
- : 'text-amber-fg bg-amber-soft border-amber-line '
- }`}
-                          >
-                            {preSuggestion.direction === 'up' ? (
-                              <ArrowUp size={11} />
-                            ) : (
-                              <ArrowDown size={11} />
-                            )}
-                            Try {preSuggestion.weight}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    <PreSetHint
+                      row={row}
+                      prior={prev}
+                      loaded={loaded}
+                      isCardio={isCardio}
+                      className="flex items-center gap-2 text-[10px] mb-1.5 flex-wrap"
+                    />
                     <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
                       {/* min-w-0 on the inner cluster + min-w-0 on the name
                           itself lets `truncate` actually kick in — without it,
@@ -864,13 +831,18 @@ export function SupersetLogger({
                         )}
                       </div>
                     )}
-                    {improved && (
-                      <div className="flex items-center justify-end gap-2 text-[10px]">
-                        <span className="inline-flex items-center gap-0.5 text-emerald-fg bg-emerald-soft border border-emerald-line rounded-full px-1.5 py-px font-semibold tabular-nums">
-                          ↑ Beat last
-                        </span>
-                      </div>
-                    )}
+                    <PostSetHint
+                      row={row}
+                      prior={prev}
+                      loaded={loaded}
+                      isCardio={isCardio}
+                      // Supersets collapse by round, not by individual
+                      // set — the shared collapse affordance is unused
+                      // here, so we pass an always-empty set + no-op.
+                      manuallyExpanded={EMPTY_SET}
+                      onCollapse={noopCollapse}
+                      className="flex items-center justify-end gap-2 text-[10px]"
+                    />
                   </div>
                 )
               })}

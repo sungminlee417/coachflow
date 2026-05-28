@@ -19,10 +19,9 @@ import {
   mealDisplayName,
   numberMealsForDay,
 } from '@/lib/utils'
-import { useQueryClient } from '@tanstack/react-query'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { useMealLogs } from '@/lib/hooks/use-meal-logs'
 import { useMealPlanAssignments } from '@/lib/hooks/use-assignments'
-import { queryKeys } from '@/lib/query-keys'
 import type { MealPlanAssignment } from '@/lib/types'
 
 interface ClientMealPlanViewProps {
@@ -34,7 +33,7 @@ const EMPTY_MP_ASSIGNMENTS: MealPlanAssignment[] = []
 
 export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps) {
   const supabase = useSupabase()
-  const qc = useQueryClient()
+  const { invalidateMealPlans } = useAssignmentSync()
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const assignmentsQuery = useMealPlanAssignments(clientId, selectedDate)
   const assignments = assignmentsQuery.data ?? EMPTY_MP_ASSIGNMENTS
@@ -69,18 +68,16 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
         .eq('id', pendingUnassign.id)
       if (error) throw error
       showToast('Meal plan removed')
-      await fetchAssignments()
+      // Same shape as the workout unassign — invalidate every day so the
+      // Today MealsCard reflects the change even when the user removed
+      // a plan from a different selectedDate.
+      await invalidateMealPlans()
     } catch {
       showToast('Failed to remove meal plan', 'error')
     } finally {
       setPendingUnassign(null)
     }
   }
-
-  const fetchAssignments = () =>
-    qc.invalidateQueries({
-      queryKey: queryKeys.mealPlanAssignments.forDay(clientId, selectedDate),
-    })
 
   // Reset the banner-dismiss state whenever the user navigates to a new date —
   // a fresh day deserves a fresh nudge.

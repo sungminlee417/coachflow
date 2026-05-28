@@ -8,15 +8,15 @@ import { IconButton } from '@/components/ui/IconButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
-import { LibrarySearch } from '@/components/ui/LibrarySearch'
-import { LibrarySort, sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
+import { sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
+import { LibraryFilterableGrid } from '@/components/ui/LibraryFilterableGrid'
 import { Plus, Send, Pencil, Trash2, ListChecks, Copy } from 'lucide-react'
 import type { WorkoutProgram } from '@/lib/types'
 import dynamic from 'next/dynamic'
 // Lazy-loaded — only mounted after the coach taps "Create / Edit", so
 // keeping it out of the dashboard's initial JS chunk is a free win.
 const ProgramBuilder = dynamic(() => import('./ProgramBuilder'), { ssr: false })
-import ProgramAssignmentModal from './ProgramAssignmentModal'
+import ProgramAssignmentModal from '../assignments/ProgramAssignmentModal'
 
 interface ProgramLibraryProps {
   coachId: string
@@ -240,28 +240,17 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
           }
         />
       ) : (
-        <>
-          {programs.length > 4 && (
-            <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-              <LibrarySearch
-                value={query}
-                onChange={setQuery}
-                placeholder="Search programs…"
-              />
-              <LibrarySort
-                value={sortMode}
-                onChange={setSortMode}
-                className="sm:w-48"
-              />
-            </div>
-          )}
-          {visiblePrograms.length === 0 ? (
-            <p className="text-sm text-muted italic py-6 text-center">
-              No programs match &ldquo;{query}&rdquo;.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visiblePrograms.map(p => (
+        <LibraryFilterableGrid
+          total={programs.length}
+          visibleCount={visiblePrograms.length}
+          query={query}
+          onQueryChange={setQuery}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
+          searchPlaceholder="Search programs…"
+          emptyMatchLabel="programs"
+        >
+          {visiblePrograms.map(p => (
             <div
               key={p.id}
               className="bg-surface rounded-xl border border-line p-5 transition-all hover:border-indigo-line hover:shadow-md hover:-translate-y-0.5"
@@ -310,9 +299,7 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
               </div>
             </div>
           ))}
-            </div>
-          )}
-        </>
+        </LibraryFilterableGrid>
       )}
     </div>
   )
