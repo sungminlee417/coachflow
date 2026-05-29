@@ -6,7 +6,7 @@ import { showToast } from '@/components/ui/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Button } from '@/components/ui/Button'
-import { Field, Textarea } from '@/components/ui/Input'
+import { Field, Input, Textarea } from '@/components/ui/Input'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { UnsavedBadge } from '@/components/ui/UnsavedBadge'
 import { FractionInput } from './FractionInput'
@@ -43,6 +43,7 @@ const emptyMeasurement = (): BodyMeasurement => ({
   arm_left_flexed: false,
   arm_right: null,
   arm_right_flexed: false,
+  body_fat_percent: null,
   notes: null,
 })
 
@@ -128,9 +129,47 @@ export default function MeasurementForm({
           />
         </Field>
 
+        <Field id="m-bfp" label="Body fat %" optional>
+          <div className="relative">
+            <Input
+              id="m-bfp"
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              max="100"
+              value={data.body_fat_percent ?? ''}
+              onChange={e => {
+                const raw = e.target.value
+                if (raw === '') return update('body_fat_percent', null)
+                const parsed = parseFloat(raw)
+                // Bounds check at the input layer — bad data never
+                // reaches the cache / network. Outside-range values fall
+                // through as null so the field reads "empty" instead of
+                // pinning to 100.
+                if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+                  return update('body_fat_percent', null)
+                }
+                update('body_fat_percent', parsed)
+              }}
+              placeholder="e.g. 18.5"
+              className="pr-10 tabular-nums"
+            />
+            <span
+              aria-hidden
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-subtle"
+            >
+              %
+            </span>
+          </div>
+          <p className="text-[10px] text-subtle mt-1">
+            From DEXA, calipers, or a smart scale — any source is fine.
+          </p>
+        </Field>
+
         <p className="text-[10px] text-subtle">
-          All measurements are <span className="font-semibold text-muted">circumference</span>
-          {' '}in <span className="font-semibold text-muted">{lengthUnit}</span>
+          Circumference measurements below are in{' '}
+          <span className="font-semibold text-muted">{lengthUnit}</span>
           {lengthUnit === 'in' ? ' — pick the whole inches and the fraction.' : '.'}
         </p>
 

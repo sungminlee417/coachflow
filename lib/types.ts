@@ -306,6 +306,10 @@ export interface BodyMeasurement {
   arm_left_flexed: boolean
   arm_right: number | null
   arm_right_flexed: boolean
+  // Optional standalone DEXA / caliper / smart-scale reading. Stored as
+  // a plain percent value (0–100, two decimals on the wire). Not unit-
+  // aware — lb vs. kg doesn't matter and there's no flexed/relaxed.
+  body_fat_percent: number | null
   notes: string | null
 }
 
