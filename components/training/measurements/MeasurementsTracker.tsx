@@ -95,13 +95,6 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
       entries.map(entry => {
         let filledCount = 0
         const previewParts: string[] = []
-        // BF% gets first preference in the preview line because it's
-        // the single most-watched body-comp number; circumference
-        // entries follow until we hit the 3-chip cap.
-        if (entry.body_fat_percent != null) {
-          filledCount += 1
-          previewParts.push(`BF ${roundMacro(entry.body_fat_percent)}%`)
-        }
         for (const f of FIELDS) {
           const v = entry[f.key]
           if (v == null) continue
@@ -214,40 +207,6 @@ export default function MeasurementsTracker({ userId, lengthUnit }: Measurements
               )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-              {/* Body-fat % rendered first so it leads the eye when both
-                  BF% and circumference numbers are present. Card uses
-                  the same chrome as the FIELDS cells (label / value /
-                  delta) but with a "%" suffix instead of a length unit. */}
-              {latest.body_fat_percent != null && (() => {
-                const value = latest.body_fat_percent
-                const prevValue = previous?.body_fat_percent ?? null
-                const delta =
-                  prevValue != null ? deltaIndicator(value, prevValue) : null
-                return (
-                  <div
-                    key="body_fat_percent"
-                    className="bg-surface rounded-lg border border-line px-3 py-2.5 min-w-0"
-                  >
-                    <p className="text-[11px] text-muted truncate">Body fat</p>
-                    <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-baseline">
-                      <p className="text-lg sm:text-xl font-semibold text-foreground tabular-nums whitespace-nowrap min-w-0 truncate">
-                        {roundMacro(value)}
-                        <span className="text-[10px] sm:text-xs font-normal text-subtle ml-1">
-                          %
-                        </span>
-                      </p>
-                      {delta && (
-                        <span
-                          className={`inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums shrink-0 ${delta.color}`}
-                        >
-                          <delta.icon size={11} />
-                          {delta.text}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })()}
               {FIELDS.map(({ key, label, flexedKey }) => {
                 const value = latest[key] as number | null
                 if (value == null) return null

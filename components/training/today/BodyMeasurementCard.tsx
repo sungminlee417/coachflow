@@ -2,7 +2,7 @@
 
 import { Ruler } from 'lucide-react'
 import { useBodyMeasurements } from '@/lib/hooks/use-body-measurements'
-import { daysBetween, formatDate, roundMacro, todayISO } from '@/lib/utils'
+import { daysBetween, formatDate, todayISO } from '@/lib/utils'
 import { Card, CardSkeletonBody } from './primitives'
 
 // Compact "when did I last measure" card — measurements are weekly-ish,
@@ -42,17 +42,9 @@ export function BodyMeasurementCard({
         </p>
       ) : (
         <div className="flex items-baseline justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground truncate">
-              {/* If the latest entry includes a BF% reading, lead with
-                  it — it's the single most-watched body-comp number, so
-                  putting it ahead of the generic "Last measured" copy
-                  saves the trainee a tap to confirm the value. */}
-              {latest.body_fat_percent != null
-                ? `Body fat ${roundMacro(latest.body_fat_percent)}%`
-                : 'Last measured'}
-            </p>
-          </div>
+          <p className="font-semibold text-foreground">
+            Last measured
+          </p>
           <p className="text-xs text-muted shrink-0">
             {daysSince === 0
               ? 'Today'

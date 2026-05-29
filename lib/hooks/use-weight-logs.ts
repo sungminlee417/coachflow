@@ -31,6 +31,11 @@ export function useWeightLogs(userId: string) {
 interface LogArgs {
   recorded_at: string
   weight: number
+  /** Optional BF% tag-along. `undefined` means "don't touch the column"
+   *  on upsert (preserves a prior value when the user only updates the
+   *  weight); `null` would actively clear it — callers pass either as
+   *  needed. */
+  body_fat_percent?: number | null
 }
 
 export function useLogWeight(userId: string) {
@@ -39,22 +44,40 @@ export function useLogWeight(userId: string) {
   const key = queryKeys.weightLogs.list(userId)
   return useMutation({
     mutationKey: ['weight_logs.log', userId],
-    mutationFn: async ({ recorded_at, weight }: LogArgs) => {
+    mutationFn: async ({ recorded_at, weight, body_fat_percent }: LogArgs) => {
+      const payload: Record<string, unknown> = {
+        user_id: userId,
+        recorded_at,
+        weight,
+      }
+      // Only include BF% in the payload when the caller actually
+      // supplied one. Omitting the field on upsert leaves any existing
+      // value alone, which is what the Today quick-logger wants when
+      // the user just updates their weight for a day they already
+      // tagged a BF% on.
+      if (body_fat_percent !== undefined) {
+        payload.body_fat_percent = body_fat_percent
+      }
       const { data, error } = await supabase
         .from('weight_logs')
-        .upsert(
-          { user_id: userId, recorded_at, weight },
-          { onConflict: 'user_id,recorded_at' }
-        )
+        .upsert(payload, { onConflict: 'user_id,recorded_at' })
         .select()
         .single()
       if (error) throw error
       return data as WeightLog
     },
-    onMutate: async ({ recorded_at, weight }) => {
+    onMutate: async ({ recorded_at, weight, body_fat_percent }) => {
       await qc.cancelQueries({ queryKey: key })
       const prev = qc.getQueryData<WeightLog[]>(key)
       // Optimistic: replace any entry for the same date, then prepend.
+      // When BF% wasn't supplied, carry the existing entry's value
+      // forward so the optimistic row matches what the server will
+      // return after the no-op-on-that-column upsert.
+      const existingForDate = (prev ?? []).find(l => l.recorded_at === recorded_at)
+      const optimisticBfp =
+        body_fat_percent === undefined
+          ? existingForDate?.body_fat_percent ?? null
+          : body_fat_percent
       qc.setQueryData<WeightLog[]>(key, current => {
         const list = (current ?? []).filter(l => l.recorded_at !== recorded_at)
         const optimistic: WeightLog = {
@@ -63,6 +86,7 @@ export function useLogWeight(userId: string) {
           user_id: userId,
           recorded_at,
           weight,
+          body_fat_percent: optimisticBfp,
           notes: null,
         }
         return [optimistic, ...list].slice(0, RECENT_LIMIT)

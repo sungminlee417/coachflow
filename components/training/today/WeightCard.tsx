@@ -35,6 +35,11 @@ export function WeightCard({
     !(allLogs.length === 0 && (weightQuery.isFetching || weightQuery.isStale))
   const logWeight = useLogWeight(userId)
   const [draft, setDraft] = useState('')
+  // Inline BF% on the Today card stays opt-in via a disclosure — most
+  // weigh-ins are just the number on the scale, and tossing an extra
+  // input into the row pushes the primary control off a phone width.
+  const [showBfp, setShowBfp] = useState(false)
+  const [bfpDraft, setBfpDraft] = useState('')
   const saving = logWeight.isPending
 
   const today = todayISO()
@@ -58,12 +63,26 @@ export function WeightCard({
       showToast('Enter a valid weight', 'error')
       return
     }
+    // BF% is optional and only submitted when the disclosure is open AND
+    // the field has a real number. Out-of-band values block the submit
+    // entirely so a fat-finger doesn't silently get stored.
+    let bfp: number | null | undefined = undefined
+    if (showBfp && bfpDraft !== '') {
+      const parsed = parseFloat(bfpDraft)
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+        showToast('Body fat % must be between 0 and 100', 'error')
+        return
+      }
+      bfp = parsed
+    }
     logWeight.mutate(
-      { recorded_at: today, weight },
+      { recorded_at: today, weight, body_fat_percent: bfp },
       {
         onSuccess: () => {
           showToast('Weight logged')
           setDraft('')
+          setBfpDraft('')
+          setShowBfp(false)
         },
         onError: () => showToast('Failed to log weight', 'error'),
       }
@@ -108,6 +127,13 @@ export function WeightCard({
                         : formatDate(latest.recorded_at)}
                 </p>
               )}
+              {/* BF% chip when the latest weigh-in has one — purple to
+                  match the body-comp tone used elsewhere. */}
+              {latest?.body_fat_percent != null && (
+                <span className="text-[10px] font-semibold tabular-nums text-purple-fg bg-purple-soft border border-purple-line rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                  {roundMacro(latest.body_fat_percent)}% BF
+                </span>
+              )}
               {goalDiff != null && (
                 <span
                   className={`text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5 border whitespace-nowrap ${
@@ -130,31 +156,54 @@ export function WeightCard({
                 e.preventDefault()
                 handleLog()
               }}
-              className="grid grid-cols-[1fr_auto] gap-2"
+              className="space-y-2"
             >
-              {/* `text-base` keeps mobile keyboards from auto-zooming
-                  the viewport (iOS triggers zoom when an input's
-                  computed font-size is < 16px). `py-2.5` puts the touch
-                  target around iOS's 44pt minimum. `min-w-0` prevents
-                  the input from overflowing the half-width column when
-                  the placeholder is long ("Weight (lbs)" + value). */}
-              <Input
-                type="number"
-                inputMode="decimal"
-                step="any"
-                min="0"
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                placeholder={`Weight (${weightUnit})`}
-                className="text-base py-2.5 min-w-0"
-              />
-              <Button
-                type="submit"
-                loading={saving}
-                disabled={!draft}
-              >
-                {saving ? 'Saving…' : 'Log'}
-              </Button>
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                {/* `text-base` keeps mobile keyboards from auto-zooming
+                    the viewport (iOS triggers zoom when an input's
+                    computed font-size is < 16px). `py-2.5` puts the
+                    touch target around iOS's 44pt minimum. `min-w-0`
+                    prevents the input from overflowing the half-width
+                    column when the placeholder is long. */}
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  placeholder={`Weight (${weightUnit})`}
+                  className="text-base py-2.5 min-w-0"
+                />
+                <Button
+                  type="submit"
+                  loading={saving}
+                  disabled={!draft}
+                >
+                  {saving ? 'Saving…' : 'Log'}
+                </Button>
+              </div>
+              {showBfp ? (
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={bfpDraft}
+                  onChange={e => setBfpDraft(e.target.value)}
+                  placeholder="Body fat % (e.g. 18.5)"
+                  className="text-base py-2.5 min-w-0"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowBfp(true)}
+                  className="text-[11px] font-medium text-purple-fg hover:text-purple-fg-strong cursor-pointer"
+                >
+                  + Add body fat %
+                </button>
+              )}
             </form>
           )}
         </div>

@@ -82,6 +82,10 @@ export default function WeightTracker({
   const supabase = useSupabase()
   const [newDate, setNewDate] = useState(todayISO())
   const [newWeight, setNewWeight] = useState('')
+  // BF% lives on the same row as weight so a single submission can
+  // capture both. Empty string = "don't update" (carries the prior
+  // value forward on the upsert); a number is sent through.
+  const [newBfp, setNewBfp] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showShare, setShowShare] = useState(false)
   // Local mirror so the dashed line moves immediately when the user
@@ -103,11 +107,24 @@ export default function WeightTracker({
       showToast('Enter a valid weight', 'error')
       return
     }
+    // BF% is optional. Anything outside the 0–100 band is rejected at
+    // the input layer so the upsert never sees garbage; an empty field
+    // is sent as `undefined` so an existing reading isn't clobbered.
+    let bfp: number | null | undefined = undefined
+    if (newBfp !== '') {
+      const parsed = parseFloat(newBfp)
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+        showToast('Body fat % must be between 0 and 100', 'error')
+        return
+      }
+      bfp = parsed
+    }
     logWeight.mutate(
-      { recorded_at: newDate, weight },
+      { recorded_at: newDate, weight, body_fat_percent: bfp },
       {
         onSuccess: () => {
           setNewWeight('')
+          setNewBfp('')
           setNewDate(todayISO())
           showToast('Weight logged')
         },
@@ -404,8 +421,10 @@ export default function WeightTracker({
           )}
         </div>
 
-        {/* Quick log form */}
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+        {/* Quick log form. Three equal columns on tablet+: date, weight,
+            BF%; submit button sits in its own auto-width column on the
+            right. On mobile each input stacks full-width. */}
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
           <div>
             <label htmlFor="wt-date" className="block text-[10px] text-muted mb-1 uppercase tracking-wide">
               Date
@@ -424,6 +443,26 @@ export default function WeightTracker({
               value={newWeight}
               onChange={e => setNewWeight(e.target.value)}
               placeholder={`0 ${weightUnit}`}
+              className="text-sm"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="wt-bfp"
+              className="block text-[10px] text-muted mb-1 uppercase tracking-wide"
+            >
+              Body fat % <span className="text-faint normal-case">· optional</span>
+            </label>
+            <Input
+              id="wt-bfp"
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              max="100"
+              value={newBfp}
+              onChange={e => setNewBfp(e.target.value)}
+              placeholder="e.g. 18.5"
               className="text-sm"
             />
           </div>
@@ -470,6 +509,11 @@ export default function WeightTracker({
                       {roundMacro(log.weight)}{' '}
                       <span className="text-xs text-subtle font-normal">{weightUnit}</span>
                     </span>
+                    {log.body_fat_percent != null && (
+                      <span className="text-[10px] font-semibold tabular-nums text-purple-fg bg-purple-soft rounded-full px-1.5 py-0.5 shrink-0">
+                        {roundMacro(log.body_fat_percent)}% BF
+                      </span>
+                    )}
                     {d && (
                       <span className={`flex items-center gap-0.5 text-xs shrink-0 ${d.color}`}>
                         <d.Icon size={11} />
