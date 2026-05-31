@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase cli — link metadata + cached versions. `pooler-url` in
+# particular includes the database connection string with the password
+# embedded, so this directory MUST stay out of version control.
+supabase/.temp/
