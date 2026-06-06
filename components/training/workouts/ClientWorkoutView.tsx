@@ -167,6 +167,45 @@ export default function ClientWorkoutView({
       next.add(collapseKey)
       return next
     })
+    // Anchor the next exercise to the top of the viewport once the
+    // just-completed card has finished collapsing. Without this, the
+    // page height shrinks underneath the user and they're left looking
+    // at whatever happened to scroll into view by accident — usually
+    // the middle of the *previous* exercise's neighbour. We wait for a
+    // double rAF so React has committed the collapsed state AND the
+    // browser has reflowed before the scroll target is measured.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // Build the ordered list of all collapse keys for the visible
+        // day so we can find the "next" sibling regardless of which
+        // assignment it lives in.
+        const allKeys: string[] = []
+        for (const a of assignments) {
+          const groups = groupsByAssignment.get(a.id) ?? []
+          groups.forEach((g, gi) => {
+            allKeys.push(
+              g.exercises.length === 1
+                ? `${a.id}::solo::${g.exercises[0].id ?? g.startIndex}`
+                : `${a.id}::group::${gi}`
+            )
+          })
+        }
+        const idx = allKeys.indexOf(collapseKey)
+        if (idx < 0 || idx >= allKeys.length - 1) return
+        const nextKey = allKeys[idx + 1]
+        // CSS.escape isn't quite right for attribute values, but the
+        // collapse-key alphabet is `[a-zA-Z0-9-_:]` (UUIDs + `::` +
+        // letters), so a literal attribute selector is safe.
+        const el = document.querySelector(
+          `[data-collapse-key="${nextKey}"]`
+        ) as HTMLElement | null
+        if (!el) return
+        // `block: 'start'` + the `scroll-margin-top` on each card (set
+        // in the className below) lands the next exercise's header
+        // just under the sticky workout name bar.
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    })
   }
 
   const handleUnassign = async () => {
@@ -394,6 +433,12 @@ export default function ClientWorkoutView({
                         return (
                           <div
                             key={exercise.id ?? group.startIndex}
+                            data-collapse-key={soloKey}
+                            // `scroll-margin-top` covers the sticky
+                            // workout-name bar (h-14 = 56px) plus a hair
+                            // of breathing room when `scrollIntoView`
+                            // anchors this card after auto-collapse.
+                            style={{ scrollMarginTop: '4.5rem' }}
                             className={`rounded-lg ${
  isCardio
  ? 'bg-amber-wash border border-amber-line '
@@ -508,6 +553,11 @@ export default function ClientWorkoutView({
                       return (
                         <div
                           key={`group-${gi}`}
+                          data-collapse-key={groupKey}
+                          // Mirror the solo card's scroll anchor margin
+                          // so the sticky workout name bar doesn't
+                          // clip the superset header on auto-scroll.
+                          style={{ scrollMarginTop: '4.5rem' }}
                           className="rounded-xl border-2 border-indigo-300 bg-indigo-wash overflow-hidden"
                         >
                           <button
