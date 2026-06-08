@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import {
   useIngredientCatalog,
   type IngredientCatalogEntry,
@@ -139,6 +140,7 @@ const emptyFoodAlternative = (orderIndex: number): FoodAlternative => ({
 
 export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlanBuilderProps) {
   const supabase = useSupabase()
+  const { invalidateMealPlans } = useAssignmentSync()
   // Powers the type-ahead suggestions in each IngredientRow's name
   // field. One fetch per builder mount (TanStack dedupes across rows).
   const ingredientCatalog = useIngredientCatalog(coachId)
@@ -533,6 +535,11 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
         isTemplate,
         meals,
       })
+      // Push the edit out to every trainee viewing this plan. The
+      // trainee's `useMealPlanAssignments` query embeds the full meal
+      // plan payload, so name / meal / food changes only show up on
+      // the trainee side after that cache is invalidated.
+      await invalidateMealPlans({ coachId })
       onClose()
     } catch {
       showToast('Failed to save meal plan', 'error')

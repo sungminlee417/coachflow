@@ -434,12 +434,16 @@ export default function ClientWorkoutView({
                           <div
                             key={exercise.id ?? group.startIndex}
                             data-collapse-key={soloKey}
-                            // `scroll-margin-top` covers the sticky
-                            // workout-name bar (h-14 = 56px) plus a hair
-                            // of breathing room when `scrollIntoView`
-                            // anchors this card after auto-collapse.
-                            style={{ scrollMarginTop: '4.5rem' }}
-                            className={`rounded-lg ${
+                            // `scroll-mt-*` covers BOTH sticky chrome
+                            // layers when `scrollIntoView` anchors this
+                            // card after auto-collapse: mobile has the
+                            // 56px fixed top nav + the sticky workout-
+                            // name bar (~60px) underneath; desktop has
+                            // just the workout-name bar. The earlier
+                            // 4.5rem inline value was tuned for desktop
+                            // only and left the card's header clipped
+                            // behind the top bar on phones.
+                            className={`rounded-lg scroll-mt-32 md:scroll-mt-20 ${
  isCardio
  ? 'bg-amber-wash border border-amber-line '
  : 'bg-elevated '
@@ -476,7 +480,7 @@ export default function ClientWorkoutView({
                                     >
                                       <span className="text-indigo-500">↺</span>
                                       <span className="text-indigo-500">from</span>
-                                      <span className="font-semibold truncate max-w-[10rem]">
+                                      <span className="font-semibold truncate max-w-40">
                                         {exercise.name}
                                       </span>
                                     </span>
@@ -555,10 +559,10 @@ export default function ClientWorkoutView({
                           key={`group-${gi}`}
                           data-collapse-key={groupKey}
                           // Mirror the solo card's scroll anchor margin
-                          // so the sticky workout name bar doesn't
+                          // so the sticky workout name bar (plus the
+                          // mobile top nav above it on phones) doesn't
                           // clip the superset header on auto-scroll.
-                          style={{ scrollMarginTop: '4.5rem' }}
-                          className="rounded-xl border-2 border-indigo-300 bg-indigo-wash overflow-hidden"
+                          className="rounded-xl border-2 border-indigo-300 bg-indigo-wash overflow-hidden scroll-mt-32 md:scroll-mt-20"
                         >
                           <button
                             type="button"

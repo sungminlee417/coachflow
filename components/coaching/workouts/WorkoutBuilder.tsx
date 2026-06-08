@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -102,6 +103,7 @@ const emptySet = (setNumber: number, copyFrom?: ExerciseSet): ExerciseSet => ({
 
 export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBuilderProps) {
   const supabase = useSupabase()
+  const { invalidateWorkouts } = useAssignmentSync()
   const [name, setName] = useState(workout?.name || '')
   const [description, setDescription] = useState(workout?.description || '')
   const [isTemplate, setIsTemplate] = useState(workout?.is_template || false)
@@ -433,6 +435,11 @@ export default function WorkoutBuilder({ coachId, workout, onClose }: WorkoutBui
         daysOfWeek,
         exercises,
       })
+      // Push the edit out to every trainee viewing this workout. The
+      // trainee's `useWorkoutAssignments` query embeds the full workout
+      // payload, so name / exercise / set changes are only visible
+      // after that cache is invalidated.
+      await invalidateWorkouts({ coachId })
       onClose()
     } catch {
       showToast('Failed to save workout', 'error')
