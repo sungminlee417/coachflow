@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -25,6 +26,7 @@ interface WorkoutLibraryProps {
 
 export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
   const supabase = useSupabase()
+  const { invalidateWorkouts } = useAssignmentSync()
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [loading, setLoading] = useState(true)
   const [showBuilder, setShowBuilder] = useState(false)
@@ -75,7 +77,11 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
     try {
       const { error } = await supabase.from('workouts').delete().eq('id', deletingId)
       if (error) throw error
-      await fetchWorkouts()
+      // ON DELETE CASCADE wipes workout_assignments + exercises + sets
+      // for this workout. Refresh every cache that referenced them so
+      // any open ClientWorkoutView / Today dashboard doesn't try to
+      // render a ghost assignment.
+      await Promise.all([fetchWorkouts(), invalidateWorkouts({ coachId })])
       showToast('Workout deleted')
     } catch {
       showToast('Failed to delete workout', 'error')

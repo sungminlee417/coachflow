@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
+import { useUpdateProfile } from '@/lib/hooks/use-profile'
 import type { Profile, LengthUnit, WeightUnit } from '@/lib/types'
 
 interface UnitToggleProps {
@@ -11,8 +11,13 @@ interface UnitToggleProps {
 }
 
 export function UnitToggle({ profile, onUpdate }: UnitToggleProps) {
-  const supabase = useSupabase()
   const [saving, setSaving] = useState(false)
+  // Routing through the mutation hook also patches the `['profile', id]`
+  // TanStack cache, so anything reading via `useProfile` (e.g. the
+  // cardio pace label in ExerciseSetLogger that converts mph→pace
+  // differently for lbs vs kg) re-renders immediately on unit change.
+  // The raw `.update()` we used before left those readers stale.
+  const updateProfile = useUpdateProfile(profile.id)
 
   const lengthUnit: LengthUnit = profile.length_unit ?? 'in'
   const weightUnit: WeightUnit = profile.weight_unit ?? 'lbs'
@@ -21,8 +26,7 @@ export function UnitToggle({ profile, onUpdate }: UnitToggleProps) {
     onUpdate(patch)
     setSaving(true)
     try {
-      const { error } = await supabase.from('profiles').update(patch).eq('id', profile.id)
-      if (error) throw error
+      await updateProfile.mutateAsync(patch)
     } catch {
       showToast('Failed to save unit preference', 'error')
     } finally {

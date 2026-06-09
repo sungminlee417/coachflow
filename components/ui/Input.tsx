@@ -4,8 +4,12 @@ import { InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, forw
 // the same string works in both themes because `bg-surface`, `text-foreground`,
 // `border-line`, `placeholder:text-subtle`, and `disabled:bg-elevated`
 // each resolve to the correct shade via the cascading CSS variables.
+// `read-only:*` styles let callers pass `readOnly` to communicate that a
+// value is locked but still present (e.g. a completed set in the logger):
+// dim background, no caret, no-pointer cursor — same shape as `disabled`
+// without the harsh gray tint.
 const fieldBase =
-  'w-full px-3 py-2.5 bg-surface text-foreground border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-subtle disabled:bg-elevated disabled:cursor-not-allowed'
+  'w-full px-3 py-2.5 bg-surface text-foreground border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-subtle disabled:bg-elevated disabled:cursor-not-allowed read-only:bg-elevated read-only:cursor-not-allowed read-only:focus:ring-0 read-only:focus:border-line'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className = '', ...props }, ref) {

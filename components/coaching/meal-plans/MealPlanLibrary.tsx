@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
+import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -24,6 +25,7 @@ interface MealPlanLibraryProps {
 
 export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
   const supabase = useSupabase()
+  const { invalidateMealPlans } = useAssignmentSync()
   const [plans, setPlans] = useState<MealPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [showBuilder, setShowBuilder] = useState(false)
@@ -72,7 +74,10 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
     try {
       const { error } = await supabase.from('meal_plans').delete().eq('id', deletingId)
       if (error) throw error
-      await fetchPlans()
+      // ON DELETE CASCADE wipes meal_plan_assignments + meals + foods +
+      // ingredients. Refresh every trainee-facing cache that held the
+      // plan's payload.
+      await Promise.all([fetchPlans(), invalidateMealPlans({ coachId })])
       showToast('Meal plan deleted')
     } catch {
       showToast('Failed to delete meal plan', 'error')

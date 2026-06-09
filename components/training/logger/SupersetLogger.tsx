@@ -716,6 +716,10 @@ export function SupersetLogger({
                         {loaded ? (
                           <Input
                             value={row.duration_input}
+                            // Match the solo ExerciseSetLogger: completed
+                            // rows lock against accidental overwrites.
+                            // Toggle the check off to edit again.
+                            readOnly={row.completed}
                             onChange={e =>
                               updateRow(ex.id!, setNumber, { duration_input: e.target.value })
                             }
@@ -759,6 +763,10 @@ export function SupersetLogger({
                             step="any"
                             min="0"
                             value={row.weight_performed}
+                            // Lock checked rows so an accidental tap
+                            // can't silently overwrite a logged value
+                            // and re-persist on blur.
+                            readOnly={row.completed}
                             onChange={e =>
                               updateRow(ex.id!, setNumber, { weight_performed: e.target.value })
                             }
@@ -791,6 +799,7 @@ export function SupersetLogger({
                             step="any"
                             min="0"
                             value={row.reps_performed}
+                            readOnly={row.completed}
                             onChange={e =>
                               updateRow(ex.id!, setNumber, { reps_performed: e.target.value })
                             }

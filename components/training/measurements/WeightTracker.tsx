@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
-import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -16,6 +15,7 @@ import {
   useLogWeight,
   useWeightLogs,
 } from '@/lib/hooks/use-weight-logs'
+import { useUpdateProfile } from '@/lib/hooks/use-profile'
 import { WeightShareDialog } from './WeightShareDialog'
 import type { WeightUnit } from '@/lib/types'
 
@@ -79,7 +79,13 @@ export default function WeightTracker({
   const logs = weightQuery.data ?? []
   const logWeight = useLogWeight(userId)
   const deleteWeight = useDeleteWeightLog(userId)
-  const supabase = useSupabase()
+  // Profile edits (weight_goal, weight_program_start_date) used to fire
+  // raw supabase `.update()`s, which left the `['profile', userId]`
+  // TanStack cache stale — any other component reading the profile
+  // through `useProfile` (pace label in the logger, e.g.) wouldn't see
+  // the change until a hard reload. Routing through the mutation hook
+  // optimistically patches the cache so every subscriber re-renders.
+  const updateProfile = useUpdateProfile(userId)
   const [newDate, setNewDate] = useState(todayISO())
   const [newWeight, setNewWeight] = useState('')
   // BF% lives on the same row as weight so a single submission can
@@ -241,16 +247,14 @@ export default function WeightTracker({
                   type="button"
                   onClick={async () => {
                     setSavingGoal(true)
-                    const { error } = await supabase
-                      .from('profiles')
-                      .update({ weight_goal: null })
-                      .eq('id', userId)
-                    setSavingGoal(false)
-                    if (error) {
-                      showToast('Failed to clear goal', 'error')
-                    } else {
+                    try {
+                      await updateProfile.mutateAsync({ weight_goal: null })
                       setGoal(null)
                       showToast('Goal cleared')
+                    } catch {
+                      showToast('Failed to clear goal', 'error')
+                    } finally {
+                      setSavingGoal(false)
                     }
                   }}
                   disabled={savingGoal}
@@ -270,14 +274,13 @@ export default function WeightTracker({
                   return
                 }
                 setSavingGoal(true)
-                const { error } = await supabase
-                  .from('profiles')
-                  .update({ weight_goal: next })
-                  .eq('id', userId)
-                setSavingGoal(false)
-                if (error) {
+                try {
+                  await updateProfile.mutateAsync({ weight_goal: next })
+                } catch {
                   showToast('Failed to save goal', 'error')
                   return
+                } finally {
+                  setSavingGoal(false)
                 }
                 setGoal(next)
                 setEditingGoal(false)
@@ -353,16 +356,16 @@ export default function WeightTracker({
                   type="button"
                   onClick={async () => {
                     setSavingProgram(true)
-                    const { error } = await supabase
-                      .from('profiles')
-                      .update({ weight_program_start_date: null })
-                      .eq('id', userId)
-                    setSavingProgram(false)
-                    if (error) {
-                      showToast('Failed to clear program start', 'error')
-                    } else {
+                    try {
+                      await updateProfile.mutateAsync({
+                        weight_program_start_date: null,
+                      })
                       setProgram(null)
                       showToast('Program start cleared')
+                    } catch {
+                      showToast('Failed to clear program start', 'error')
+                    } finally {
+                      setSavingProgram(false)
                     }
                   }}
                   disabled={savingProgram}
@@ -388,14 +391,15 @@ export default function WeightTracker({
                   return
                 }
                 setSavingProgram(true)
-                const { error } = await supabase
-                  .from('profiles')
-                  .update({ weight_program_start_date: programDraft })
-                  .eq('id', userId)
-                setSavingProgram(false)
-                if (error) {
+                try {
+                  await updateProfile.mutateAsync({
+                    weight_program_start_date: programDraft,
+                  })
+                } catch {
                   showToast('Failed to save program start', 'error')
                   return
+                } finally {
+                  setSavingProgram(false)
                 }
                 setProgram(programDraft)
                 setEditingProgram(false)

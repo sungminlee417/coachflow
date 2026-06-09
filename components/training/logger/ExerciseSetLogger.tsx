@@ -602,6 +602,7 @@ export function ExerciseSetLogger({
                     {loaded ? (
                       <Input
                         value={row.duration_input}
+                        readOnly={row.completed}
                         onChange={e => updateRow(row.set_number, { duration_input: e.target.value })}
                         onBlur={() => commitDuration(row.set_number)}
                         onKeyDown={e => {
@@ -645,6 +646,7 @@ export function ExerciseSetLogger({
                             min="0"
                             inputMode="decimal"
                             value={row.speed_performed}
+                            readOnly={row.completed}
                             onChange={e =>
                               updateRow(row.set_number, { speed_performed: e.target.value })
                             }
@@ -677,6 +679,7 @@ export function ExerciseSetLogger({
                             min="0"
                             inputMode="decimal"
                             value={row.incline_performed}
+                            readOnly={row.completed}
                             onChange={e =>
                               updateRow(row.set_number, { incline_performed: e.target.value })
                             }
@@ -698,6 +701,7 @@ export function ExerciseSetLogger({
                             min="0"
                             inputMode="decimal"
                             value={row.resistance_performed}
+                            readOnly={row.completed}
                             onChange={e =>
                               updateRow(row.set_number, { resistance_performed: e.target.value })
                             }
@@ -787,6 +791,14 @@ export function ExerciseSetLogger({
                       min="0"
                       inputMode="decimal"
                       value={row.weight_performed}
+                      // Completed sets are locked — once the user
+                      // checked the row off, accidental taps on the
+                      // weight/reps inputs (especially on phones)
+                      // shouldn't be able to clobber the logged value
+                      // and silently re-persist on blur. They have to
+                      // uncheck the row first, which is an explicit
+                      // intent signal.
+                      readOnly={row.completed}
                       onChange={e => updateRow(row.set_number, { weight_performed: e.target.value })}
                       onBlur={() => {
                         // Only persist on blur when the row is already
@@ -823,6 +835,7 @@ export function ExerciseSetLogger({
                       min="0"
                       inputMode="decimal"
                       value={row.reps_performed}
+                      readOnly={row.completed}
                       onChange={e => updateRow(row.set_number, { reps_performed: e.target.value })}
                       onBlur={() => {
                         const current = rows.find(r => r.set_number === row.set_number)
