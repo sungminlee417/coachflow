@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { Check, ArrowUp, ArrowDown } from 'lucide-react'
+import { Check, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react'
 import { formatDuration, formatPace, parseDuration } from '@/lib/utils'
 import { useProfile } from '@/lib/hooks/use-profile'
 import { useQuery } from '@tanstack/react-query'
@@ -473,6 +473,71 @@ export function ExerciseSetLogger({
       <div className="h-6 w-6 bg-line/70 rounded-md animate-pulse shrink-0" />
     )
 
+  // Reset the current row's inputs back to last session's actuals.
+  // Same fields the prior-prefill effect uses (weight + reps for
+  // strength, duration for cardio); leaves the cardio machine actuals
+  // (speed / incline / resistance) alone since those aren't prefilled.
+  const revertToPrior = (setNumber: number) => {
+    const prior = priorBySet.get(setNumber)
+    if (!prior) return
+    updateRow(setNumber, {
+      weight_performed:
+        prior.weight_performed != null ? String(prior.weight_performed) : '',
+      reps_performed:
+        prior.reps_performed != null ? String(prior.reps_performed) : '',
+      duration_performed_seconds: prior.duration_performed_seconds,
+      duration_input:
+        prior.duration_performed_seconds != null
+          ? formatDuration(prior.duration_performed_seconds)
+          : '',
+    })
+  }
+
+  // Compact "revert to last session" affordance shown only when there's
+  // something to revert TO and the current input values actually differ
+  // — otherwise the button would be a no-op visual clutter. Hidden on
+  // completed rows (inputs are locked there anyway; if the user does
+  // want to roll back a completed set they uncheck → revert → re-check).
+  const renderRevert = (row: RowState) => {
+    if (!loaded || row.completed) return null
+    const prior = priorBySet.get(row.set_number)
+    if (!prior) return null
+    const priorWeight =
+      prior.weight_performed != null ? String(prior.weight_performed) : ''
+    const priorReps =
+      prior.reps_performed != null ? String(prior.reps_performed) : ''
+    const priorDuration =
+      prior.duration_performed_seconds != null
+        ? formatDuration(prior.duration_performed_seconds)
+        : ''
+    const differs = isCardio
+      ? row.duration_input !== priorDuration
+      : row.weight_performed !== priorWeight || row.reps_performed !== priorReps
+    if (!differs) return null
+    return (
+      <button
+        type="button"
+        onClick={() => revertToPrior(row.set_number)}
+        aria-label="Revert to last session's values"
+        title="Revert to last session"
+        className="h-6 w-6 rounded-md border border-line text-subtle hover:text-foreground hover:border-subtle hover:bg-elevated flex items-center justify-center transition-colors cursor-pointer shrink-0"
+      >
+        <RotateCcw size={12} />
+      </button>
+    )
+  }
+
+  // Action cluster rendered to the right of each row's inputs: optional
+  // revert button + the green check. `gap-2` (8px) keeps them from
+  // crowding each other, and the wrapper is `shrink-0` so the inputs
+  // never push the controls off-screen on narrow phones.
+  const renderActions = (row: RowState) => (
+    <div className="flex items-center gap-2 shrink-0">
+      {renderRevert(row)}
+      {renderDone(row)}
+    </div>
+  )
+
   // True when a row should render as the auto-collapsed one-liner. Forced
   // expansion (after a tap) wins over completed-state.
   const isAutoCollapsed = (row: RowState) =>
@@ -533,8 +598,10 @@ export function ExerciseSetLogger({
         <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-subtle px-3 py-2 bg-amber-wash border-b border-amber-line">
           <div className="col-span-1 text-center">{rows.length > 1 ? '#' : ''}</div>
           <div className="col-span-4">Target</div>
-          <div className="col-span-6">Time</div>
-          <div className="col-span-1 text-center">Done</div>
+          {/* Trimmed by 1 col to give the actions cluster (revert +
+              done) a breathing-room 2-col landing pad on the right. */}
+          <div className="col-span-5">Time</div>
+          <div className="col-span-2 text-center">Done</div>
         </div>
         <div className="divide-y divide-line-subtle">
           {rows.map(row => {
@@ -582,7 +649,7 @@ export function ExerciseSetLogger({
                         <span className="text-subtle italic">—</span>
                       ) : null}
                     </span>
-                    {renderDone(row)}
+                    {renderActions(row)}
                   </div>
 
                   {/* Desktop-only set + target columns. */}
@@ -597,8 +664,10 @@ export function ExerciseSetLogger({
                     )}
                   </div>
 
-                  {/* Time input — full width on mobile, 6-col on desktop. */}
-                  <div className="sm:col-span-6">
+                  {/* Time input — full width on mobile, 5-col on
+                      desktop (was 6; trimmed to make room for the
+                      revert + done cluster). */}
+                  <div className="sm:col-span-5">
                     {loaded ? (
                       <Input
                         value={row.duration_input}
@@ -620,9 +689,11 @@ export function ExerciseSetLogger({
                     )}
                   </div>
 
-                  {/* Desktop-only done column. */}
-                  <div className="hidden sm:col-span-1 sm:flex sm:justify-center">
-                    {renderDone(row)}
+                  {/* Desktop-only done column. Span-2 (was span-1) so
+                      the revert button has comfortable room next to
+                      the green check. */}
+                  <div className="hidden sm:col-span-2 sm:flex sm:justify-center">
+                    {renderActions(row)}
                   </div>
                 </div>
 
@@ -741,8 +812,11 @@ export function ExerciseSetLogger({
         <div className="col-span-1 text-center">Set</div>
         <div className="col-span-2">Target</div>
         <div className="col-span-4">Weight</div>
-        <div className="col-span-4">Reps</div>
-        <div className="col-span-1 text-center">Done</div>
+        {/* Reps trimmed by 1 col (was 4) so the action cluster on the
+            right gets 2 cols instead of 1 — keeps the revert + done
+            buttons from feeling crammed against each other. */}
+        <div className="col-span-3">Reps</div>
+        <div className="col-span-2 text-center">Done</div>
       </div>
 
       <div className="divide-y divide-line-subtle">
@@ -768,7 +842,7 @@ export function ExerciseSetLogger({
                     <span className="font-normal text-muted"> · target {row.target_reps}</span>
                   )}
                 </span>
-                {renderDone(row)}
+                {renderActions(row)}
               </div>
 
               {/* Desktop columns 1–2. */}
@@ -827,7 +901,7 @@ export function ExerciseSetLogger({
                     <div className="h-8.5 w-full bg-line/70 rounded-lg animate-pulse" />
                   )}
                 </div>
-                <div className="sm:col-span-4">
+                <div className="sm:col-span-3">
                   {loaded ? (
                     <Input
                       type="number"
@@ -856,9 +930,11 @@ export function ExerciseSetLogger({
                 </div>
               </div>
 
-              {/* Desktop-only done column. */}
-              <div className="hidden sm:col-span-1 sm:flex sm:justify-center">
-                {renderDone(row)}
+              {/* Desktop-only done column. Span-2 (was span-1) so the
+                  revert button can sit beside the green check without
+                  feeling crammed. */}
+              <div className="hidden sm:col-span-2 sm:flex sm:justify-center">
+                {renderActions(row)}
               </div>
             </div>
             <PostSetHint

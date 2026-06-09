@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { Check, ChevronUp } from 'lucide-react'
+import { Check, ChevronUp, RotateCcw } from 'lucide-react'
 import { formatDuration, parseDuration } from '@/lib/utils'
 import {
   useSaveSetLog,
@@ -267,6 +267,26 @@ export function SupersetLogger({
         rows.map(r => (r.set_number === setNumber ? { ...r, ...patch } : r))
       )
       return next
+    })
+  }
+
+  // Reset this row's inputs back to last session's actuals — same
+  // fields the prior-prefill effect uses. SupersetLogger doesn't own
+  // the cardio-machine actuals (speed / incline / resistance) so those
+  // aren't touched.
+  const revertToPrior = (exerciseId: string, setNumber: number) => {
+    const prior = priorByKey.get(priorKey(exerciseId, setNumber))
+    if (!prior) return
+    updateRow(exerciseId, setNumber, {
+      weight_performed:
+        prior.weight_performed != null ? String(prior.weight_performed) : '',
+      reps_performed:
+        prior.reps_performed != null ? String(prior.reps_performed) : '',
+      duration_performed_seconds: prior.duration_performed_seconds,
+      duration_input:
+        prior.duration_performed_seconds != null
+          ? formatDuration(prior.duration_performed_seconds)
+          : '',
     })
   }
 
@@ -737,23 +757,48 @@ export function SupersetLogger({
                         ) : (
                           <div className="h-8.5 w-full bg-line/70 rounded-lg animate-pulse" />
                         )}
-                        {loaded ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleComplete(ex.id!, setNumber)}
-                            aria-label={row.completed ? 'Mark incomplete' : 'Mark complete'}
-                            aria-pressed={row.completed}
-                            className={`h-7 w-7 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
+                        {/* Action cluster: optional "revert to last
+                            session" button + the green check.
+                            `gap-2` keeps the two from crowding each
+                            other; the grid's `auto` column expands. */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {(() => {
+                            if (!loaded || row.completed || !prev) return null
+                            const priorDuration =
+                              prev.duration_performed_seconds != null
+                                ? formatDuration(prev.duration_performed_seconds)
+                                : ''
+                            if (row.duration_input === priorDuration) return null
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => revertToPrior(ex.id!, setNumber)}
+                                aria-label="Revert to last session's value"
+                                title="Revert to last session"
+                                className="h-7 w-7 rounded-md border border-line text-subtle hover:text-foreground hover:border-subtle hover:bg-elevated flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <RotateCcw size={12} />
+                              </button>
+                            )
+                          })()}
+                          {loaded ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleComplete(ex.id!, setNumber)}
+                              aria-label={row.completed ? 'Mark incomplete' : 'Mark complete'}
+                              aria-pressed={row.completed}
+                              className={`h-7 w-7 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
  row.completed
  ? 'bg-emerald-500 border-emerald-500 text-white'
  : 'border-line text-transparent hover:border-subtle'
  }`}
-                          >
-                            <Check size={14} />
-                          </button>
-                        ) : (
-                          <div className="h-7 w-7 bg-line/70 rounded-md animate-pulse" />
-                        )}
+                            >
+                              <Check size={14} />
+                            </button>
+                          ) : (
+                            <div className="h-7 w-7 bg-line/70 rounded-md animate-pulse" />
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center mb-1">
@@ -821,23 +866,57 @@ export function SupersetLogger({
                         ) : (
                           <div className="h-8.5 w-full bg-line/70 rounded-lg animate-pulse" />
                         )}
-                        {loaded ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleComplete(ex.id!, setNumber)}
-                            aria-label={row.completed ? 'Mark set incomplete' : 'Mark set complete'}
-                            aria-pressed={row.completed}
-                            className={`h-7 w-7 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
+                        {/* Action cluster — see the cardio branch
+                            above for the rationale. `gap-2` between
+                            revert and check keeps the controls from
+                            feeling tight against each other. */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {(() => {
+                            if (!loaded || row.completed || !prev) return null
+                            const priorWeight =
+                              prev.weight_performed != null
+                                ? String(prev.weight_performed)
+                                : ''
+                            const priorReps =
+                              prev.reps_performed != null
+                                ? String(prev.reps_performed)
+                                : ''
+                            if (
+                              row.weight_performed === priorWeight &&
+                              row.reps_performed === priorReps
+                            ) {
+                              return null
+                            }
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => revertToPrior(ex.id!, setNumber)}
+                                aria-label="Revert to last session's values"
+                                title="Revert to last session"
+                                className="h-7 w-7 rounded-md border border-line text-subtle hover:text-foreground hover:border-subtle hover:bg-elevated flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <RotateCcw size={12} />
+                              </button>
+                            )
+                          })()}
+                          {loaded ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleComplete(ex.id!, setNumber)}
+                              aria-label={row.completed ? 'Mark set incomplete' : 'Mark set complete'}
+                              aria-pressed={row.completed}
+                              className={`h-7 w-7 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
  row.completed
  ? 'bg-emerald-500 border-emerald-500 text-white'
  : 'border-line text-transparent hover:border-subtle'
  }`}
-                          >
-                            <Check size={14} />
-                          </button>
-                        ) : (
-                          <div className="h-7 w-7 bg-line/70 rounded-md animate-pulse" />
-                        )}
+                            >
+                              <Check size={14} />
+                            </button>
+                          ) : (
+                            <div className="h-7 w-7 bg-line/70 rounded-md animate-pulse" />
+                          )}
+                        </div>
                       </div>
                     )}
                     <PostSetHint
