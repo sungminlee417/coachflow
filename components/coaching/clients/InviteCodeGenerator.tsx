@@ -82,7 +82,9 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
 
       if (error) throw error
       setInviteCodes(data || [])
-    } catch {
+    } catch (err) {
+      console.error('fetchInviteCodes failed:', err)
+      showToast('Failed to load invite codes', 'error')
     } finally {
       setLoading(false)
     }
@@ -259,7 +261,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
                     {isUsable && (
                       <button
                         onClick={() => handleCopy(invite.code)}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-indigo-fg hover:bg-indigo-soft rounded-lg transition-colors cursor-pointer font-medium border border-indigo-line sm:border-transparent flex-1 sm:flex-initial"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-indigo-fg hover:bg-indigo-soft rounded-lg transition-colors cursor-pointer font-medium border border-indigo-line sm:border-transparent flex-1 sm:flex-initial focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
                       >
                         <Copy size={14} />
                         Copy Link
@@ -283,7 +285,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
             <button
               type="button"
               onClick={() => setShowRevoked(s => !s)}
-              className="mt-4 text-xs font-medium text-muted hover:text-foreground cursor-pointer"
+              className="mt-4 text-xs font-medium text-muted hover:text-foreground cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
             >
               {showRevoked
                 ? `Hide revoked (${revokedCount})`
@@ -311,7 +313,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
                     key={opt.value}
                     type="button"
                     onClick={() => setUsesChoice(opt.value)}
-                    className={`rounded-xl border p-3 text-center transition-colors cursor-pointer ${
+                    className={`rounded-xl border p-3 text-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
  selected
  ? 'border-indigo-500 bg-indigo-soft '
  : 'border-line hover:border-line '
@@ -341,7 +343,7 @@ export default function InviteCodeGenerator({ coachId }: InviteCodeGeneratorProp
                     key={opt.value}
                     type="button"
                     onClick={() => setExpiryChoice(opt.value)}
-                    className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+                    className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
  selected
  ? 'border-indigo-500 bg-indigo-soft text-indigo-fg '
  : 'border-line text-foreground hover:border-line '

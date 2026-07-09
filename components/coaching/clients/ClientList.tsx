@@ -130,7 +130,7 @@ export default function ClientList({ coachId }: ClientListProps) {
       <div>
         <button
           onClick={() => setShowInvites(false)}
-          className="flex items-center gap-1 text-sm text-muted hover:text-foreground mb-6 cursor-pointer"
+          className="flex items-center gap-1 text-sm text-muted hover:text-foreground mb-6 cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
         >
           ← Back to Clients
         </button>
@@ -188,7 +188,7 @@ export default function ClientList({ coachId }: ClientListProps) {
                   <button
                     key={client.id}
                     onClick={() => setSelectedClient(client)}
-                    className={`bg-surface rounded-xl border p-5 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all text-left w-full cursor-pointer group ${
+                    className={`bg-surface rounded-xl border p-5 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all text-left w-full cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
                       seen.atRisk
                         ? 'border-red-line/60 hover:border-red-line'
                         : 'border-line hover:border-indigo-line'

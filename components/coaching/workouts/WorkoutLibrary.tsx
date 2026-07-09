@@ -33,6 +33,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
   const [assigningWorkout, setAssigningWorkout] = useState<Workout | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [sortMode, setSortMode] = useState<LibrarySortMode>('recent')
 
@@ -66,7 +67,9 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
         exercise_count: w.exercises?.[0]?.count || 0,
       }))
       setWorkouts(list)
-    } catch {
+    } catch (err) {
+      console.error('fetchWorkouts failed:', err)
+      showToast('Failed to load workouts', 'error')
     } finally {
       setLoading(false)
     }
@@ -95,6 +98,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
   // and the date columns reset so cycle/days-of-week assignments don't
   // accidentally fire for the duplicate before the coach reviews it.
   const handleDuplicate = async (workoutId: string) => {
+    setDuplicatingId(workoutId)
     try {
       const { data: src } = await supabase
         .from('workouts')
@@ -204,8 +208,11 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
 
       await fetchWorkouts()
       showToast('Workout duplicated')
-    } catch {
+    } catch (err) {
+      console.error('handleDuplicate failed:', err)
       showToast('Failed to duplicate workout', 'error')
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -301,54 +308,66 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
           {visibleWorkouts.map(workout => (
             <div
               key={workout.id}
-              className="bg-surface rounded-xl border border-line p-5 transition-all hover:border-indigo-line hover:shadow-md hover:-translate-y-0.5"
+              className="bg-surface rounded-xl border border-line p-5 flex flex-col gap-3 transition-all hover:border-indigo-line hover:shadow-md hover:-translate-y-0.5"
             >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-foreground">{workout.name}</h3>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-foreground leading-snug">{workout.name}</h3>
                 {workout.is_template && (
-                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-soft text-purple-fg border border-purple-line rounded-full">
+                  <span className="shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-soft text-purple-fg border border-purple-line rounded-full">
                     Template
                   </span>
                 )}
               </div>
-              {workout.description && (
-                <p className="text-sm text-muted mb-3 line-clamp-2">{workout.description}</p>
-              )}
-              <div className="flex items-center gap-2 flex-wrap mb-3">
-                <p className="text-xs text-subtle">
-                  {workout.exercise_count} {workout.exercise_count === 1 ? 'exercise' : 'exercises'}
-                </p>
-                {workout.cycle_length && workout.cycle_position && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-soft text-indigo-fg border border-indigo-line rounded-full px-2 py-0.5 tabular-nums">
-                    {workout.cycle_length}-day · day {workout.cycle_position}
-                  </span>
+
+              <div className="flex-1">
+                {workout.description && (
+                  <p className="text-sm text-muted line-clamp-2">{workout.description}</p>
                 )}
               </div>
-              <div className="flex items-center gap-2 pt-3 border-t border-line-subtle">
-                <Button onClick={() => setAssigningWorkout(workout)} className="flex-1">
-                  <Send size={16} />
-                  Assign
-                </Button>
-                <IconButton
-                  onClick={() => { setEditingWorkout(workout); setShowBuilder(true) }}
-                  aria-label="Edit workout"
-                >
-                  <Pencil size={16} />
-                </IconButton>
-                <IconButton
-                  onClick={() => handleDuplicate(workout.id)}
-                  aria-label="Duplicate workout"
-                >
-                  <Copy size={16} />
-                </IconButton>
-                <IconButton
-                  tone="danger"
-                  onClick={() => setDeletingId(workout.id)}
-                  aria-label="Delete workout"
-                >
-                  <Trash2 size={16} />
-                </IconButton>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-elevated text-xs text-subtle font-medium">
+                    <Dumbbell size={11} className="text-indigo-500" />
+                    {workout.exercise_count} {workout.exercise_count === 1 ? 'exercise' : 'exercises'}
+                  </span>
+                  {workout.cycle_length && workout.cycle_position && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-indigo-soft text-indigo-fg border border-indigo-line rounded-full px-2 py-0.5 tabular-nums">
+                      {workout.cycle_length}-day · day {workout.cycle_position}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    onClick={() => { setEditingWorkout(workout); setShowBuilder(true) }}
+                    aria-label="Edit workout"
+                    title="Edit"
+                  >
+                    <Pencil size={15} />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => handleDuplicate(workout.id)}
+                    aria-label="Duplicate workout"
+                    title="Duplicate"
+                    disabled={duplicatingId === workout.id}
+                  >
+                    <Copy size={15} />
+                  </IconButton>
+                  <IconButton
+                    tone="danger"
+                    onClick={() => setDeletingId(workout.id)}
+                    aria-label="Delete workout"
+                    title="Delete"
+                  >
+                    <Trash2 size={15} />
+                  </IconButton>
+                </div>
               </div>
+
+              <Button onClick={() => setAssigningWorkout(workout)} variant="secondary" className="w-full">
+                <Send size={14} />
+                Assign to client
+              </Button>
             </div>
           ))}
         </LibraryFilterableGrid>

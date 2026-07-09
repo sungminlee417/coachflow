@@ -32,6 +32,7 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
   const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null)
   const [assigningPlan, setAssigningPlan] = useState<MealPlan | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [sortMode, setSortMode] = useState<LibrarySortMode>('recent')
 
@@ -63,7 +64,9 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
         meal_count: p.meals?.[0]?.count || 0,
       }))
       setPlans(list)
-    } catch {
+    } catch (err) {
+      console.error('fetchPlans failed:', err)
+      showToast('Failed to load meal plans', 'error')
     } finally {
       setLoading(false)
     }
@@ -93,6 +96,7 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
   // table is missing on an older deploy we skip rather than fail the
   // whole duplicate.
   const handleDuplicate = async (mealPlanId: string) => {
+    setDuplicatingId(mealPlanId)
     try {
       const { data: src } = await supabase
         .from('meal_plans')
@@ -252,8 +256,11 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
 
       await fetchPlans()
       showToast('Meal plan duplicated')
-    } catch {
+    } catch (err) {
+      console.error('handleDuplicate failed:', err)
       showToast('Failed to duplicate meal plan', 'error')
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -344,47 +351,59 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
           {visiblePlans.map(plan => (
             <div
               key={plan.id}
-              className="bg-surface rounded-xl border border-line p-5 transition-all hover:border-emerald-line hover:shadow-md hover:-translate-y-0.5"
+              className="bg-surface rounded-xl border border-line p-5 flex flex-col gap-3 transition-all hover:border-emerald-line hover:shadow-md hover:-translate-y-0.5"
             >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-foreground">{plan.name}</h3>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-foreground leading-snug">{plan.name}</h3>
                 {plan.is_template && (
-                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-soft text-purple-fg border border-purple-line rounded-full">
+                  <span className="shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-soft text-purple-fg border border-purple-line rounded-full">
                     Template
                   </span>
                 )}
               </div>
-              {plan.description && (
-                <p className="text-sm text-muted mb-3 line-clamp-2">{plan.description}</p>
-              )}
-              <p className="text-xs text-subtle mb-4">
-                {plan.meal_count} {plan.meal_count === 1 ? 'meal' : 'meals'}
-              </p>
-              <div className="flex gap-2">
-                <Button onClick={() => setAssigningPlan(plan)} className="flex-1">
-                  <Send size={14} />
-                  Assign
-                </Button>
-                <IconButton
-                  onClick={() => { setEditingPlan(plan); setShowBuilder(true) }}
-                  aria-label="Edit meal plan"
-                >
-                  <Pencil size={16} />
-                </IconButton>
-                <IconButton
-                  onClick={() => handleDuplicate(plan.id)}
-                  aria-label="Duplicate meal plan"
-                >
-                  <Copy size={16} />
-                </IconButton>
-                <IconButton
-                  tone="danger"
-                  onClick={() => setDeletingId(plan.id)}
-                  aria-label="Delete meal plan"
-                >
-                  <Trash2 size={16} />
-                </IconButton>
+
+              <div className="flex-1">
+                {plan.description && (
+                  <p className="text-sm text-muted line-clamp-2">{plan.description}</p>
+                )}
               </div>
+
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-elevated text-xs text-subtle font-medium">
+                  <Apple size={11} className="text-emerald-500" />
+                  {plan.meal_count} {plan.meal_count === 1 ? 'meal' : 'meals'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    onClick={() => { setEditingPlan(plan); setShowBuilder(true) }}
+                    aria-label="Edit meal plan"
+                    title="Edit"
+                  >
+                    <Pencil size={15} />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => handleDuplicate(plan.id)}
+                    aria-label="Duplicate meal plan"
+                    title="Duplicate"
+                    disabled={duplicatingId === plan.id}
+                  >
+                    <Copy size={15} />
+                  </IconButton>
+                  <IconButton
+                    tone="danger"
+                    onClick={() => setDeletingId(plan.id)}
+                    aria-label="Delete meal plan"
+                    title="Delete"
+                  >
+                    <Trash2 size={15} />
+                  </IconButton>
+                </div>
+              </div>
+
+              <Button onClick={() => setAssigningPlan(plan)} variant="secondary" className="w-full">
+                <Send size={14} />
+                Assign to client
+              </Button>
             </div>
           ))}
         </LibraryFilterableGrid>

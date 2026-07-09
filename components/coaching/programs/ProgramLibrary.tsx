@@ -30,6 +30,7 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
   const [editing, setEditing] = useState<WorkoutProgram | null>(null)
   const [assigning, setAssigning] = useState<WorkoutProgram | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [sortMode, setSortMode] = useState<LibrarySortMode>('recent')
 
@@ -97,6 +98,7 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
   // `name + " (copy)"`. Member workouts themselves are NOT cloned —
   // both the original and the copy reference the same workout templates.
   const handleDuplicate = async (programId: string) => {
+    setDuplicatingId(programId)
     try {
       const { data: src } = await supabase
         .from('workout_programs')
@@ -151,8 +153,11 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
 
       await fetchPrograms()
       showToast('Program duplicated')
-    } catch {
+    } catch (err) {
+      console.error('handleDuplicate failed:', err)
       showToast('Failed to duplicate program', 'error')
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -253,50 +258,59 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
           {visiblePrograms.map(p => (
             <div
               key={p.id}
-              className="bg-surface rounded-xl border border-line p-5 transition-all hover:border-indigo-line hover:shadow-md hover:-translate-y-0.5"
+              className="bg-surface rounded-xl border border-line p-5 flex flex-col gap-3 transition-all hover:border-indigo-line hover:shadow-md hover:-translate-y-0.5"
             >
-              <div className="flex justify-between items-start mb-2 gap-2">
-                <h3 className="font-semibold text-foreground">{p.name}</h3>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-foreground leading-snug">{p.name}</h3>
                 {p.is_template && (
-                  <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-soft text-purple-fg border border-purple-line rounded-full">
+                  <span className="shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-purple-soft text-purple-fg border border-purple-line rounded-full">
                     Template
                   </span>
                 )}
               </div>
-              {p.description && (
-                <p className="text-sm text-muted mb-3 line-clamp-2">{p.description}</p>
-              )}
-              <p className="text-xs text-subtle mb-4 tabular-nums">
-                {p.workout_count} {p.workout_count === 1 ? 'workout' : 'workouts'}
-              </p>
-              <div className="flex gap-2">
-                <Button onClick={() => setAssigning(p)} className="flex-1">
-                  <Send size={14} />
-                  Assign
-                </Button>
-                <IconButton
-                  onClick={() => {
-                    setEditing(p)
-                    setShowBuilder(true)
-                  }}
-                  aria-label="Edit program"
-                >
-                  <Pencil size={16} />
-                </IconButton>
-                <IconButton
-                  onClick={() => handleDuplicate(p.id)}
-                  aria-label="Duplicate program"
-                >
-                  <Copy size={16} />
-                </IconButton>
-                <IconButton
-                  tone="danger"
-                  onClick={() => setDeletingId(p.id)}
-                  aria-label="Delete program"
-                >
-                  <Trash2 size={16} />
-                </IconButton>
+
+              <div className="flex-1">
+                {p.description && (
+                  <p className="text-sm text-muted line-clamp-2">{p.description}</p>
+                )}
               </div>
+
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-elevated text-xs text-subtle font-medium tabular-nums">
+                  <ListChecks size={11} className="text-indigo-500" />
+                  {p.workout_count} {p.workout_count === 1 ? 'workout' : 'workouts'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    onClick={() => { setEditing(p); setShowBuilder(true) }}
+                    aria-label="Edit program"
+                    title="Edit"
+                  >
+                    <Pencil size={15} />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => handleDuplicate(p.id)}
+                    aria-label="Duplicate program"
+                    title="Duplicate"
+                    disabled={duplicatingId === p.id}
+                  >
+                    <Copy size={15} />
+                  </IconButton>
+                  <IconButton
+                    tone="danger"
+                    onClick={() => setDeletingId(p.id)}
+                    aria-label="Delete program"
+                    title="Delete"
+                  >
+                    <Trash2 size={15} />
+                  </IconButton>
+                </div>
+              </div>
+
+              <Button onClick={() => setAssigning(p)} variant="secondary" className="w-full">
+                <Send size={14} />
+                Assign to client
+              </Button>
             </div>
           ))}
         </LibraryFilterableGrid>

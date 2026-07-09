@@ -88,7 +88,9 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
         workout: unwrapJoin<{ id: string; name: string }>(item.workout),
       }))
       setWorkoutAssignments(rows)
-    } catch {
+    } catch (err) {
+      console.error('fetchWorkoutAssignments failed:', err)
+      showToast('Failed to load workout assignments', 'error')
     } finally {
       setLoading(false)
     }
@@ -110,7 +112,8 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
         meal_plan: unwrapJoin<{ id: string; name: string }>(item.meal_plan),
       }))
       setMealPlanAssignments(rows)
-    } catch {
+    } catch (err) {
+      console.error('fetchMealPlanAssignments failed:', err)
     }
   }
 
@@ -124,7 +127,8 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
 
       if (error) throw error
       setWorkouts(data || [])
-    } catch {
+    } catch (err) {
+      console.error('fetchWorkouts failed:', err)
     }
   }
 
@@ -138,7 +142,8 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
 
       if (error) throw error
       setMealPlans(data || [])
-    } catch {
+    } catch (err) {
+      console.error('fetchMealPlans failed:', err)
     }
   }
 

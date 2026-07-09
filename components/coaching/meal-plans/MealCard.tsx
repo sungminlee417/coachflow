@@ -93,7 +93,7 @@ export function MealCard({
         <button
           type="button"
           onClick={() => actions.toggleMealExpanded(index)}
-          className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer group"
+          className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer group rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
           aria-expanded={isExpanded}
         >
           <span className="text-subtle group-hover:text-foreground transition-transform shrink-0">
@@ -357,7 +357,7 @@ export function MealCard({
                               <button
                                 type="button"
                                 onClick={() => actions.addIngredient(index, foodIndex)}
-                                className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer"
+                                className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
                               >
                                 + Add Ingredient
                               </button>
@@ -399,7 +399,7 @@ export function MealCard({
                           <button
                             type="button"
                             onClick={() => actions.addFoodAlternative(index, foodIndex)}
-                            className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer"
+                            className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
                           >
                             + Add Alternative
                           </button>
