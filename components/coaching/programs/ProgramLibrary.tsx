@@ -11,6 +11,7 @@ import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import { sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
 import { LibraryFilterableGrid } from '@/components/ui/LibraryFilterableGrid'
 import { Plus, Send, Pencil, Trash2, ListChecks, Copy } from 'lucide-react'
+import { stripMeta } from '@/lib/copy-utils'
 import type { WorkoutProgram } from '@/lib/types'
 import dynamic from 'next/dynamic'
 // Lazy-loaded — only mounted after the coach taps "Create / Edit", so
@@ -77,8 +78,7 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
   const handleDelete = async () => {
     if (!deletingId) return
     try {
-      // CASCADE on workout_program_workouts cleans up the join rows.
-      // workout_assignments are NOT linked to programs and remain intact.
+      // workout_assignments are NOT linked to programs — they survive deletion and stay intact.
       const { error } = await supabase
         .from('workout_programs')
         .delete()
@@ -93,61 +93,30 @@ export default function ProgramLibrary({ coachId }: ProgramLibraryProps) {
     }
   }
 
-  // Deep-copy a program (header + child workout_program_workouts join
-  // rows) into a new template owned by the same coach. The new row is
-  // `name + " (copy)"`. Member workouts themselves are NOT cloned —
-  // both the original and the copy reference the same workout templates.
   const handleDuplicate = async (programId: string) => {
     setDuplicatingId(programId)
     try {
-      const { data: src } = await supabase
-        .from('workout_programs')
-        .select('*')
-        .eq('id', programId)
-        .maybeSingle()
-      if (!src) throw new Error('Program not found')
+      const { data: src } = await supabase.from('workout_programs').select('*').eq('id', programId).maybeSingle()
+      if (!src) throw new Error('Source not found')
 
-      const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = src as {
-        id: string
-        created_at?: string
-        updated_at?: string
-        name: string
-      } & Record<string, unknown>
-      void _id; void _ca; void _ua
-      const newPayload = {
-        ...rest,
-        name: `${src.name} (copy)`,
-        coach_id: coachId,
-      }
-      const { data: created, error: insertErr } = await supabase
+      const { data: program, error: insertErr } = await supabase
         .from('workout_programs')
-        .insert(newPayload)
+        .insert({ ...stripMeta(src), name: `${src.name} (copy)`, coach_id: coachId })
         .select('id')
         .single()
-      if (insertErr || !created) throw insertErr ?? new Error('Insert failed')
-      const newProgramId = created.id as string
+      if (insertErr || !program) throw insertErr ?? new Error('Insert failed')
 
-      // Copy the join rows (workout_id + order_index). Member workouts
-      // are shared — editing one in the original also changes it in the
-      // copy. That's expected: the copy gives the coach a different
-      // *grouping*, not a duplicate of every workout.
       const { data: joinRows } = await supabase
         .from('workout_program_workouts')
         .select('workout_id, order_index')
         .eq('program_id', programId)
         .order('order_index')
 
-      if (joinRows && joinRows.length > 0) {
-        const joinsPayload = (joinRows as Array<{ workout_id: string; order_index: number }>).map(
-          r => ({
-            program_id: newProgramId,
-            workout_id: r.workout_id,
-            order_index: r.order_index,
-          })
-        )
+      if (joinRows?.length) {
+        // Member workouts are shared — the copy gives a different grouping, not cloned content.
         const { error: joinErr } = await supabase
           .from('workout_program_workouts')
-          .insert(joinsPayload)
+          .insert(joinRows.map(r => ({ program_id: program.id, workout_id: r.workout_id, order_index: r.order_index })))
         if (joinErr) throw joinErr
       }
 

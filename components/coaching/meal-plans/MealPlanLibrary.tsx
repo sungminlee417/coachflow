@@ -12,6 +12,7 @@ import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import { sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
 import { LibraryFilterableGrid } from '@/components/ui/LibraryFilterableGrid'
 import { Plus, Send, Pencil, Trash2, Apple, Copy } from 'lucide-react'
+import { stripMeta, mapByOrderIndex } from '@/lib/copy-utils'
 import type { MealPlan } from '@/lib/types'
 import dynamic from 'next/dynamic'
 // Lazy-loaded — the builder is the heaviest screen in the app (~1400 LOC
@@ -77,9 +78,7 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
     try {
       const { error } = await supabase.from('meal_plans').delete().eq('id', deletingId)
       if (error) throw error
-      // ON DELETE CASCADE wipes meal_plan_assignments + meals + foods +
-      // ingredients. Refresh every trainee-facing cache that held the
-      // plan's payload.
+      // Invalidate trainee-facing caches so deleted plan doesn't ghost in active views.
       await Promise.all([fetchPlans(), invalidateMealPlans({ coachId })])
       showToast('Meal plan deleted')
     } catch {
@@ -89,168 +88,76 @@ export default function MealPlanLibrary({ coachId }: MealPlanLibraryProps) {
     }
   }
 
-  // Deep-copy a meal plan: header → meals → foods → (ingredients +
-  // food_alternatives). At each level we map old-id → new-id by index
-  // so the child re-inserts point at the right new parent. The deepest
-  // child rows (ingredients/food_alternatives) are best-effort; if a
-  // table is missing on an older deploy we skip rather than fail the
-  // whole duplicate.
   const handleDuplicate = async (mealPlanId: string) => {
     setDuplicatingId(mealPlanId)
     try {
-      const { data: src } = await supabase
-        .from('meal_plans')
-        .select('*')
-        .eq('id', mealPlanId)
-        .maybeSingle()
-      if (!src) throw new Error('Meal plan not found')
+      const { data: src } = await supabase.from('meal_plans').select('*').eq('id', mealPlanId).maybeSingle()
+      if (!src) throw new Error('Source not found')
 
-      const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = src as {
-        id: string
-        created_at?: string
-        updated_at?: string
-        name: string
-      } & Record<string, unknown>
-      void _id; void _ca; void _ua
-      const newPayload = {
-        ...rest,
-        name: `${src.name} (copy)`,
-        coach_id: coachId,
-      }
-      const { data: created, error: insertErr } = await supabase
+      const { data: plan, error: planErr } = await supabase
         .from('meal_plans')
-        .insert(newPayload)
+        .insert({ ...stripMeta(src), name: `${src.name} (copy)`, coach_id: coachId })
         .select('id')
         .single()
-      if (insertErr || !created) throw insertErr ?? new Error('Insert failed')
-      const newPlanId = created.id as string
+      if (planErr || !plan) throw planErr ?? new Error('Insert failed')
 
-      const { data: mealRows } = await supabase
-        .from('meals')
-        .select('*')
-        .eq('meal_plan_id', mealPlanId)
-        .order('order_index')
+      const { data: meals } = await supabase
+        .from('meals').select('*').eq('meal_plan_id', mealPlanId).order('order_index')
 
-      if (mealRows && mealRows.length > 0) {
-        type MealRow = { id: string; meal_plan_id: string } & Record<string, unknown>
-        const oldMealIds = (mealRows as MealRow[]).map(m => m.id)
-        const mealsPayload = (mealRows as MealRow[]).map(m => {
-          const { id: _mid, created_at: _mca, meal_plan_id: _mpid, ...mRest } =
-            m as MealRow & { created_at?: string }
-          void _mid; void _mca; void _mpid
-          return { ...mRest, meal_plan_id: newPlanId }
-        })
-        const { data: newMealRows, error: mealErr } = await supabase
+      if (meals?.length) {
+        const oldMealIds = meals.map(m => m.id as string)
+        const { data: newMeals, error: mealErr } = await supabase
           .from('meals')
-          .insert(mealsPayload)
+          .insert(meals.map(m => ({ ...stripMeta(m), meal_plan_id: plan.id })))
           .select('id, order_index')
         if (mealErr) throw mealErr
 
-        // Map old meal id → new meal id by order_index, then carry
-        // foods over the same way.
-        const oldMealByOrder = new Map<number, string>()
-        for (const o of mealRows as Array<{ id: string; order_index: number }>) {
-          oldMealByOrder.set(o.order_index, o.id)
-        }
-        const newMealByOldId = new Map<string, string>()
-        for (const n of (newMealRows ?? []) as Array<{ id: string; order_index: number }>) {
-          const oldId = oldMealByOrder.get(n.order_index)
-          if (oldId) newMealByOldId.set(oldId, n.id)
-        }
+        const mealIdMap = mapByOrderIndex(
+          meals as Array<{ id: string; order_index: number }>,
+          (newMeals ?? []) as Array<{ id: string; order_index: number }>
+        )
 
-        const { data: foodRows } = await supabase
-          .from('foods')
-          .select('*')
-          .in('meal_id', oldMealIds)
-        if (foodRows && foodRows.length > 0) {
-          type FoodRow = { id: string; meal_id: string } & Record<string, unknown>
-          const oldFoodIds = (foodRows as FoodRow[]).map(f => f.id)
-          const foodsPayload: Record<string, unknown>[] = []
-          for (const f of foodRows as FoodRow[]) {
-            const { id: _fid, created_at: _fca, meal_id: oldMealId, ...fRest } =
-              f as FoodRow & { created_at?: string }
-            void _fid; void _fca
-            const newMealId = newMealByOldId.get(oldMealId)
-            if (!newMealId) continue
-            foodsPayload.push({ ...fRest, meal_id: newMealId })
+        const { data: foods } = await supabase.from('foods').select('*').in('meal_id', oldMealIds)
+        if (foods?.length) {
+          const oldFoodIds = foods.map(f => f.id as string)
+          const foodPayload = foods.flatMap(f => {
+            const newMealId = mealIdMap.get(f.meal_id as string)
+            return newMealId ? [{ ...stripMeta(f), meal_id: newMealId }] : []
+          })
+          const { data: newFoods, error: foodErr } = await supabase
+            .from('foods').insert(foodPayload).select('id, meal_id, order_index')
+          if (foodErr) throw foodErr
+
+          // Foods share order_index within a meal, so key the lookup on (oldMealId, order_index).
+          const reverseMealMap = new Map([...mealIdMap].map(([o, n]) => [n, o]))
+          const oldFoodByKey = new Map(
+            (foods as Array<{ id: string; meal_id: string; order_index: number }>)
+              .map(f => [`${f.meal_id}::${f.order_index}`, f.id])
+          )
+          const foodIdMap = new Map<string, string>()
+          for (const n of (newFoods ?? []) as Array<{ id: string; meal_id: string; order_index: number }>) {
+            const oldMealId = reverseMealMap.get(n.meal_id)
+            const oldFoodId = oldFoodByKey.get(`${oldMealId}::${n.order_index}`)
+            if (oldFoodId) foodIdMap.set(oldFoodId, n.id)
           }
-          if (foodsPayload.length > 0) {
-            const { data: newFoodRows, error: foodErr } = await supabase
-              .from('foods')
-              .insert(foodsPayload)
-              .select('id, meal_id, order_index')
-            if (foodErr) throw foodErr
 
-            // Map old food id → new food id by (meal_id, order_index).
-            // `meal_id` alone isn't unique enough for foods because a
-            // meal can have multiple foods.
-            const oldFoodKey = (f: { meal_id: string; order_index: number }) =>
-              `${f.meal_id}::${f.order_index}`
-            const newFoodKey = (f: { meal_id: string; order_index: number }) =>
-              // The new food's meal_id is the *new* meal; reverse the
-              // map to match against old keys.
-              `${[...newMealByOldId.entries()].find(([, v]) => v === f.meal_id)?.[0] ?? ''}::${f.order_index}`
-            const newFoodByOldId = new Map<string, string>()
-            const oldFoodLookup = new Map<string, string>()
-            for (const o of foodRows as Array<{ id: string; meal_id: string; order_index: number }>) {
-              oldFoodLookup.set(oldFoodKey(o), o.id)
-            }
-            for (const n of (newFoodRows ?? []) as Array<{
-              id: string
-              meal_id: string
-              order_index: number
-            }>) {
-              const oldId = oldFoodLookup.get(newFoodKey(n))
-              if (oldId) newFoodByOldId.set(oldId, n.id)
-            }
+          try {
+            const { data: ings } = await supabase.from('ingredients').select('*').in('food_id', oldFoodIds)
+            const ingPayload = (ings ?? []).flatMap(ing => {
+              const newFoodId = foodIdMap.get(ing.food_id as string)
+              return newFoodId ? [{ ...stripMeta(ing), food_id: newFoodId }] : []
+            })
+            if (ingPayload.length) await supabase.from('ingredients').insert(ingPayload)
+          } catch { /* ingredients table may be absent on older deploys */ }
 
-            // Best-effort: ingredients + food_alternatives.
-            try {
-              const { data: ingRows } = await supabase
-                .from('ingredients')
-                .select('*')
-                .in('food_id', oldFoodIds)
-              if (ingRows && ingRows.length > 0) {
-                const ingPayload: Record<string, unknown>[] = []
-                for (const ing of ingRows) {
-                  const { id: _iid, created_at: _ica, food_id: oldFoodId, ...iRest } =
-                    ing as { id: string; created_at?: string; food_id: string } & Record<string, unknown>
-                  void _iid; void _ica
-                  const newFoodId = newFoodByOldId.get(oldFoodId)
-                  if (!newFoodId) continue
-                  ingPayload.push({ ...iRest, food_id: newFoodId })
-                }
-                if (ingPayload.length > 0) {
-                  await supabase.from('ingredients').insert(ingPayload)
-                }
-              }
-            } catch {
-              // ingredients table missing on older deploys — skip.
-            }
-
-            try {
-              const { data: altRows } = await supabase
-                .from('food_alternatives')
-                .select('*')
-                .in('food_id', oldFoodIds)
-              if (altRows && altRows.length > 0) {
-                const altPayload: Record<string, unknown>[] = []
-                for (const a of altRows) {
-                  const { id: _aid, created_at: _aca, food_id: oldFoodId, ...aRest } =
-                    a as { id: string; created_at?: string; food_id: string } & Record<string, unknown>
-                  void _aid; void _aca
-                  const newFoodId = newFoodByOldId.get(oldFoodId)
-                  if (!newFoodId) continue
-                  altPayload.push({ ...aRest, food_id: newFoodId })
-                }
-                if (altPayload.length > 0) {
-                  await supabase.from('food_alternatives').insert(altPayload)
-                }
-              }
-            } catch {
-              // food_alternatives table missing — skip.
-            }
-          }
+          try {
+            const { data: alts } = await supabase.from('food_alternatives').select('*').in('food_id', oldFoodIds)
+            const altPayload = (alts ?? []).flatMap(a => {
+              const newFoodId = foodIdMap.get(a.food_id as string)
+              return newFoodId ? [{ ...stripMeta(a), food_id: newFoodId }] : []
+            })
+            if (altPayload.length) await supabase.from('food_alternatives').insert(altPayload)
+          } catch { /* food_alternatives table may be absent on older deploys */ }
         }
       }
 

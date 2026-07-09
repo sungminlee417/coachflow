@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { sortLibrary, type LibrarySortMode } from '@/components/ui/LibrarySort'
 import { LibraryFilterableGrid } from '@/components/ui/LibraryFilterableGrid'
 import { Plus, Send, Pencil, Trash2, Dumbbell, Copy } from 'lucide-react'
+import { stripMeta, mapByOrderIndex } from '@/lib/copy-utils'
 import type { Workout } from '@/lib/types'
 import { CardGridSkeleton } from '@/components/ui/Skeleton'
 import dynamic from 'next/dynamic'
@@ -80,10 +81,7 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
     try {
       const { error } = await supabase.from('workouts').delete().eq('id', deletingId)
       if (error) throw error
-      // ON DELETE CASCADE wipes workout_assignments + exercises + sets
-      // for this workout. Refresh every cache that referenced them so
-      // any open ClientWorkoutView / Today dashboard doesn't try to
-      // render a ghost assignment.
+      // Invalidate caches so open views (Today, ClientWorkoutView) don't render stale assignments.
       await Promise.all([fetchWorkouts(), invalidateWorkouts({ coachId })])
       showToast('Workout deleted')
     } catch {
@@ -93,117 +91,50 @@ export default function WorkoutLibrary({ coachId }: WorkoutLibraryProps) {
     }
   }
 
-  // Deep-copy a workout (header + per-set exercise rows + alternatives)
-  // into a new row owned by the same coach. The new row is `name + " (copy)"`
-  // and the date columns reset so cycle/days-of-week assignments don't
-  // accidentally fire for the duplicate before the coach reviews it.
   const handleDuplicate = async (workoutId: string) => {
     setDuplicatingId(workoutId)
     try {
-      const { data: src } = await supabase
-        .from('workouts')
-        .select('*')
-        .eq('id', workoutId)
-        .maybeSingle()
-      if (!src) throw new Error('Workout not found')
+      const { data: src } = await supabase.from('workouts').select('*').eq('id', workoutId).maybeSingle()
+      if (!src) throw new Error('Source not found')
 
-      // Build the destination header. Skip generated columns (id, timestamps).
-      const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = src as {
-        id: string
-        created_at?: string
-        updated_at?: string
-        name: string
-      } & Record<string, unknown>
-      void _id; void _ca; void _ua
-      const newWorkoutPayload = {
-        ...rest,
-        name: `${src.name} (copy)`,
-        coach_id: coachId,
-      }
-      const { data: created, error: insertErr } = await supabase
+      const { data: workout, error: insertErr } = await supabase
         .from('workouts')
-        .insert(newWorkoutPayload)
+        .insert({ ...stripMeta(src), name: `${src.name} (copy)`, coach_id: coachId })
         .select('id')
         .single()
-      if (insertErr || !created) throw insertErr ?? new Error('Insert failed')
-      const newId = created.id as string
+      if (insertErr || !workout) throw insertErr ?? new Error('Insert failed')
 
-      // Pull source children and re-insert pointing at the new workout.
-      const { data: exList } = await supabase
-        .from('exercises')
-        .select('*')
-        .eq('workout_id', workoutId)
-        .order('order_index')
+      const { data: exercises } = await supabase
+        .from('exercises').select('*').eq('workout_id', workoutId).order('order_index')
 
-      if (exList && exList.length > 0) {
-        type ExRow = { id: string; workout_id?: string } & Record<string, unknown>
-        const oldIds = exList.map(e => (e as ExRow).id)
-        const newExPayload = exList.map(e => {
-          const { id: _exId, created_at: _eca, updated_at: _eua, workout_id: _wid, ...exRest } =
-            e as ExRow & { created_at?: string; updated_at?: string; workout_id?: string }
-          void _exId; void _eca; void _eua; void _wid
-          return { ...exRest, workout_id: newId }
-        })
-        const { data: newExRows, error: exErr } = await supabase
+      if (exercises?.length) {
+        const oldIds = exercises.map(e => e.id as string)
+        const { data: newExercises, error: exErr } = await supabase
           .from('exercises')
-          .insert(newExPayload)
+          .insert(exercises.map(e => ({ ...stripMeta(e), workout_id: workout.id })))
           .select('id, order_index')
         if (exErr) throw exErr
 
-        // Map old exercise_id → new exercise_id by order_index.
-        const oldByOrder = new Map<number, string>()
-        for (const o of exList as Array<{ id: string; order_index: number }>) {
-          oldByOrder.set(o.order_index, o.id)
-        }
-        const newByOldId = new Map<string, string>()
-        for (const n of (newExRows ?? []) as Array<{ id: string; order_index: number }>) {
-          const oldId = oldByOrder.get(n.order_index)
-          if (oldId) newByOldId.set(oldId, n.id)
-        }
+        const exerciseIdMap = mapByOrderIndex(
+          exercises as Array<{ id: string; order_index: number }>,
+          (newExercises ?? []) as Array<{ id: string; order_index: number }>
+        )
 
-        // Copy per-set rows. Alternatives table may not exist on older
-        // deploys — best-effort.
-        const { data: setRows } = await supabase
-          .from('exercise_sets')
-          .select('*')
-          .in('exercise_id', oldIds)
-        if (setRows && setRows.length > 0) {
-          const setsPayload: Record<string, unknown>[] = []
-          for (const s of setRows) {
-            const { id: _sid, created_at: _sca, exercise_id: oldExId, ...sRest } =
-              s as { id: string; created_at?: string; exercise_id: string } & Record<string, unknown>
-            void _sid; void _sca
-            const newExId = newByOldId.get(oldExId)
-            if (!newExId) continue
-            setsPayload.push({ ...sRest, exercise_id: newExId })
-          }
-          if (setsPayload.length > 0) {
-            await supabase.from('exercise_sets').insert(setsPayload)
-          }
-        }
+        const { data: sets } = await supabase.from('exercise_sets').select('*').in('exercise_id', oldIds)
+        const setsPayload = (sets ?? []).flatMap(s => {
+          const newId = exerciseIdMap.get(s.exercise_id as string)
+          return newId ? [{ ...stripMeta(s), exercise_id: newId }] : []
+        })
+        if (setsPayload.length) await supabase.from('exercise_sets').insert(setsPayload)
 
         try {
-          const { data: altRows } = await supabase
-            .from('exercise_alternatives')
-            .select('*')
-            .in('exercise_id', oldIds)
-          if (altRows && altRows.length > 0) {
-            const altsPayload: Record<string, unknown>[] = []
-            for (const a of altRows) {
-              const { id: _aid, exercise_id: oldExId, ...aRest } =
-                a as { id: string; exercise_id: string } & Record<string, unknown>
-              void _aid
-              const newExId = newByOldId.get(oldExId)
-              if (!newExId) continue
-              altsPayload.push({ ...aRest, exercise_id: newExId })
-            }
-            if (altsPayload.length > 0) {
-              await supabase.from('exercise_alternatives').insert(altsPayload)
-            }
-          }
-        } catch {
-          // Alternatives are optional — silently skip if table is missing.
-        }
+          const { data: alts } = await supabase.from('exercise_alternatives').select('*').in('exercise_id', oldIds)
+          const altsPayload = (alts ?? []).flatMap(a => {
+            const newId = exerciseIdMap.get(a.exercise_id as string)
+            return newId ? [{ ...stripMeta(a), exercise_id: newId }] : []
+          })
+          if (altsPayload.length) await supabase.from('exercise_alternatives').insert(altsPayload)
+        } catch { /* exercise_alternatives may be absent on older deploys */ }
       }
 
       await fetchWorkouts()
