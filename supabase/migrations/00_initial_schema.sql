@@ -53,7 +53,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: user_role; Type: TYPE; Schema: public; Owner: -
@@ -70,7 +70,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: get_active_meal_plan_assignments(uuid, date); Type: FUNCTION; Schema: public; Owner: -
@@ -964,7 +964,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: coach_client_relationships coach_client_relationships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -991,7 +991,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: conversations conversations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1033,7 +1033,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: exercise_sets exercise_sets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1060,7 +1060,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: exercise_substitutions exercise_substitutions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1147,7 +1147,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: invite_codes invite_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1174,7 +1174,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meal_logs meal_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1291,7 +1291,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: set_logs set_logs_assignment_exercise_set_date_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1303,7 +1303,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: set_logs set_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1345,7 +1345,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workout_assignments workout_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1387,7 +1387,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workout_programs workout_programs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1798,7 +1798,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: coach_client_relationships coach_client_relationships_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1810,7 +1810,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: coach_client_relationships coach_client_relationships_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1822,7 +1822,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: coach_client_relationships coach_client_relationships_invite_code_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1834,7 +1834,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: conversations conversations_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1846,7 +1846,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: conversations conversations_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1858,7 +1858,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: exercise_alternatives exercise_alternatives_exercise_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1870,7 +1870,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: exercise_sets exercise_sets_exercise_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1882,7 +1882,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: exercise_substitutions exercise_substitutions_assignment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1894,7 +1894,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: exercise_substitutions exercise_substitutions_exercise_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1906,7 +1906,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: exercises exercises_workout_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1918,7 +1918,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: food_alternatives food_alternatives_food_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1930,7 +1930,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: foods foods_meal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1942,7 +1942,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: ingredients ingredients_food_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1954,7 +1954,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: invite_codes invite_codes_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1966,7 +1966,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meal_logs meal_logs_assignment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1978,7 +1978,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meal_logs meal_logs_meal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1990,7 +1990,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meal_logs meal_logs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2002,7 +2002,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meal_plan_assignments meal_plan_assignments_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2014,7 +2014,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meal_plan_assignments meal_plan_assignments_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2026,7 +2026,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meal_plan_assignments meal_plan_assignments_meal_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2038,7 +2038,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meal_plans meal_plans_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2050,7 +2050,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: meals meals_meal_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2062,7 +2062,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: messages messages_conversation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2074,7 +2074,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: messages messages_sender_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2086,7 +2086,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: profiles profiles_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2098,7 +2098,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: program_assignments program_assignments_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2110,7 +2110,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: program_assignments program_assignments_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2122,7 +2122,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: program_assignments program_assignments_program_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2134,7 +2134,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: set_logs set_logs_assignment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2146,7 +2146,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: set_logs set_logs_exercise_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2158,7 +2158,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: weight_logs weight_logs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2170,7 +2170,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workout_assignments workout_assignments_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2182,7 +2182,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workout_assignments workout_assignments_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2194,7 +2194,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workout_assignments workout_assignments_workout_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2206,7 +2206,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workout_program_workouts workout_program_workouts_program_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2218,7 +2218,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workout_program_workouts workout_program_workouts_workout_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2230,7 +2230,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workout_programs workout_programs_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2242,7 +2242,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: workouts workouts_coach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2254,7 +2254,7 @@ DO $$ BEGIN
 
 
   --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 
 -- Name: invite_codes Anyone can view valid invite codes for signup; Type: POLICY; Schema: public; Owner: -
