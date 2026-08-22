@@ -3064,7 +3064,7 @@ DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'meal_logs'
-      AND policyname = 'coaches view their clients' meal logs'
+      AND policyname = 'coaches view their clients'' meal logs'
   ) THEN
     CREATE POLICY "coaches view their clients' meal logs" ON public.meal_logs FOR SELECT USING ((EXISTS ( SELECT 1
        FROM public.coach_client_relationships ccr
@@ -3083,7 +3083,7 @@ DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'exercise_substitutions'
-      AND policyname = 'coaches view their clients' substitutions'
+      AND policyname = 'coaches view their clients'' substitutions'
   ) THEN
     CREATE POLICY "coaches view their clients' substitutions" ON public.exercise_substitutions FOR SELECT USING ((EXISTS ( SELECT 1
        FROM public.workout_assignments a
