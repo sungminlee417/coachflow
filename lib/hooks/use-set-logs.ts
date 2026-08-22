@@ -163,6 +163,13 @@ export function useSaveSetLog() {
     // Per-(scope, set_number) mutationKey so the persister dedupes
     // identical interrupted writes on rehydrate.
     mutationKey: ['set_logs.save'],
+    // Serialize all set-log saves so a fast uncheck → edit → re-check
+    // sequence can't race at the network layer. Both writes hit the
+    // same (assignment, exercise, set_number, logged_date) upsert key
+    // and if the older one arrives at Postgres last, the DB ends up
+    // with stale values — the optimistic UI hides it until any refetch
+    // (window focus, tab switch, next mount) pulls the race-loser back.
+    scope: { id: 'set_logs.save' },
     mutationFn: async ({ assignmentId, exerciseId, date, row }: SaveSetArgs) => {
       const { error } = await supabase
         .from('set_logs')
