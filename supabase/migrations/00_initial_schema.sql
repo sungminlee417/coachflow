@@ -971,12 +971,15 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.coach_client_relationships
-      ADD CONSTRAINT coach_client_relationships_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.coach_client_relationships'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.coach_client_relationships
+        ADD CONSTRAINT coach_client_relationships_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: conversations conversations_coach_id_client_id_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -995,24 +998,30 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.conversations
-      ADD CONSTRAINT conversations_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.conversations'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.conversations
+        ADD CONSTRAINT conversations_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: exercise_alternatives exercise_alternatives_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.exercise_alternatives
-      ADD CONSTRAINT exercise_alternatives_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.exercise_alternatives'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.exercise_alternatives
+        ADD CONSTRAINT exercise_alternatives_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: exercise_sets exercise_sets_exercise_id_set_number_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1031,12 +1040,15 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.exercise_sets
-      ADD CONSTRAINT exercise_sets_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.exercise_sets'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.exercise_sets
+        ADD CONSTRAINT exercise_sets_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: exercise_substitutions exercise_substitutions_assignment_id_exercise_id_logged_dat_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1055,60 +1067,75 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.exercise_substitutions
-      ADD CONSTRAINT exercise_substitutions_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.exercise_substitutions'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.exercise_substitutions
+        ADD CONSTRAINT exercise_substitutions_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: exercises exercises_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.exercises
-      ADD CONSTRAINT exercises_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.exercises'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.exercises
+        ADD CONSTRAINT exercises_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: food_alternatives food_alternatives_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.food_alternatives
-      ADD CONSTRAINT food_alternatives_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.food_alternatives'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.food_alternatives
+        ADD CONSTRAINT food_alternatives_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: foods foods_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.foods
-      ADD CONSTRAINT foods_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.foods'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.foods
+        ADD CONSTRAINT foods_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: ingredients ingredients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.ingredients
-      ADD CONSTRAINT ingredients_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.ingredients'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.ingredients
+        ADD CONSTRAINT ingredients_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: invite_codes invite_codes_code_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1127,12 +1154,15 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.invite_codes
-      ADD CONSTRAINT invite_codes_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.invite_codes'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.invite_codes
+        ADD CONSTRAINT invite_codes_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: meal_logs meal_logs_meal_id_user_id_logged_date_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1151,84 +1181,105 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.meal_logs
-      ADD CONSTRAINT meal_logs_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.meal_logs'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.meal_logs
+        ADD CONSTRAINT meal_logs_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: meal_plan_assignments meal_plan_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.meal_plan_assignments
-      ADD CONSTRAINT meal_plan_assignments_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.meal_plan_assignments'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.meal_plan_assignments
+        ADD CONSTRAINT meal_plan_assignments_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: meal_plans meal_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.meal_plans
-      ADD CONSTRAINT meal_plans_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.meal_plans'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.meal_plans
+        ADD CONSTRAINT meal_plans_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: meals meals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.meals
-      ADD CONSTRAINT meals_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.meals'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.meals
+        ADD CONSTRAINT meals_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: messages messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.messages
-      ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.messages'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.messages
+        ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: profiles profiles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.profiles
-      ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.profiles'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.profiles
+        ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: program_assignments program_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.program_assignments
-      ADD CONSTRAINT program_assignments_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.program_assignments'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.program_assignments
+        ADD CONSTRAINT program_assignments_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: program_assignments program_assignments_program_id_client_id_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1259,24 +1310,30 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.set_logs
-      ADD CONSTRAINT set_logs_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.set_logs'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.set_logs
+        ADD CONSTRAINT set_logs_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: weight_logs weight_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.weight_logs
-      ADD CONSTRAINT weight_logs_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.weight_logs'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.weight_logs
+        ADD CONSTRAINT weight_logs_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: weight_logs weight_logs_user_id_recorded_at_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1295,24 +1352,30 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.workout_assignments
-      ADD CONSTRAINT workout_assignments_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.workout_assignments'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.workout_assignments
+        ADD CONSTRAINT workout_assignments_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: workout_program_workouts workout_program_workouts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.workout_program_workouts
-      ADD CONSTRAINT workout_program_workouts_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.workout_program_workouts'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.workout_program_workouts
+        ADD CONSTRAINT workout_program_workouts_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: workout_program_workouts workout_program_workouts_program_id_workout_id_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1331,24 +1394,30 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.workout_programs
-      ADD CONSTRAINT workout_programs_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.workout_programs'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.workout_programs
+        ADD CONSTRAINT workout_programs_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: workouts workouts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.workouts
-      ADD CONSTRAINT workouts_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.workouts'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.workouts
+        ADD CONSTRAINT workouts_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 
 
 -- Name: idx_body_measurements_user_date; Type: INDEX; Schema: public; Owner: -
