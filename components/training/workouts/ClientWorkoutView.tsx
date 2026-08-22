@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useAssignmentSync } from '@/lib/hooks/use-assignment-sync'
 import { useSupabase } from '@/lib/use-supabase'
 import { WeekSelector } from '@/components/ui/WeekSelector'
@@ -95,21 +95,23 @@ export default function ClientWorkoutView({
   const { invalidateWorkouts } = useAssignmentSync()
   const [selectedDate, setSelectedDate] = useState(todayISO())
 
-  // Honor the parent's "jump to this date" signal exactly once per
-  // value change. We can't put the prop in `useState`'s initializer
-  // because the tab panel is mounted on first visit and stays mounted —
-  // the prop may arrive long after first render.
+  // Honor the parent's "jump to this date" signal exactly once per value.
+  // We can't seed `useState` because the tab panel mounts on first visit
+  // and stays mounted — the prop may arrive long after first render, and
+  // may be re-issued from a fresh banner click after the trainee has
+  // moved to another date via WeekSelector. Always force `setSelectedDate`
+  // when a truthy `requestedDate` arrives (React no-ops if it matches)
+  // so the last-visited date can't win over an explicit navigation
+  // request. The consume callback lives in a ref so its inline-arrow
+  // identity from the parent doesn't cause spurious effect re-runs.
+  const consumeRef = useRef(onRequestedDateConsumed)
+  useEffect(() => {
+    consumeRef.current = onRequestedDateConsumed
+  }, [onRequestedDateConsumed])
   useEffect(() => {
     if (!requestedDate) return
-    if (requestedDate === selectedDate) {
-      onRequestedDateConsumed?.()
-      return
-    }
     setSelectedDate(requestedDate)
-    onRequestedDateConsumed?.()
-    // selectedDate is read for the equality check but intentionally not
-    // a dep — we only react to a fresh `requestedDate` from the parent.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    consumeRef.current?.()
   }, [requestedDate])
   const assignmentsQuery = useWorkoutAssignments(clientId, selectedDate)
   const assignments = assignmentsQuery.data ?? EMPTY_ASSIGNMENTS

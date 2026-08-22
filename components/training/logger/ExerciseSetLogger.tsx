@@ -193,10 +193,14 @@ export function ExerciseSetLogger({
     setManuallyExpanded(new Set())
   }, [assignmentId, exercise, loggedDate, currentVariant])
 
-  // Merge the query's persisted rows into local `rows` state whenever
-  // they change. Local state still owns the in-flight input strings so
-  // the user's keystrokes between persists aren't lost — we only stamp
-  // a row from the cache when there's an actual persisted row for it.
+  // Merge the query's persisted rows into local `rows` state. Runs on
+  // scope change too (not just when persistedRows itself changes) —
+  // otherwise the reset effect above wipes rows to prescribed blanks and
+  // this merge silently skips because `persistedRows` is still the same
+  // cached Map reference. That path erases the trainee's logged values
+  // when the coach saves an unrelated workout edit and the assignments
+  // cache refetches. Local state still owns in-flight input strings so
+  // typed-but-not-saved values survive between persists.
   useEffect(() => {
     setRows(prev =>
       prev.map(r => {
@@ -223,7 +227,7 @@ export function ExerciseSetLogger({
         }
       })
     )
-  }, [persistedRows])
+  }, [persistedRows, assignmentId, exercise, loggedDate, currentVariant])
 
   // Prefill empty inputs from last session's actuals. Fires whenever
   // prior performance data arrives, but only patches a row that has:

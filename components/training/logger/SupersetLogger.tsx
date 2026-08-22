@@ -183,8 +183,12 @@ export function SupersetLogger({
   }, [assignmentId, exercises, loggedDate, variantSignature])
 
   // Merge persisted rows from the query cache back into local
-  // `rowsByExercise`. Local state still holds in-flight input drafts;
-  // we only stamp a row when the cache has a persisted log for it.
+  // `rowsByExercise`. Depends on scope too (not just persistedByExercise)
+  // so a coach-side workout edit — which refetches the assignments cache
+  // and hands us fresh exercise references — doesn't leave rows wiped to
+  // prescribed blanks while this merge silently skips on a stable cache
+  // Map. Local state still holds in-flight input drafts; we only stamp a
+  // row when the cache has a persisted log for it.
   useEffect(() => {
     setRowsByExercise(prev => {
       const next = new Map<string, RowState[]>()
@@ -212,7 +216,7 @@ export function SupersetLogger({
       }
       return next
     })
-  }, [persistedByExercise])
+  }, [persistedByExercise, assignmentId, exercises, loggedDate, variantSignature])
 
   // Prefill empty inputs from last session's actuals. Same pattern as
   // ExerciseSetLogger — only patches rows that have neither a persisted
