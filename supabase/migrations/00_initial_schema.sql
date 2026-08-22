@@ -944,12 +944,15 @@ CREATE TABLE IF NOT EXISTS public.workouts (
 --
 
 DO $$ BEGIN
-  ALTER TABLE ONLY public.body_measurements
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.body_measurements'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE ONLY public.body_measurements
       ADD CONSTRAINT body_measurements_pkey PRIMARY KEY (id);
-
-
-  --
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  END IF;
+END $$;
 
 
 -- Name: coach_client_relationships coach_client_relationships_coach_id_client_id_key; Type: CONSTRAINT; Schema: public; Owner: -
