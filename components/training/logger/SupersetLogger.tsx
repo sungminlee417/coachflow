@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
@@ -183,13 +183,16 @@ export function SupersetLogger({
   }, [assignmentId, exercises, loggedDate, variantSignature])
 
   // Merge persisted rows from the query cache back into local
-  // `rowsByExercise`. Depends on scope too (not just persistedByExercise)
-  // so a coach-side workout edit — which refetches the assignments cache
-  // and hands us fresh exercise references — doesn't leave rows wiped to
-  // prescribed blanks while this merge silently skips on a stable cache
-  // Map. Local state still holds in-flight input drafts; we only stamp a
-  // row when the cache has a persisted log for it.
-  useEffect(() => {
+  // `rowsByExercise`. useLayoutEffect (not useEffect) so the overlay
+  // lands before the browser paints — otherwise on first mount and on
+  // superset regrouping (key change → remount), the useState initializer
+  // paints blank rows for a frame before the merge fills them, which
+  // reads as "logged values blanked out" to the trainee. Depends on
+  // scope too so a stale cached Map reference can't skip the overlay
+  // after the reset effect rebuilds rows. Local state still holds
+  // in-flight input drafts; we only stamp a row when the cache has a
+  // persisted log for it.
+  useLayoutEffect(() => {
     setRowsByExercise(prev => {
       const next = new Map<string, RowState[]>()
       for (const [exId, rows] of prev) {

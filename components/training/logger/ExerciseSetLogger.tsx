@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { showToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
@@ -193,15 +193,17 @@ export function ExerciseSetLogger({
     setManuallyExpanded(new Set())
   }, [assignmentId, exercise, loggedDate, currentVariant])
 
-  // Merge the query's persisted rows into local `rows` state. Runs on
-  // scope change too (not just when persistedRows itself changes) —
-  // otherwise the reset effect above wipes rows to prescribed blanks and
-  // this merge silently skips because `persistedRows` is still the same
-  // cached Map reference. That path erases the trainee's logged values
-  // when the coach saves an unrelated workout edit and the assignments
-  // cache refetches. Local state still owns in-flight input strings so
-  // typed-but-not-saved values survive between persists.
-  useEffect(() => {
+  // Merge the query's persisted rows into local `rows` state. Runs
+  // pre-paint via useLayoutEffect so the very first render after mount
+  // (or a scope-change remount) doesn't briefly paint the buildInitialRows
+  // blanks before the overlay lands — that flash is what users perceive
+  // as their logged values "blanking out" when the coach edits exercises
+  // and the assignments cache refetches. Depends on the scope tuple as
+  // well as persistedRows so a stale cached Map reference can't skip the
+  // overlay after the reset effect above rebuilds rows from scratch.
+  // Local state still owns in-flight input strings so typed-but-not-saved
+  // values survive between persists.
+  useLayoutEffect(() => {
     setRows(prev =>
       prev.map(r => {
         const log = persistedRows.get(r.set_number)
