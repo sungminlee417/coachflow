@@ -227,7 +227,7 @@ export default function TodayDashboard({
           userId={user.id}
           weightUnit={profile.weight_unit ?? 'lbs'}
           goalMl={profile.water_daily_goal_ml ?? null}
-          onOpen={() => onNavigate('measurements')}
+          onOpen={() => onNavigate('settings')}
         />
         {/* Secondary tiles — paired side-by-side on every viewport
             (including phones) so the dashboard reads as a mosaic

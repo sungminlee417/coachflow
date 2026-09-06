@@ -59,6 +59,7 @@ export type TodayNavTarget =
   | 'my-workouts'
   | 'my-programs'
   | 'my-meal-plans'
+  | 'settings'
 
 /** Optional payload carried with a navigation. Today, only the workout
  *  view consumes a `date`, but the shape is generic so other cards can
