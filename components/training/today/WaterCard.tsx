@@ -19,6 +19,7 @@ import { useState } from 'react'
 import { Droplets, Plus, Undo2 } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { showToast } from '@/components/ui/Toast'
+import { useProfile } from '@/lib/hooks/use-profile'
 import { useLogWaterDelta, useWaterLog } from '@/lib/hooks/use-water-logs'
 import { todayISO } from '@/lib/utils'
 import type { WeightUnit } from '@/lib/types'
@@ -62,13 +63,17 @@ export function WaterCard({
 }: {
   userId: string
   weightUnit: WeightUnit
-  /** Trainee-configured daily goal in ml. NULL falls back to DEFAULT_GOAL_ML. */
+  /** SSR-drilled initial goal from `profiles.water_daily_goal_ml`. The
+   *  live value is read via `useProfile` below so a Settings save reflects
+   *  on the card instantly without a page reload. This prop just seeds
+   *  the first render when the cache is cold. */
   goalMl: number | null
   onOpen: () => void
 }) {
   const today = todayISO()
   const waterQuery = useWaterLog(userId, today)
   const logDelta = useLogWaterDelta(userId)
+  const profileQuery = useProfile(userId)
   const loaded = waterQuery.isSuccess
 
   // Track the last successful add so Undo knows exactly how much to
@@ -82,7 +87,11 @@ export function WaterCard({
   const [customDraft, setCustomDraft] = useState('')
 
   const amount = waterQuery.data?.amount_ml ?? 0
-  const goal = goalMl && goalMl > 0 ? goalMl : DEFAULT_GOAL_ML
+  // Prefer the live profile value so a Settings save reflects immediately;
+  // fall back to the SSR-drilled prop while the profile query warms, and
+  // finally to the app-wide default so the card never shows an empty goal.
+  const liveGoal = profileQuery.data?.water_daily_goal_ml ?? goalMl
+  const goal = liveGoal && liveGoal > 0 ? liveGoal : DEFAULT_GOAL_ML
   const consumed = displayAmount(amount, weightUnit)
   const target = displayAmount(goal, weightUnit)
   const goalMet = amount >= goal
@@ -163,7 +172,7 @@ export function WaterCard({
                 key={p.delta_ml}
                 type="button"
                 onClick={() => handleAdd(p.delta_ml)}
-                className="flex-1 min-w-[68px] inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-indigo-line bg-surface text-xs font-semibold text-indigo-fg hover:bg-indigo-soft hover:border-indigo-fg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 tabular-nums"
+                className="flex-1 min-w-17 inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-indigo-line bg-surface text-xs font-semibold text-indigo-fg hover:bg-indigo-soft hover:border-indigo-fg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 tabular-nums"
               >
                 {p.label}
               </button>
