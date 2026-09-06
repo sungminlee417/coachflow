@@ -22,6 +22,10 @@ export interface Profile {
   /** Settings → Appearance. 'system' follows OS prefers-color-scheme;
    *  'light' / 'dark' force the theme regardless of OS preference. */
   theme?: ThemePreference
+  /** Daily hydration goal in ml. NULL = unset; UI falls back to 2000 ml
+   *  (~68 oz) for display, matching mainstream guidance. Stored in the
+   *  canonical unit so display can switch (oz ↔ ml) without a rewrite. */
+  water_daily_goal_ml?: number | null
   created_at?: string
   updated_at?: string
 }
@@ -283,6 +287,16 @@ export interface WeightLog {
   // along with the weigh-in. Plain percent value (0–100 on the wire).
   body_fat_percent: number | null
   notes: string | null
+}
+
+/** Per-(user, day) hydration total. Stored canonically in millilitres so
+ *  the display can toggle oz ↔ ml without touching the DB, and increments
+ *  can't drift via floating-point rounding. */
+export interface WaterLog {
+  id?: string
+  user_id?: string
+  logged_date: string
+  amount_ml: number
 }
 
 export interface BodyMeasurement {

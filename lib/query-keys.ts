@@ -39,6 +39,13 @@ export const queryKeys = {
     all: () => ['weight_logs'] as const,
   },
 
+  waterLogs: {
+    /** Total ml for one (user, day) — the Today card's data source. */
+    forDay: (userId: string, date: string) =>
+      ['water_logs', userId, date] as const,
+    all: () => ['water_logs'] as const,
+  },
+
   bodyMeasurements: {
     list: (userId: string) => ['body_measurements', userId] as const,
     /** Just the most-recent recorded_at for the Today card. */

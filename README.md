@@ -26,6 +26,7 @@ A coaching-and-training platform where every user can both coach and train. One 
 - **Auto-collapse on completion** — finished sets and finished superset rounds collapse to a one-line summary (`Set 1 · ✓ · 135 × 8`); tap to re-expand if you misclicked, with an in-row "↑ Collapse" link to fold it back.
 - **Cardio support** — duration in `mm:ss`, `1h 20m`, or bare-number minutes; intervals supported.
 - **Meal logging** — per-day check on each meal with a daily "X / Y eaten" chip; coach can see their clients' check history via RLS.
+- **Water intake tracking** — quick-add buttons on the Today dashboard (small / bottle / large glass, unit-aware for lbs vs kg users) accumulate throughout the day. A server-side atomic RPC (`log_water_delta`) does the addition so rapid taps or flaky retries can't lose an increment. Progress bar flips emerald when the daily goal is met; undo button reverses the last add. Storage in canonical ml; display converts to oz for lbs users. Daily goal lives on the profile with a 2 L default.
 - **Body measurements + weight chart** (Recharts) with a smooth area line, hover crosshair, lowest/avg/highest stats, and configurable units (lb/kg, in/cm).
 - **Settings** — `/app` Settings tab with three sections. Appearance: light / dark / system theme (persisted on `profiles.theme` for cross-device sync + `localStorage` for FOUC-free first paint). Preferences: hide the rest timer, hide the streak card. Account: change password via Supabase Auth. Toggle changes patch through TanStack Query optimistically so the UI flips instantly.
 - **Dark mode** — full app dark theme via Tailwind v4 class-based `dark:` variant. Inline bootstrap script in `<head>` applies the theme before React mounts (no flash), system preference auto-tracked when in 'system' mode, cross-tab sync via the `storage` event. Implementation in [lib/theme.tsx](lib/theme.tsx).
@@ -97,14 +98,14 @@ The schema includes:
 
 | Area | Tables |
 | --- | --- |
-| Identity | `profiles` (with `length_unit`, `weight_unit`, `weight_goal`, `rest_timer_enabled`, `show_streak_card`, `theme`) |
+| Identity | `profiles` (with `length_unit`, `weight_unit`, `weight_goal`, `rest_timer_enabled`, `show_streak_card`, `theme`, `water_daily_goal_ml`) |
 | Coaching | `coach_client_relationships`, `invite_codes` (with `expires_at`, `revoked_at`, `max_uses`) |
 | Workouts | `workouts`, `exercises`, `exercise_sets`, `exercise_alternatives` |
 | Programs | `workout_programs`, `workout_program_workouts`, `program_assignments` |
 | Assignments | `workout_assignments` (with `cycle_anchor_date`) |
 | Logs | `set_logs` (with `logged_date` for progressive overload), `exercise_substitutions` |
 | Nutrition | `meal_plans`, `meals`, `foods`, `ingredients`, `food_alternatives`, `meal_plan_assignments`, `meal_logs` |
-| Tracking | `weight_logs`, `body_measurements` |
+| Tracking | `weight_logs`, `body_measurements`, `water_logs` |
 
 All tables enable **Row Level Security**. Trainees see only their own data; coaches see their clients' assignments, set/meal logs, and substitutions through the `coach_client_relationships` join.
 

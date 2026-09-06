@@ -23,6 +23,7 @@ import { WorkoutCard } from './today/WorkoutCard'
 import { MealsCard } from './today/MealsCard'
 import { WeightCard } from './today/WeightCard'
 import { StreakCard } from './today/StreakCard'
+import { WaterCard } from './today/WaterCard'
 import { BodyMeasurementCard } from './today/BodyMeasurementCard'
 import { CoachSection } from './today/CoachSection'
 import { UnfinishedWorkoutBanner } from './today/UnfinishedWorkoutBanner'
@@ -217,6 +218,16 @@ export default function TodayDashboard({
           clientId={user.id}
           loggedDate={today}
           onOpen={() => onNavigate('assigned-meals')}
+        />
+        {/* Hydration lives right below meals — same "log throughout the
+            day" model, and pairing it with nutrition helps trainees
+            remember to sip alongside eating. Full-width so the three
+            quick-add buttons + progress bar breathe on any phone. */}
+        <WaterCard
+          userId={user.id}
+          weightUnit={profile.weight_unit ?? 'lbs'}
+          goalMl={profile.water_daily_goal_ml ?? null}
+          onOpen={() => onNavigate('measurements')}
         />
         {/* Secondary tiles — paired side-by-side on every viewport
             (including phones) so the dashboard reads as a mosaic
