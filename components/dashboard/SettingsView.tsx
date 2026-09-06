@@ -21,6 +21,7 @@ import {
   Moon,
   Sun,
   Palette,
+  Droplets,
 } from 'lucide-react'
 import { useProfile, useUpdateProfile } from '@/lib/hooks/use-profile'
 import { useTheme } from '@/lib/theme'
@@ -47,6 +48,7 @@ export default function SettingsView({ userId, email }: SettingsViewProps) {
       </header>
 
       <AppearanceSection userId={userId} />
+      <HydrationSection userId={userId} />
       <PreferencesSection userId={userId} />
       <AccountSection email={email} />
     </div>
@@ -141,6 +143,100 @@ function SectionCard({
       </div>
       {children}
     </section>
+  )
+}
+
+// ── Hydration ───────────────────────────────────────────────────────────
+
+// The card + RPC store water in canonical millilitres so unit toggles
+// never touch the DB — this section converts to the trainee's natural
+// unit (oz for lbs users, ml for kg) at the boundary and rounds the
+// stored value so the input never shows a fractional oz.
+const ML_PER_OZ_SETTINGS = 29.5735
+const DEFAULT_GOAL_ML_SETTINGS = 2000
+
+function HydrationSection({ userId }: { userId: string }) {
+  const profile = useProfile(userId)
+  const update = useUpdateProfile(userId)
+  const weightUnit = profile.data?.weight_unit ?? 'lbs'
+  const goalMl = profile.data?.water_daily_goal_ml ?? null
+
+  const unitLabel = weightUnit === 'lbs' ? 'oz' : 'ml'
+  const toDisplay = (ml: number | null): string => {
+    if (ml == null || ml <= 0) return ''
+    return weightUnit === 'lbs' ? String(Math.round(ml / ML_PER_OZ_SETTINGS)) : String(ml)
+  }
+  const toMl = (raw: string): number | null => {
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+    const n = parseFloat(trimmed)
+    if (!Number.isFinite(n) || n <= 0) return null
+    return weightUnit === 'lbs' ? Math.round(n * ML_PER_OZ_SETTINGS) : Math.round(n)
+  }
+
+  // Local draft so the user can clear the input mid-typing without the
+  // controlled value snapping back to a formatted number on every keystroke.
+  const [draft, setDraft] = useState<string | null>(null)
+  const display = draft ?? toDisplay(goalMl)
+  const placeholder = toDisplay(DEFAULT_GOAL_ML_SETTINGS)
+
+  const commit = () => {
+    const nextMl = toMl(display)
+    // If the user cleared the field we intentionally save NULL — the card
+    // treats NULL as "use the default" so the trainee can reset back to
+    // the standard target without knowing the specific default number.
+    if (nextMl === goalMl) {
+      setDraft(null)
+      return
+    }
+    update.mutate(
+      { water_daily_goal_ml: nextMl },
+      {
+        onSuccess: () => {
+          setDraft(null)
+          showToast('Water goal saved')
+        },
+        onError: () => showToast('Failed to save water goal', 'error'),
+      }
+    )
+  }
+
+  return (
+    <SectionCard
+      icon={Droplets}
+      title="Hydration"
+      description={`Daily water goal in ${unitLabel}. Leave blank to use the default (${placeholder} ${unitLabel}).`}
+    >
+      <Field id="hydration-goal" label={`Daily goal (${unitLabel})`}>
+        <div className="relative">
+          <Input
+            id="hydration-goal"
+            type="number"
+            inputMode="numeric"
+            min="0"
+            step={weightUnit === 'lbs' ? '1' : '50'}
+            value={display}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                ;(e.currentTarget as HTMLInputElement).blur()
+              }
+            }}
+            placeholder={placeholder}
+            disabled={!profile.isSuccess}
+            className="pr-12"
+          />
+          <span
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-subtle pointer-events-none tabular-nums"
+            aria-hidden
+          >
+            {unitLabel}
+          </span>
+        </div>
+      </Field>
+    </SectionCard>
   )
 }
 

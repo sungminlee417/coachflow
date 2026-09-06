@@ -16,7 +16,8 @@
 // numeric fraction so the trainee gets a visible reward for hitting it.
 
 import { useState } from 'react'
-import { Droplets, Undo2 } from 'lucide-react'
+import { Droplets, Plus, Undo2 } from 'lucide-react'
+import { Input } from '@/components/ui/Input'
 import { showToast } from '@/components/ui/Toast'
 import { useLogWaterDelta, useWaterLog } from '@/lib/hooks/use-water-logs'
 import { todayISO } from '@/lib/utils'
@@ -74,6 +75,11 @@ export function WaterCard({
   // subtract — undoing "the whole day" (which the RPC could support via
   // a big negative delta) would be too destructive for a one-tap button.
   const [lastDelta, setLastDelta] = useState<number | null>(null)
+  // Custom-amount field starts collapsed to keep the card compact for
+  // the 90% path (preset buttons). Expands to a small numeric input when
+  // the trainee needs an oddball amount (a 12 oz glass, a 700 ml flask).
+  const [customOpen, setCustomOpen] = useState(false)
+  const [customDraft, setCustomDraft] = useState('')
 
   const amount = waterQuery.data?.amount_ml ?? 0
   const goal = goalMl && goalMl > 0 ? goalMl : DEFAULT_GOAL_ML
@@ -101,6 +107,21 @@ export function WaterCard({
         onError: () => showToast('Failed to undo', 'error'),
       }
     )
+  }
+
+  const handleCustomAdd = () => {
+    const n = parseFloat(customDraft)
+    if (!Number.isFinite(n) || n <= 0) {
+      showToast(`Enter an amount in ${weightUnit === 'lbs' ? 'oz' : 'ml'}`, 'error')
+      return
+    }
+    // Round to ml at the boundary — the RPC only takes integers, and
+    // fractional oz would show back rounded on the next render anyway.
+    const delta_ml =
+      weightUnit === 'lbs' ? Math.round(n * ML_PER_OZ) : Math.round(n)
+    handleAdd(delta_ml)
+    setCustomDraft('')
+    setCustomOpen(false)
   }
 
   return (
@@ -158,6 +179,68 @@ export function WaterCard({
               <Undo2 size={14} />
             </button>
           </div>
+
+          {/* Custom-amount adder. Hidden behind a disclosure so the card
+              stays compact for the common case (preset buttons) but still
+              accommodates odd-sized containers (a 12 oz can, a 700 ml
+              flask) without forcing multiple preset taps. */}
+          {customOpen ? (
+            <form
+              onSubmit={e => {
+                e.preventDefault()
+                handleCustomAdd()
+              }}
+              className="grid grid-cols-[1fr_auto_auto] gap-1.5"
+            >
+              <div className="relative min-w-0">
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  value={customDraft}
+                  onChange={e => setCustomDraft(e.target.value)}
+                  placeholder={`Amount in ${weightUnit === 'lbs' ? 'oz' : 'ml'}`}
+                  className="text-sm py-1.5 pr-10"
+                  autoFocus
+                />
+                <span
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-subtle pointer-events-none"
+                  aria-hidden
+                >
+                  {weightUnit === 'lbs' ? 'oz' : 'ml'}
+                </span>
+              </div>
+              <button
+                type="submit"
+                disabled={!customDraft}
+                aria-label="Add custom amount"
+                className="h-8 px-3 rounded-lg bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+              >
+                <Plus size={12} />
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomOpen(false)
+                  setCustomDraft('')
+                }}
+                aria-label="Cancel custom amount"
+                className="h-8 px-2 rounded-lg text-xs font-medium text-subtle hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+              >
+                Cancel
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCustomOpen(true)}
+              className="text-[11px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer self-start rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+            >
+              + Custom amount
+            </button>
+          )}
         </div>
       )}
     </Card>

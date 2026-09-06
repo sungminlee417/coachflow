@@ -43,6 +43,7 @@ type ProfilePatch = Partial<
     | 'theme'
     | 'weight_program_start_date'
     | 'weight_goal'
+    | 'water_daily_goal_ml'
   >
 >
 
