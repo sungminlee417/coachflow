@@ -7,7 +7,7 @@
 // Sized to fit a 360px phone: 12 cols × 14px + gaps ≈ 220px. Day-of-
 // week labels collapse to single letters on mobile, full names on sm+.
 
-import { shiftDateISO, todayISO } from '@/lib/utils'
+import { dayOfMonthOf, parseLocalISO, shiftDateISO, todayISO, weekdayOf } from '@/lib/utils'
 
 const WEEKS = 12
 
@@ -16,8 +16,7 @@ export function ActivityHeatmap({ loggedDates }: { loggedDates: Set<string> }) {
   // Anchor the trailing week to the most recent Saturday (end of the
   // current week in Sun-first convention) so the latest column doesn't
   // visually float — fitness apps tend to align around weekly cycles.
-  const todayDate = new Date(today + 'T00:00:00')
-  const daysUntilSat = (6 - todayDate.getDay() + 7) % 7
+  const daysUntilSat = (6 - weekdayOf(today) + 7) % 7
   const anchorISO = shiftDateISO(today, daysUntilSat)
   // Build week columns: each column is 7 day cells (Sun-Sat).
   const columns: Array<{ date: string; logged: boolean; isToday: boolean }[]> = []
@@ -40,9 +39,8 @@ export function ActivityHeatmap({ loggedDates }: { loggedDates: Set<string> }) {
   // on or just after the 1st of a month, so the header reads naturally.
   const monthLabels = columns.map(col => {
     const sun = col[0]
-    const d = new Date(sun.date + 'T00:00:00')
-    return d.getDate() <= 7
-      ? d.toLocaleDateString('en-US', { month: 'short' })
+    return dayOfMonthOf(sun.date) <= 7
+      ? parseLocalISO(sun.date).toLocaleDateString('en-US', { month: 'short' })
       : ''
   })
 
@@ -69,7 +67,7 @@ export function ActivityHeatmap({ loggedDates }: { loggedDates: Set<string> }) {
                     key={cell.date}
                     title={`${
                       cell.logged ? 'Logged' : 'No activity'
-                    } · ${new Date(cell.date + 'T00:00:00').toLocaleDateString('en-US', {
+                    } · ${parseLocalISO(cell.date).toLocaleDateString('en-US', {
                       weekday: 'short',
                       month: 'short',
                       day: 'numeric',

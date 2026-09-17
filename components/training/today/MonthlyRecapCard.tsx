@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query'
 import { CalendarCheck2, Sparkles, X } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
 import { formatDuration, todayISO } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 interface SetLogPoint {
   logged_date: string
@@ -134,7 +135,25 @@ export function MonthlyRecapCard({
   })
 
   if (!inWindow || dismissed) return null
-  if (recapQuery.isLoading) return null
+  if (recapQuery.isLoading) return (
+    <div className="rounded-2xl border border-purple-line card-tint-purple p-4 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+        <div className="flex-1 space-y-1.5">
+          <Skeleton className="h-2.5 w-24 rounded" />
+          <Skeleton className="h-3.5 w-40 rounded" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-1">
+            <Skeleton className="h-6 w-12 rounded" />
+            <Skeleton className="h-2.5 w-16 rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
   const recap = recapQuery.data
   if (!recap || recap.sets === 0) return null
 

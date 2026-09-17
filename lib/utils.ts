@@ -15,7 +15,7 @@ const toLocalISO = (d: Date): string => {
  * Parse a YYYY-MM-DD string as LOCAL midnight.
  * (new Date("YYYY-MM-DD") parses as UTC, which shifts in non-UTC timezones.)
  */
-const parseLocalISO = (s: string): Date => {
+export const parseLocalISO = (s: string): Date => {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, m - 1, d)
 }

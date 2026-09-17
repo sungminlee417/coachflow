@@ -174,10 +174,12 @@ export function SupersetLogger({
     setPriorByKey(flat)
   }, [priorQuery.data])
 
-  // Reset draft inputs when the scope changes. See the matching comment
-  // in ExerciseSetLogger — this is the legitimate "mirror server state
-  // into a mutable draft" pattern.
-  useEffect(() => {
+  // Reset draft inputs when the scope changes. Must be useLayoutEffect so
+  // it runs before the merge below — both fire pre-paint and React chains
+  // their setState calls in order, giving the merge `prev` the reset blank
+  // rows. With useEffect the reset fired post-paint, after the merge, so
+  // the merged data was immediately wiped with no second merge to follow.
+  useLayoutEffect(() => {
     setRowsByExercise(buildInitialMap(exercises))
     setManuallyExpandedRounds(new Set())
   }, [assignmentId, exercises, loggedDate, variantSignature])

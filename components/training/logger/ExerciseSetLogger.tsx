@@ -183,12 +183,14 @@ export function ExerciseSetLogger({
     return null
   }, [rows, isCardio])
 
-  // Reset draft inputs when the scope changes. This is the legitimate
-  // "mirror server-derived state into a mutable draft" pattern — the
-  // local state owns mid-edit input strings which can't live in the
-  // query cache. The React-19 lint rule's general advice doesn't apply.
+  // Reset draft inputs when the scope changes. Must be a useLayoutEffect
+  // (not useEffect) so it runs before the merge below — both effects fire
+  // before paint and React chains their setState calls in order, giving the
+  // merge `prev` the freshly-reset blank rows. With useEffect the reset
+  // fired AFTER the merge (after paint), blanking the restored data with no
+  // second merge to follow.
   /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
+  useLayoutEffect(() => {
     setRows(buildInitialRows(exercise))
     setManuallyExpanded(new Set())
   }, [assignmentId, exercise, loggedDate, currentVariant])

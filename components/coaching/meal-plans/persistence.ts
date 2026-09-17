@@ -228,8 +228,16 @@ export async function saveMealPlan(
     if (foodDelErr) throw foodDelErr
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const foodsToInsert: any[] = []
+  const foodsToInsert: {
+    meal_id: string
+    name: string
+    quantity: string | undefined
+    calories: number | null
+    protein_grams: number | null
+    carbs_grams: number | null
+    fat_grams: number | null
+    order_index: number
+  }[] = []
   const foodLocalRefs: { mealIndex: number; foodIndex: number }[] = []
   meals.forEach((m, mealIndex) => {
     const mealId = allMealIds[mealIndex]
@@ -251,8 +259,7 @@ export async function saveMealPlan(
     })
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let insertedFoods: any[] = []
+  let insertedFoods: { id: string; meal_id: string; order_index: number }[] = []
   if (foodsToInsert.length > 0) {
     const { data, error: foodError } = await supabase
       .from('foods')
@@ -262,8 +269,16 @@ export async function saveMealPlan(
     insertedFoods = data ?? []
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ingredientsToInsert: any[] = []
+  const ingredientsToInsert: {
+    food_id: string
+    name: string
+    quantity: string
+    calories: number | null
+    protein_grams: number | null
+    carbs_grams: number | null
+    fat_grams: number | null
+    order_index: number
+  }[] = []
   foodLocalRefs.forEach((ref, i) => {
     const insertedFood = insertedFoods[i]
     if (!insertedFood) return

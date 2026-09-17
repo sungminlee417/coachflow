@@ -100,9 +100,9 @@ export async function loadWorkoutExercises(
     // Alternatives are optional — silently skip if unavailable.
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return exerciseList.map((ex: any) => {
-    const sets = (setsByExercise.get(ex.id) ?? [])
+  return (exerciseList as Exercise[]).map(ex => {
+    const id = ex.id!
+    const sets = (setsByExercise.get(id) ?? [])
       .slice()
       .sort((a: ExerciseSet, b: ExerciseSet) => a.set_number - b.set_number)
     const baseSets = sets.length > 0 ? sets : seedSetsFromLegacy(ex)
@@ -111,11 +111,9 @@ export async function loadWorkoutExercises(
     return {
       ...ex,
       exercise_type: type,
-      alternatives: altsByExercise.get(ex.id) ?? [],
+      alternatives: altsByExercise.get(id) ?? [],
       exercise_sets: type === 'cardio' ? hydrateCardioInputs(baseSets) : baseSets,
-      // Reuse the server id as the DnD key so identity is stable across
-      // unrelated state updates.
-      _dndKey: ex.id,
+      _dndKey: id,
     }
   })
 }
@@ -438,8 +436,16 @@ export async function saveWorkout(
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const setsToInsert: any[] = []
+  const setsToInsert: {
+    exercise_id: string
+    set_number: number
+    target_reps: string
+    target_duration_seconds: number | null
+    notes: string
+    target_speed: string | null
+    target_incline: string | null
+    target_resistance: string | null
+  }[] = []
   exercises.forEach((ex, i) => {
     const exId = allExerciseIds[i]
     const isCardio = ex.exercise_type === 'cardio'

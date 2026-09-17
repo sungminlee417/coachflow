@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Trophy, Flame, TrendingUp, Activity, HeartPulse } from 'lucide-react'
 import { useSupabase } from '@/lib/use-supabase'
-import { formatDate, formatDuration, todayISO } from '@/lib/utils'
+import { formatDate, formatDuration, parseLocalISO, todayISO } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { queryKeys } from '@/lib/query-keys'
 import { StatRowSkeleton, SummaryTilesSkeleton } from '@/components/ui/Skeleton'
@@ -93,7 +93,7 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
   // purity lint rule doesn't trip and so the memo keys off a stable
   // anchor for the day. Re-anchored when the underlying data changes.
   const todayAnchor = useMemo(
-    () => new Date(todayISO() + 'T00:00:00').getTime(),
+    () => parseLocalISO(todayISO()).getTime(),
     []
   )
 
@@ -168,7 +168,7 @@ export default function WorkoutHistory({ clientId }: WorkoutHistoryProps) {
     const weekDays = new Set<string>()
     const monthDays = new Set<string>()
     for (const d of sessionDays) {
-      const t = new Date(`${d}T00:00:00`).getTime()
+      const t = parseLocalISO(d).getTime()
       const diff = todayAnchor - t
       if (diff <= 7 * 86400_000) weekDays.add(d)
       if (diff <= 30 * 86400_000) monthDays.add(d)
