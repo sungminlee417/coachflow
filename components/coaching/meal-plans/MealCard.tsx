@@ -391,26 +391,20 @@ export function MealCard({
                         </>
                       )}
 
-                      <div className="mt-2 ml-4 pl-3 border-l-2 border-line">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-[10px] font-semibold text-subtle uppercase tracking-wide">
-                            Alternatives
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => actions.addFoodAlternative(index, foodIndex)}
-                            className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
-                          >
-                            + Add Alternative
-                          </button>
-                        </div>
-                        {(food.alternatives ?? []).length === 0 ? (
-                          <p className="text-[10px] text-subtle italic px-1 py-0.5">
-                            None yet. Add &ldquo;Greek yogurt&rdquo; or &ldquo;Cottage
-                            cheese&rdquo; so clients can swap if they don&rsquo;t have
-                            the original on hand.
-                          </p>
-                        ) : (
+                      {(food.alternatives ?? []).length > 0 && (
+                        <div className="mt-2 ml-4 pl-3 border-l-2 border-line">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] font-semibold text-subtle uppercase tracking-wide">
+                              Alternatives
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => actions.addFoodAlternative(index, foodIndex)}
+                              className="text-[10px] font-medium text-indigo-fg hover:text-indigo-fg-strong cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                            >
+                              + Add Alternative
+                            </button>
+                          </div>
                           <div className="space-y-1">
                             {(food.alternatives ?? []).map((alt, altIdx) => (
                               <IngredientRow
@@ -431,8 +425,37 @@ export function MealCard({
                               />
                             ))}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
+
+                      {(!hasIngredients || (food.alternatives ?? []).length === 0) && (
+                        <div className="mt-2 flex items-center gap-2">
+                          {!hasIngredients && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!expanded) actions.toggleFoodExpanded(index, foodIndex)
+                                actions.addIngredient(index, foodIndex)
+                              }}
+                              className="text-[10px] text-indigo-fg/70 hover:text-indigo-fg cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                            >
+                              + Sub-ingredients
+                            </button>
+                          )}
+                          {!hasIngredients && (food.alternatives ?? []).length === 0 && (
+                            <span className="text-[10px] text-faint leading-none">·</span>
+                          )}
+                          {(food.alternatives ?? []).length === 0 && (
+                            <button
+                              type="button"
+                              onClick={() => actions.addFoodAlternative(index, foodIndex)}
+                              className="text-[10px] text-indigo-fg/70 hover:text-indigo-fg cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                            >
+                              + Alternative
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
