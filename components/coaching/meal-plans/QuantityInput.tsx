@@ -24,7 +24,7 @@ export const COMMON_UNITS = [
 export function parseQuantity(raw: string): { amount: string; unit: string } {
   const trimmed = (raw ?? '').trim()
   if (!trimmed) return { amount: '', unit: '' }
-  const m = trimmed.match(/^(\d+(?:\.\d+)?)\s*(.*)$/)
+  const m = trimmed.match(/^(\d+(?:\.\d*)?)\s*(.*)$/)
   if (!m) return { amount: '', unit: trimmed }
   return { amount: m[1], unit: m[2].trim() }
 }
