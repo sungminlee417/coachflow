@@ -209,12 +209,42 @@ export function useSaveSetLog() {
         })
         return next
       })
-      return { prevExercise, prevDay, exerciseKey, dayKey }
+
+      // Also patch any superset cache that includes this exercise. Without
+      // this, editing a set in a superset (uncheck → edit → recheck) causes
+      // the stale superset cache to overwrite the edit when the group
+      // remounts — the per-exercise cache is patched optimistically but the
+      // superset query reads from its own cache key.
+      const supersetEntries = qc.getQueriesData<Map<string, Map<number, SetLogRow>>>({
+        predicate: q =>
+          Array.isArray(q.queryKey) &&
+          q.queryKey[0] === 'set_logs' &&
+          q.queryKey[1] === 'superset' &&
+          q.queryKey[2] === assignmentId &&
+          typeof q.queryKey[3] === 'string' &&
+          (q.queryKey[3] as string).split(',').includes(exerciseId),
+      })
+      const prevSupersets: Array<[readonly unknown[], Map<string, Map<number, SetLogRow>> | undefined]> = []
+      for (const [key] of supersetEntries) {
+        prevSupersets.push([key, qc.getQueryData(key)])
+        qc.setQueryData<Map<string, Map<number, SetLogRow>>>(key, current => {
+          const next = new Map(current ?? [])
+          const bySet = new Map(next.get(exerciseId) ?? [])
+          bySet.set(row.set_number, row)
+          next.set(exerciseId, bySet)
+          return next
+        })
+      }
+
+      return { prevExercise, prevDay, exerciseKey, dayKey, prevSupersets }
     },
     onError: (_err, _vars, ctx) => {
       if (!ctx) return
       if (ctx.prevExercise) qc.setQueryData(ctx.exerciseKey, ctx.prevExercise)
       if (ctx.prevDay) qc.setQueryData(ctx.dayKey, ctx.prevDay)
+      for (const [key, prev] of ctx.prevSupersets) {
+        qc.setQueryData(key, prev)
+      }
     },
     onSuccess: (_data, vars) => {
       // Lifetime aggregates (PR cards, streak) depend on set_logs too —

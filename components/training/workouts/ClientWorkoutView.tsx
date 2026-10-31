@@ -122,6 +122,11 @@ export default function ClientWorkoutView({
   // for solos and `${assignment.id}::group::${gi}` for supersets so the same
   // exercise across two simultaneous assignments doesn't collide.
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set())
+  // Keys the user deliberately re-opened after an auto-collapse. While a key
+  // is in this set, `handleAnyAllSetsCompleted` skips the auto-collapse so
+  // the trainee can edit without the card immediately snapping shut again.
+  // Cleared when the user manually collapses the card.
+  const [userExpandedKeys, setUserExpandedKeys] = useState<Set<string>>(new Set())
   // Active substitution per (assignment, exercise). Seeded from the fetched
   // exercise.substitution; mutated by the SubstitutionPicker's onChange.
   // null = original is in play; absent = not yet seeded.
@@ -131,10 +136,24 @@ export default function ClientWorkoutView({
     `${assignmentId}::${exerciseId}`
 
   const toggleCollapsed = (key: string) => {
+    const isCurrentlyCollapsed = collapsedKeys.has(key)
     setCollapsedKeys(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
+      return next
+    })
+    setUserExpandedKeys(prev => {
+      const next = new Set(prev)
+      if (isCurrentlyCollapsed) {
+        // User is expanding a (previously auto-collapsed) card — mark it so
+        // the next completion doesn't immediately re-collapse it.
+        next.add(key)
+      } else {
+        // User is manually collapsing — clear the guard so a future
+        // completion can auto-collapse normally.
+        next.delete(key)
+      }
       return next
     })
   }
@@ -163,6 +182,10 @@ export default function ClientWorkoutView({
   // mounts this component). It now lives at the TodayDashboard level
   // where the shared day-set-logs cache catches saves from any UI.
   const handleAnyAllSetsCompleted = (collapseKey: string) => {
+    // Skip auto-collapse if the trainee deliberately re-opened this card
+    // after a previous auto-collapse — they're editing and don't want it
+    // snapping shut on them again mid-edit.
+    if (userExpandedKeys.has(collapseKey)) return
     setCollapsedKeys(prev => {
       if (prev.has(collapseKey)) return prev
       const next = new Set(prev)
@@ -390,8 +413,14 @@ export default function ClientWorkoutView({
                               // Expand: drop every key for this assignment.
                               for (const k of allKeys) next.delete(k)
                             } else {
-                              // Collapse: add them all.
+                              // Collapse all: add them and clear user-expanded
+                              // guards so future completions can auto-collapse.
                               for (const k of allKeys) next.add(k)
+                              setUserExpandedKeys(prev2 => {
+                                const n2 = new Set(prev2)
+                                for (const k of allKeys) n2.delete(k)
+                                return n2
+                              })
                             }
                             return next
                           })
