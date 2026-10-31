@@ -16,6 +16,13 @@ import {
   scheduleValue,
 } from './AssignmentSchedulingFields'
 
+/** Convert a 1-indexed program day number to an absolute ISO date. */
+function programDayToDate(programStart: string, day: number): string {
+  const [y, m, d] = programStart.split('-').map(Number)
+  const date = new Date(y, m - 1, d + day - 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 interface ProgramAssignmentModalProps {
   open: boolean
   coachId: string
@@ -27,6 +34,8 @@ interface ProgramAssignmentModalProps {
 
 interface MemberRow {
   workout_id: string
+  start_day: number | null
+  end_day: number | null
   workout: {
     id: string
     name: string
@@ -129,7 +138,7 @@ export default function ProgramAssignmentModal({
       const { data } = await supabase
         .from('workout_program_workouts')
         .select(
-          'workout_id, order_index, workout:workout_id ( id, name, cycle_length, cycle_position )'
+          'workout_id, order_index, start_day, end_day, workout:workout_id ( id, name, cycle_length, cycle_position )'
         )
         .eq('program_id', programId)
         .order('order_index', { ascending: true })
@@ -179,19 +188,30 @@ export default function ProgramAssignmentModal({
       const workoutRows = targetIds.flatMap(targetId =>
         members
           .filter(m => m.workout)
-          .map(m => ({
-            workout_id: m.workout!.id,
-            client_id: targetId,
-            coach_id: coachId,
-            start_date: startVal,
-            end_date: endVal,
-            // Cycle anchor only meaningful if the workout uses cycle scheduling.
-            cycle_anchor_date:
-              m.workout!.cycle_length && m.workout!.cycle_position
-                ? anchorFallback
-                : null,
-            notes: notes || null,
-          }))
+          .map(m => {
+            // When a start date is set, per-workout day offsets compute
+            // absolute dates. Fall back to the program-level dates otherwise.
+            const wStart =
+              startVal && m.start_day != null
+                ? programDayToDate(startVal, m.start_day)
+                : startVal
+            const wEnd =
+              startVal && m.end_day != null
+                ? programDayToDate(startVal, m.end_day)
+                : endVal
+            return {
+              workout_id: m.workout!.id,
+              client_id: targetId,
+              coach_id: coachId,
+              start_date: wStart,
+              end_date: wEnd,
+              cycle_anchor_date:
+                m.workout!.cycle_length && m.workout!.cycle_position
+                  ? anchorFallback
+                  : null,
+              notes: notes || null,
+            }
+          })
       )
 
       // Skip dupes if the client already had any of these workouts assigned.
@@ -209,6 +229,8 @@ export default function ProgramAssignmentModal({
           client_id: targetId,
           coach_id: coachId,
           cycle_anchor_date: anchorFallback,
+          start_date: startVal,
+          end_date: endVal,
         }))
         // ignoreDuplicates so re-clicking Assign on an already-assigned client
         // doesn't overwrite the original anchor (which would shift the
@@ -271,9 +293,14 @@ export default function ProgramAssignmentModal({
             </p>
             <ol className="text-xs text-foreground space-y-0.5">
               {members.map((m, i) => (
-                <li key={m.workout_id} className="truncate">
-                  <span className="text-subtle mr-1 tabular-nums">{i + 1}.</span>
-                  {m.workout?.name ?? '(deleted workout)'}
+                <li key={m.workout_id} className="flex items-baseline gap-1.5">
+                  <span className="text-subtle tabular-nums shrink-0">{i + 1}.</span>
+                  <span className="truncate">{m.workout?.name ?? '(deleted workout)'}</span>
+                  {(m.start_day != null || m.end_day != null) && (
+                    <span className="text-subtle tabular-nums shrink-0">
+                      days {m.start_day ?? 1}–{m.end_day ?? '∞'}
+                    </span>
+                  )}
                 </li>
               ))}
             </ol>

@@ -20,6 +20,13 @@ import { useDirtyState } from '@/lib/use-dirty-state'
 import { Plus, X, Search } from 'lucide-react'
 import type { WorkoutProgram } from '@/lib/types'
 
+/** Convert a 1-indexed program day number to an absolute ISO date. */
+function programDayToDate(programStart: string, day: number): string {
+  const [y, m, d] = programStart.split('-').map(Number)
+  const date = new Date(y, m - 1, d + day - 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 interface ProgramBuilderProps {
   coachId: string
   program: WorkoutProgram | null
@@ -33,6 +40,10 @@ interface MemberWorkout {
   exercise_count: number
   cycle_length: number | null
   cycle_position: number | null
+  /** 1-indexed day from program start when this workout becomes active. */
+  start_day: number | null
+  /** 1-indexed day from program start on which this workout expires. */
+  end_day: number | null
 }
 
 export default function ProgramBuilder({ coachId, program, onClose }: ProgramBuilderProps) {
@@ -52,7 +63,13 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
   const [snapshotReady, setSnapshotReady] = useState(!program?.id)
 
   const isDirty = useDirtyState(
-    { name, description, isTemplate, memberIds: members.map(m => m.id) },
+    {
+      name,
+      description,
+      isTemplate,
+      memberIds: members.map(m => m.id),
+      memberDays: members.map(m => `${m.id}:${m.start_day ?? ''}:${m.end_day ?? ''}`),
+    },
     snapshotReady
   )
 
@@ -81,19 +98,25 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
         exercise_count: w.exercises?.[0]?.count ?? 0,
         cycle_length: w.cycle_length ?? null,
         cycle_position: w.cycle_position ?? null,
+        start_day: null,
+        end_day: null,
       }))
       setAllWorkouts(list)
 
       if (program?.id) {
         const { data: rows, error } = await supabase
           .from('workout_program_workouts')
-          .select('workout_id, order_index')
+          .select('workout_id, order_index, start_day, end_day')
           .eq('program_id', program.id)
           .order('order_index', { ascending: true })
         if (error) throw error
         const byId = new Map(list.map(w => [w.id, w]))
         const ordered: MemberWorkout[] = (rows ?? [])
-          .map((r: { workout_id: string }) => byId.get(r.workout_id))
+          .map((r: { workout_id: string; start_day: number | null; end_day: number | null }) => {
+            const base = byId.get(r.workout_id)
+            if (!base) return null
+            return { ...base, start_day: r.start_day ?? null, end_day: r.end_day ?? null }
+          })
           .filter((w): w is MemberWorkout => !!w)
         setMembers(ordered)
       }
@@ -105,9 +128,21 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
   }
 
   const addMember = (workout: MemberWorkout) => {
-    setMembers(prev => (prev.find(m => m.id === workout.id) ? prev : [...prev, workout]))
+    setMembers(prev =>
+      prev.find(m => m.id === workout.id)
+        ? prev
+        : [...prev, { ...workout, start_day: null, end_day: null }]
+    )
     setShowPicker(false)
     setPickerQuery('')
+  }
+
+  const updateMemberDay = (
+    workoutId: string,
+    field: 'start_day' | 'end_day',
+    value: number | null
+  ) => {
+    setMembers(prev => prev.map(m => (m.id === workoutId ? { ...m, [field]: value } : m)))
   }
 
   const removeMember = (workoutId: string) => {
@@ -177,6 +212,8 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
           program_id: programId,
           workout_id: m.id,
           order_index: i,
+          start_day: m.start_day ?? null,
+          end_day: m.end_day ?? null,
         }))
         const { error } = await supabase.from('workout_program_workouts').insert(rows)
         if (error) throw error
@@ -191,30 +228,42 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
         try {
           const { data: tracked } = await supabase
             .from('program_assignments')
-            .select('client_id, coach_id, cycle_anchor_date')
+            .select('client_id, coach_id, cycle_anchor_date, start_date, end_date')
             .eq('program_id', programId)
           const tracking = (tracked ?? []) as {
             client_id: string
             coach_id: string
             cycle_anchor_date: string | null
+            start_date: string | null
+            end_date: string | null
           }[]
           if (tracking.length > 0) {
             const newRows = tracking.flatMap(t =>
-              addedWorkouts.map(w => ({
-                workout_id: w.id,
-                client_id: t.client_id,
-                coach_id: t.coach_id,
-                start_date: null,
-                end_date: null,
-                // Cycle workouts use the anchor that was set when the
-                // program was originally assigned to this client, so the
-                // rotation stays in phase with the rest of the program.
-                cycle_anchor_date:
-                  w.cycle_length && w.cycle_position
-                    ? t.cycle_anchor_date ?? new Date().toISOString().slice(0, 10)
-                    : null,
-                notes: null,
-              }))
+              addedWorkouts.map(w => {
+                // If the program has a stored start date and this workout
+                // has day offsets, derive absolute dates; otherwise fall
+                // back to the program-level start/end dates.
+                const wStart =
+                  t.start_date && w.start_day != null
+                    ? programDayToDate(t.start_date, w.start_day)
+                    : t.start_date ?? null
+                const wEnd =
+                  t.start_date && w.end_day != null
+                    ? programDayToDate(t.start_date, w.end_day)
+                    : t.end_date ?? null
+                return {
+                  workout_id: w.id,
+                  client_id: t.client_id,
+                  coach_id: t.coach_id,
+                  start_date: wStart,
+                  end_date: wEnd,
+                  cycle_anchor_date:
+                    w.cycle_length && w.cycle_position
+                      ? t.cycle_anchor_date ?? new Date().toISOString().slice(0, 10)
+                      : null,
+                  notes: null,
+                }
+              })
             )
             await supabase
               .from('workout_assignments')
@@ -313,12 +362,12 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
           className="space-y-2"
           renderItem={(m, idx, dragProps) => (
             <div
-              className={`bg-surface rounded-xl border border-line p-3 flex items-center gap-3 ${
+              className={`bg-surface rounded-xl border border-line p-3 flex items-start gap-3 ${
  dragProps.isDragging ? 'shadow-lg' : ''
  }`}
             >
               <DragHandle {...dragProps} />
-              <span className="text-xs font-semibold text-subtle tabular-nums w-6">
+              <span className="text-xs font-semibold text-subtle tabular-nums w-6 mt-0.5">
                 {idx + 1}.
               </span>
               <div className="flex-1 min-w-0">
@@ -334,6 +383,38 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
                     </>
                   )}
                 </p>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <span className="text-[10px] text-subtle shrink-0">Days</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={m.start_day ?? ''}
+                    onChange={e =>
+                      updateMemberDay(
+                        m.id,
+                        'start_day',
+                        e.target.value ? parseInt(e.target.value, 10) : null
+                      )
+                    }
+                    placeholder="1"
+                    className="text-xs py-1 px-2 w-16"
+                  />
+                  <span className="text-[10px] text-subtle">–</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={m.end_day ?? ''}
+                    onChange={e =>
+                      updateMemberDay(
+                        m.id,
+                        'end_day',
+                        e.target.value ? parseInt(e.target.value, 10) : null
+                      )
+                    }
+                    placeholder="end"
+                    className="text-xs py-1 px-2 w-16"
+                  />
+                </div>
               </div>
               <IconButton
                 tone="danger"
