@@ -3,12 +3,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSupabase } from '@/lib/use-supabase'
 import { WeekSelector } from '@/components/ui/WeekSelector'
-import { Bell, Flame, Beef, Wheat, Droplet, Trash2, X } from 'lucide-react'
+import { Bell, Flame, Beef, Wheat, Droplet, Trash2, Pencil, X } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { AssignmentCardSkeleton } from '@/components/ui/Skeleton'
 import { showToast } from '@/components/ui/Toast'
 import { MealLogToggle } from './MealLogToggle'
+import EditMealPlanScheduleModal from '@/components/coaching/assignments/EditMealPlanScheduleModal'
 import {
   todayISO,
   formatLongDate,
@@ -58,6 +59,12 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
   }, [])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [pendingUnassign, setPendingUnassign] = useState<{ id: string; name: string } | null>(null)
+  const [editingSchedule, setEditingSchedule] = useState<{
+    id: string
+    planName: string
+    startDate: string | null
+    endDate: string | null
+  } | null>(null)
 
   const handleUnassign = async () => {
     if (!pendingUnassign) return
@@ -264,18 +271,33 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
                     )}
                   </div>
                   {isOwnAssignment && (
-                    <IconButton
-                      tone="danger"
-                      onClick={() =>
-                        setPendingUnassign({
-                          id: assignment.id,
-                          name: assignment.meal_plan.name,
-                        })
-                      }
-                      aria-label="Unassign meal plan"
-                    >
-                      <Trash2 size={16} />
-                    </IconButton>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <IconButton
+                        onClick={() =>
+                          setEditingSchedule({
+                            id: assignment.id,
+                            planName: assignment.meal_plan.name,
+                            startDate: assignment.start_date ?? null,
+                            endDate: assignment.end_date ?? null,
+                          })
+                        }
+                        aria-label="Edit schedule"
+                      >
+                        <Pencil size={16} />
+                      </IconButton>
+                      <IconButton
+                        tone="danger"
+                        onClick={() =>
+                          setPendingUnassign({
+                            id: assignment.id,
+                            name: assignment.meal_plan.name,
+                          })
+                        }
+                        aria-label="Unassign meal plan"
+                      >
+                        <Trash2 size={16} />
+                      </IconButton>
+                    </div>
                   )}
                 </div>
 
@@ -453,6 +475,16 @@ export default function ClientMealPlanView({ clientId }: ClientMealPlanViewProps
           })}
         </div>
       )}
+
+      <EditMealPlanScheduleModal
+        open={!!editingSchedule}
+        coachId={clientId}
+        assignmentId={editingSchedule?.id ?? ''}
+        planName={editingSchedule?.planName ?? ''}
+        initialStartDate={editingSchedule?.startDate ?? null}
+        initialEndDate={editingSchedule?.endDate ?? null}
+        onClose={() => setEditingSchedule(null)}
+      />
 
       <ConfirmDialog
         open={!!pendingUnassign}
