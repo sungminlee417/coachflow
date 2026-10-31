@@ -12,6 +12,9 @@ interface DatePickerProps {
   allowClear?: boolean
   id?: string
   className?: string
+  /** Which edge of the trigger to anchor the popup to. Default 'left'. Use
+   *  'right' for pickers in a right-hand column to avoid viewport overflow. */
+  align?: 'left' | 'right'
 }
 
 const toLocalISO = (d: Date): string => {
@@ -45,6 +48,7 @@ export function DatePicker({
   allowClear,
   id,
   className = '',
+  align = 'left',
 }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -100,7 +104,7 @@ export function DatePicker({
 
       {open && (
         <div
-          className="absolute z-50 mt-2 bg-surface rounded-xl border border-line shadow-xl p-3 left-0"
+          className={`absolute z-50 mt-2 bg-surface rounded-xl border border-line shadow-xl p-3 ${align === 'right' ? 'right-0' : 'left-0'}`}
           style={
             {
               animation: 'popIn 0.15s ease-out',

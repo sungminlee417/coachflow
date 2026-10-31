@@ -8,11 +8,12 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Avatar } from '@/components/ui/Avatar'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { AssignedItemRowSkeleton } from '@/components/ui/Skeleton'
-import { ArrowLeft, Trash2, Apple, Dumbbell } from 'lucide-react'
+import { ArrowLeft, Trash2, Apple, Dumbbell, Pencil } from 'lucide-react'
 import { formatDate, unwrapJoin } from '@/lib/utils'
 import type { Client } from '@/lib/types'
 import WorkoutAssignmentModal from '../assignments/WorkoutAssignmentModal'
 import MealPlanAssignmentModal from '../assignments/MealPlanAssignmentModal'
+import EditMealPlanScheduleModal from '../assignments/EditMealPlanScheduleModal'
 
 interface WorkoutAssignmentRow {
   id: string
@@ -60,6 +61,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
   const [loading, setLoading] = useState(true)
   const [assigningWorkout, setAssigningWorkout] = useState<WorkoutOption | null>(null)
   const [assigningMealPlan, setAssigningMealPlan] = useState<MealPlanOption | null>(null)
+  const [editingMealPlan, setEditingMealPlan] = useState<MealPlanAssignmentRow | null>(null)
   const [pendingDelete, setPendingDelete] = useState<DeleteTarget | null>(null)
 
   useEffect(() => {
@@ -210,6 +212,19 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
         }}
       />
 
+      <EditMealPlanScheduleModal
+        open={!!editingMealPlan}
+        coachId={coachId}
+        assignmentId={editingMealPlan?.id ?? ''}
+        planName={editingMealPlan?.meal_plan?.name ?? 'Meal Plan'}
+        initialStartDate={editingMealPlan?.start_date ?? null}
+        initialEndDate={editingMealPlan?.end_date ?? null}
+        onClose={() => {
+          setEditingMealPlan(null)
+          fetchMealPlanAssignments()
+        }}
+      />
+
       <ConfirmDialog
         open={!!pendingDelete}
         title={
@@ -331,19 +346,27 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
                   </p>
                 </div>
               </div>
-              <IconButton
-                tone="danger"
-                onClick={() =>
-                  setPendingDelete({
-                    kind: 'meal-plan',
-                    id: a.id,
-                    label: a.meal_plan?.name ?? 'Meal Plan',
-                  })
-                }
-                aria-label="Remove meal plan assignment"
-              >
-                <Trash2 size={14} />
-              </IconButton>
+              <div className="flex items-center gap-1 shrink-0">
+                <IconButton
+                  onClick={() => setEditingMealPlan(a)}
+                  aria-label="Edit schedule"
+                >
+                  <Pencil size={14} />
+                </IconButton>
+                <IconButton
+                  tone="danger"
+                  onClick={() =>
+                    setPendingDelete({
+                      kind: 'meal-plan',
+                      id: a.id,
+                      label: a.meal_plan?.name ?? 'Meal Plan',
+                    })
+                  }
+                  aria-label="Remove meal plan assignment"
+                >
+                  <Trash2 size={14} />
+                </IconButton>
+              </div>
             </div>
           ))}
         </div>

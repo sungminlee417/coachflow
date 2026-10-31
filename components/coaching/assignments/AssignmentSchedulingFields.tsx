@@ -88,6 +88,7 @@ export function AssignmentSchedulingFields({
                 onChange={onEndChange}
                 placeholder="No end"
                 allowClear
+                align="right"
               />
             </Field>
           </div>
