@@ -540,7 +540,7 @@ export default function MealPlanBuilder({ coachId, mealPlan, onClose }: MealPlan
       // plan payload, so name / meal / food changes only show up on
       // the trainee side after that cache is invalidated.
       await invalidateMealPlans({ coachId })
-      onClose()
+      showToast('Meal plan saved')
     } catch {
       showToast('Failed to save meal plan', 'error')
     } finally {
