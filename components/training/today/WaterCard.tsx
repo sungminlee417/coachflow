@@ -50,7 +50,7 @@ const DEFAULT_GOAL_ML = 2000
 
 function displayAmount(ml: number, unit: WeightUnit): { value: number; suffix: string } {
   if (unit === 'lbs') {
-    return { value: Math.round(ml / ML_PER_OZ * 10) / 10, suffix: 'oz' }
+    return { value: Math.round(ml / ML_PER_OZ * 100) / 100, suffix: 'oz' }
   }
   return { value: ml, suffix: 'ml' }
 }
