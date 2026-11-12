@@ -32,9 +32,9 @@ const ML_PER_OZ = 29.5735
 // vs. an exact conversion are irrelevant for hydration tracking.
 const PRESETS_ML: Record<WeightUnit, Array<{ label: string; delta_ml: number }>> = {
   lbs: [
-    { label: '+8 oz', delta_ml: 237 },
-    { label: '+16 oz', delta_ml: 473 },
-    { label: '+32 oz', delta_ml: 946 },
+    { label: '+8 oz',  delta_ml: 8  * ML_PER_OZ },
+    { label: '+16 oz', delta_ml: 16 * ML_PER_OZ },
+    { label: '+32 oz', delta_ml: 32 * ML_PER_OZ },
   ],
   kg: [
     { label: '+250 ml', delta_ml: 250 },
@@ -124,10 +124,8 @@ export function WaterCard({
       showToast(`Enter an amount in ${weightUnit === 'lbs' ? 'oz' : 'ml'}`, 'error')
       return
     }
-    // Round to ml at the boundary — the RPC only takes integers, and
-    // fractional oz would show back rounded on the next render anyway.
     const delta_ml =
-      weightUnit === 'lbs' ? Math.round(n * ML_PER_OZ) : Math.round(n)
+      weightUnit === 'lbs' ? n * ML_PER_OZ : n
     handleAdd(delta_ml)
     setCustomDraft('')
     setCustomOpen(false)
