@@ -208,7 +208,10 @@ export function WaterCard({
                   step="any"
                   min="0"
                   value={customDraft}
-                  onChange={e => setCustomDraft(e.target.value)}
+                  onChange={e => {
+                    const v = e.target.value
+                    if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) setCustomDraft(v)
+                  }}
                   placeholder={`Amount in ${weightUnit === 'lbs' ? 'oz' : 'ml'}`}
                   className="text-sm py-1.5 pr-10"
                   autoFocus
