@@ -50,12 +50,7 @@ const DEFAULT_GOAL_ML = 2000
 
 function displayAmount(ml: number, unit: WeightUnit): { value: number; suffix: string } {
   if (unit === 'lbs') {
-    const oz = Math.round(ml / ML_PER_OZ * 100) / 100
-    // Snap to integer when within the oz↔ml round-trip tolerance (~0.017 oz
-    // max error from storing oz as integer ml). Without this, 128 oz saves
-    // as 3785 ml and reads back as 127.99 oz.
-    const display = Math.abs(oz - Math.round(oz)) <= 0.02 ? Math.round(oz) : oz
-    return { value: display, suffix: 'oz' }
+    return { value: Math.round(ml / ML_PER_OZ * 100) / 100, suffix: 'oz' }
   }
   return { value: ml, suffix: 'ml' }
 }
