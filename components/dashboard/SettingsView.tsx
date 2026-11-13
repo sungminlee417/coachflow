@@ -171,7 +171,7 @@ function HydrationSection({ userId }: { userId: string }) {
     if (!trimmed) return null
     const n = parseFloat(trimmed)
     if (!Number.isFinite(n) || n <= 0) return null
-    return weightUnit === 'lbs' ? Math.round(n * ML_PER_OZ_SETTINGS) : Math.round(n)
+    return weightUnit === 'lbs' ? n * ML_PER_OZ_SETTINGS : n
   }
 
   // Local draft so the user can clear the input mid-typing without the
