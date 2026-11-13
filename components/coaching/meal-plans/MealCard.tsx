@@ -100,7 +100,7 @@ export function MealCard({
             {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </span>
           {meal.name ? (
-            <span className="text-sm font-medium text-foreground truncate min-w-0">
+            <span className="text-sm font-medium text-foreground truncate min-w-0" title={meal.name}>
               {meal.name}
             </span>
           ) : (

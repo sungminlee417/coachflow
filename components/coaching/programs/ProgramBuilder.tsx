@@ -18,14 +18,8 @@ import { AddItemButton } from '@/components/ui/AddItemButton'
 import { AddFab } from '@/components/ui/AddFab'
 import { useDirtyState } from '@/lib/use-dirty-state'
 import { Plus, X, Search } from 'lucide-react'
-import type { WorkoutProgram } from '@/lib/types'
-
-/** Convert a 1-indexed program day number to an absolute ISO date. */
-function programDayToDate(programStart: string, day: number): string {
-  const [y, m, d] = programStart.split('-').map(Number)
-  const date = new Date(y, m - 1, d + day - 1)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
+import type { DayOfWeek, WorkoutProgram } from '@/lib/types'
+import { DayOfWeekSelector } from '@/components/ui/DayOfWeekSelector'
 
 interface ProgramBuilderProps {
   coachId: string
@@ -40,10 +34,10 @@ interface MemberWorkout {
   exercise_count: number
   cycle_length: number | null
   cycle_position: number | null
-  /** 1-indexed day from program start when this workout becomes active. */
-  start_day: number | null
-  /** 1-indexed day from program start on which this workout expires. */
-  end_day: number | null
+  /** Days set on the workout template itself — takes precedence; slot is locked when non-empty. */
+  workoutDays: DayOfWeek[]
+  /** Per-slot override stored in workout_program_workouts.days_of_week. Null = inherit program default. */
+  slotDays: DayOfWeek[] | null
 }
 
 export default function ProgramBuilder({ coachId, program, onClose }: ProgramBuilderProps) {
@@ -52,14 +46,13 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
   const [name, setName] = useState(program?.name || '')
   const [description, setDescription] = useState(program?.description || '')
   const [isTemplate, setIsTemplate] = useState(program?.is_template || false)
+  const [defaultDays, setDefaultDays] = useState<DayOfWeek[]>([])
   const [members, setMembers] = useState<MemberWorkout[]>([])
   const [allWorkouts, setAllWorkouts] = useState<MemberWorkout[]>([])
   const [showPicker, setShowPicker] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
-  // Don't snapshot for dirty-state until the initial fetches finish — otherwise
-  // the dirty badge flashes the moment the form is opened to edit.
   const [snapshotReady, setSnapshotReady] = useState(!program?.id)
 
   const isDirty = useDirtyState(
@@ -67,8 +60,9 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
       name,
       description,
       isTemplate,
+      defaultDays: defaultDays.join(','),
       memberIds: members.map(m => m.id),
-      memberDays: members.map(m => `${m.id}:${m.start_day ?? ''}:${m.end_day ?? ''}`),
+      memberSlotDays: members.map(m => `${m.id}:${(m.slotDays ?? []).join(',')}`),
     },
     snapshotReady
   )
@@ -80,16 +74,26 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
 
   const fetchAll = async () => {
     try {
-      // Coach's full workout catalog — used both as the picker source and the
-      // lookup for member metadata.
-      const { data: catalog, error: catalogErr } = await supabase
-        .from('workouts')
-        .select(
-          'id, name, description, cycle_length, cycle_position, exercises(count)'
-        )
-        .eq('coach_id', coachId)
-        .order('name')
+      const [{ data: catalog, error: catalogErr }, programRow] = await Promise.all([
+        supabase
+          .from('workouts')
+          .select('id, name, description, days_of_week, cycle_length, cycle_position, exercises(count)')
+          .eq('coach_id', coachId)
+          .order('name'),
+        program?.id
+          ? supabase
+              .from('workout_programs')
+              .select('default_days_of_week')
+              .eq('id', program.id)
+              .single()
+          : Promise.resolve({ data: null }),
+      ])
       if (catalogErr) throw catalogErr
+
+      if (programRow.data?.default_days_of_week) {
+        setDefaultDays(programRow.data.default_days_of_week as DayOfWeek[])
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const list: MemberWorkout[] = (catalog ?? []).map((w: any) => ({
         id: w.id,
@@ -98,24 +102,24 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
         exercise_count: w.exercises?.[0]?.count ?? 0,
         cycle_length: w.cycle_length ?? null,
         cycle_position: w.cycle_position ?? null,
-        start_day: null,
-        end_day: null,
+        workoutDays: (w.days_of_week ?? []) as DayOfWeek[],
+        slotDays: null,
       }))
       setAllWorkouts(list)
 
       if (program?.id) {
         const { data: rows, error } = await supabase
           .from('workout_program_workouts')
-          .select('workout_id, order_index, start_day, end_day')
+          .select('workout_id, order_index, days_of_week')
           .eq('program_id', program.id)
           .order('order_index', { ascending: true })
         if (error) throw error
         const byId = new Map(list.map(w => [w.id, w]))
         const ordered: MemberWorkout[] = (rows ?? [])
-          .map((r: { workout_id: string; start_day: number | null; end_day: number | null }) => {
+          .map((r: { workout_id: string; days_of_week: DayOfWeek[] | null }) => {
             const base = byId.get(r.workout_id)
             if (!base) return null
-            return { ...base, start_day: r.start_day ?? null, end_day: r.end_day ?? null }
+            return { ...base, slotDays: r.days_of_week ?? null }
           })
           .filter((w): w is MemberWorkout => !!w)
         setMembers(ordered)
@@ -131,18 +135,16 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
     setMembers(prev =>
       prev.find(m => m.id === workout.id)
         ? prev
-        : [...prev, { ...workout, start_day: null, end_day: null }]
+        : [...prev, { ...workout, slotDays: null }]
     )
     setShowPicker(false)
     setPickerQuery('')
   }
 
-  const updateMemberDay = (
-    workoutId: string,
-    field: 'start_day' | 'end_day',
-    value: number | null
-  ) => {
-    setMembers(prev => prev.map(m => (m.id === workoutId ? { ...m, [field]: value } : m)))
+  const updateSlotDays = (workoutId: string, days: DayOfWeek[]) => {
+    setMembers(prev =>
+      prev.map(m => (m.id === workoutId ? { ...m, slotDays: days.length > 0 ? days : null } : m))
+    )
   }
 
   const removeMember = (workoutId: string) => {
@@ -165,7 +167,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
       if (programId) {
         const { error } = await supabase
           .from('workout_programs')
-          .update({ name, description, is_template: isTemplate })
+          .update({ name, description, is_template: isTemplate, default_days_of_week: defaultDays.length > 0 ? defaultDays : null })
           .eq('id', programId)
         if (error) throw error
       } else {
@@ -176,6 +178,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
             name,
             description,
             is_template: isTemplate,
+            default_days_of_week: defaultDays.length > 0 ? defaultDays : null,
           })
           .select()
           .single()
@@ -212,8 +215,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
           program_id: programId,
           workout_id: m.id,
           order_index: i,
-          start_day: m.start_day ?? null,
-          end_day: m.end_day ?? null,
+          days_of_week: m.slotDays ?? null,
         }))
         const { error } = await supabase.from('workout_program_workouts').insert(rows)
         if (error) throw error
@@ -240,27 +242,23 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
           if (tracking.length > 0) {
             const newRows = tracking.flatMap(t =>
               addedWorkouts.map(w => {
-                // If the program has a stored start date and this workout
-                // has day offsets, derive absolute dates; otherwise fall
-                // back to the program-level start/end dates.
-                const wStart =
-                  t.start_date && w.start_day != null
-                    ? programDayToDate(t.start_date, w.start_day)
-                    : t.start_date ?? null
-                const wEnd =
-                  t.start_date && w.end_day != null
-                    ? programDayToDate(t.start_date, w.end_day)
-                    : t.end_date ?? null
+                // Workout's own days take precedence; otherwise use the slot
+                // override, then the program default.
+                const effectiveDays =
+                  w.workoutDays.length > 0
+                    ? null
+                    : (w.slotDays ?? (defaultDays.length > 0 ? defaultDays : null))
                 return {
                   workout_id: w.id,
                   client_id: t.client_id,
                   coach_id: t.coach_id,
-                  start_date: wStart,
-                  end_date: wEnd,
+                  start_date: t.start_date ?? null,
+                  end_date: t.end_date ?? null,
                   cycle_anchor_date:
                     w.cycle_length && w.cycle_position
                       ? t.cycle_anchor_date ?? new Date().toISOString().slice(0, 10)
                       : null,
+                  days_of_week: effectiveDays,
                   notes: null,
                 }
               })
@@ -332,6 +330,16 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
           />
         </Field>
 
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Default schedule
+          </label>
+          <p className="text-[11px] text-muted mb-2">
+            Applies to any workout in this program that has no days set. Leave empty for every day.
+          </p>
+          <DayOfWeekSelector value={defaultDays} onChange={setDefaultDays} />
+        </div>
+
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -371,7 +379,7 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
                 {idx + 1}.
               </span>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{m.name}</p>
+                <p className="font-medium text-foreground truncate" title={m.name}>{m.name}</p>
                 <p className="text-xs text-muted truncate">
                   {m.exercise_count} {m.exercise_count === 1 ? 'exercise' : 'exercises'}
                   {m.cycle_length && m.cycle_position && (
@@ -383,37 +391,20 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
                     </>
                   )}
                 </p>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <span className="text-[10px] text-subtle shrink-0">Days</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={m.start_day ?? ''}
-                    onChange={e =>
-                      updateMemberDay(
-                        m.id,
-                        'start_day',
-                        e.target.value ? parseInt(e.target.value, 10) : null
-                      )
-                    }
-                    placeholder="1"
-                    className="text-xs py-1 px-2 w-16"
-                  />
-                  <span className="text-[10px] text-subtle">–</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={m.end_day ?? ''}
-                    onChange={e =>
-                      updateMemberDay(
-                        m.id,
-                        'end_day',
-                        e.target.value ? parseInt(e.target.value, 10) : null
-                      )
-                    }
-                    placeholder="end"
-                    className="text-xs py-1 px-2 w-16"
-                  />
+                <div className="mt-2">
+                  {m.workoutDays.length > 0 ? (
+                    <p className="text-[11px] text-subtle">
+                      Schedule set by workout
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-[10px] text-subtle mb-1">Days (overrides program default)</p>
+                      <DayOfWeekSelector
+                        value={m.slotDays ?? []}
+                        onChange={days => updateSlotDays(m.id, days)}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
               <IconButton
@@ -485,14 +476,15 @@ export default function ProgramBuilder({ coachId, program, onClose }: ProgramBui
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-elevated transition-colors cursor-pointer flex items-center justify-between gap-2"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-foreground truncate">{w.name}</p>
+                    <p className="font-medium text-foreground truncate" title={w.name}>{w.name}</p>
                     <p className="text-xs text-muted truncate">
                       {w.exercise_count}{' '}
                       {w.exercise_count === 1 ? 'exercise' : 'exercises'}
                       {w.cycle_length && w.cycle_position && (
-                        <>
-                          {' · '}Day {w.cycle_position}/{w.cycle_length}
-                        </>
+                        <> · Day {w.cycle_position}/{w.cycle_length}</>
+                      )}
+                      {w.workoutDays.length > 0 && (
+                        <> · has schedule</>
                       )}
                     </p>
                   </div>

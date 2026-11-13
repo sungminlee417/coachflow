@@ -11,17 +11,11 @@ import { DatePicker } from '@/components/ui/DatePicker'
 import { AssigneePicker } from '@/components/ui/AssigneePicker'
 import { ListChecks, Users } from 'lucide-react'
 import { todayISO } from '@/lib/utils'
+import type { DayOfWeek } from '@/lib/types'
 import {
   AssignmentSchedulingFields,
   scheduleValue,
 } from './AssignmentSchedulingFields'
-
-/** Convert a 1-indexed program day number to an absolute ISO date. */
-function programDayToDate(programStart: string, day: number): string {
-  const [y, m, d] = programStart.split('-').map(Number)
-  const date = new Date(y, m - 1, d + day - 1)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
 
 interface ProgramAssignmentModalProps {
   open: boolean
@@ -34,11 +28,11 @@ interface ProgramAssignmentModalProps {
 
 interface MemberRow {
   workout_id: string
-  start_day: number | null
-  end_day: number | null
+  days_of_week: DayOfWeek[] | null
   workout: {
     id: string
     name: string
+    days_of_week: DayOfWeek[]
     cycle_length: number | null
     cycle_position: number | null
   } | null
@@ -68,6 +62,7 @@ export default function ProgramAssignmentModal({
   const [cycleAnchor, setCycleAnchor] = useState('')
   const [notes, setNotes] = useState('')
   const [members, setMembers] = useState<MemberRow[]>([])
+  const [programDefaultDays, setProgramDefaultDays] = useState<DayOfWeek[]>([])
   const [loadingMembers, setLoadingMembers] = useState(false)
   const [assigning, setAssigning] = useState(false)
   // Bulk mode swaps the single-select dropdown for a checklist of every
@@ -135,16 +130,24 @@ export default function ProgramAssignmentModal({
     let cancelled = false
     setLoadingMembers(true)
     ;(async () => {
-      const { data } = await supabase
-        .from('workout_program_workouts')
-        .select(
-          'workout_id, order_index, start_day, end_day, workout:workout_id ( id, name, cycle_length, cycle_position )'
-        )
-        .eq('program_id', programId)
-        .order('order_index', { ascending: true })
+      const [{ data }, { data: prog }] = await Promise.all([
+        supabase
+          .from('workout_program_workouts')
+          .select(
+            'workout_id, order_index, days_of_week, workout:workout_id ( id, name, days_of_week, cycle_length, cycle_position )'
+          )
+          .eq('program_id', programId)
+          .order('order_index', { ascending: true }),
+        supabase
+          .from('workout_programs')
+          .select('default_days_of_week')
+          .eq('id', programId)
+          .single(),
+      ])
       if (cancelled) return
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setMembers((data ?? []) as any)
+      setProgramDefaultDays((prog?.default_days_of_week ?? []) as DayOfWeek[])
       setLoadingMembers(false)
     })()
     return () => {
@@ -189,26 +192,24 @@ export default function ProgramAssignmentModal({
         members
           .filter(m => m.workout)
           .map(m => {
-            // When a start date is set, per-workout day offsets compute
-            // absolute dates. Fall back to the program-level dates otherwise.
-            const wStart =
-              startVal && m.start_day != null
-                ? programDayToDate(startVal, m.start_day)
-                : startVal
-            const wEnd =
-              startVal && m.end_day != null
-                ? programDayToDate(startVal, m.end_day)
-                : endVal
+            // Workout's own days take precedence (don't override with
+            // assignment-level days); fall back to slot → program default.
+            const workoutDays = m.workout!.days_of_week ?? []
+            const effectiveDays =
+              workoutDays.length > 0
+                ? null
+                : (m.days_of_week ?? (programDefaultDays.length > 0 ? programDefaultDays : null))
             return {
               workout_id: m.workout!.id,
               client_id: targetId,
               coach_id: coachId,
-              start_date: wStart,
-              end_date: wEnd,
+              start_date: startVal,
+              end_date: endVal,
               cycle_anchor_date:
                 m.workout!.cycle_length && m.workout!.cycle_position
                   ? anchorFallback
                   : null,
+              days_of_week: effectiveDays,
               notes: notes || null,
             }
           })
@@ -292,17 +293,24 @@ export default function ProgramAssignmentModal({
               {members.length === 1 ? 'workout' : 'workouts'}
             </p>
             <ol className="text-xs text-foreground space-y-0.5">
-              {members.map((m, i) => (
-                <li key={m.workout_id} className="flex items-baseline gap-1.5">
-                  <span className="text-subtle tabular-nums shrink-0">{i + 1}.</span>
-                  <span className="truncate">{m.workout?.name ?? '(deleted workout)'}</span>
-                  {(m.start_day != null || m.end_day != null) && (
-                    <span className="text-subtle tabular-nums shrink-0">
-                      days {m.start_day ?? 1}–{m.end_day ?? '∞'}
-                    </span>
-                  )}
-                </li>
-              ))}
+              {members.map((m, i) => {
+                const workoutDays = m.workout?.days_of_week ?? []
+                const effectiveDays =
+                  workoutDays.length > 0
+                    ? workoutDays
+                    : (m.days_of_week ?? (programDefaultDays.length > 0 ? programDefaultDays : null))
+                return (
+                  <li key={m.workout_id} className="flex items-baseline gap-1.5">
+                    <span className="text-subtle tabular-nums shrink-0">{i + 1}.</span>
+                    <span className="truncate">{m.workout?.name ?? '(deleted workout)'}</span>
+                    {effectiveDays && effectiveDays.length > 0 && (
+                      <span className="text-subtle tabular-nums shrink-0 text-[10px]">
+                        {['Su','M','T','W','Th','F','Sa'].filter((_, d) => effectiveDays.includes(d as DayOfWeek)).join('/')}
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
             </ol>
             <p className="text-[10px] text-subtle mt-2">
               Workouts already assigned to this person will be left as-is.

@@ -151,12 +151,11 @@ export interface WorkoutAssignment {
   completed?: boolean
   completed_at?: string | null
   notes?: string | null
-  // The coach who created the assignment. Equals the trainee's own id for
-  // self-assigned workouts — used to gate the "Unassign" button.
   coach_id?: string
-  // For cycle-based workouts: the calendar date that maps to position 1 of
-  // the rotation. Null when the workout uses weekly scheduling.
   cycle_anchor_date?: string | null
+  // Assignment-level schedule override. When set, takes precedence over
+  // workout.days_of_week. Null means "use the workout's own schedule."
+  days_of_week?: DayOfWeek[] | null
   workout: {
     id: string
     name: string

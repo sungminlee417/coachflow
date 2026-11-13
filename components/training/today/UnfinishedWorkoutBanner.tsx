@@ -127,7 +127,7 @@ export function UnfinishedWorkoutBanner({
           <p className="text-[10px] font-bold uppercase tracking-widest text-amber-fg">
             Unfinished
           </p>
-          <p className="text-sm font-semibold text-foreground mt-0.5 truncate">
+          <p className="text-sm font-semibold text-foreground mt-0.5 truncate" title={data.name}>
             {data.name}
           </p>
           <p className="text-xs text-muted mt-0.5 tabular-nums">

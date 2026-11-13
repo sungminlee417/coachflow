@@ -338,7 +338,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
                   <Apple size={16} className="text-emerald-fg" />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-foreground text-sm truncate">
+                  <p className="font-medium text-foreground text-sm truncate" title={a.meal_plan?.name ?? 'Meal Plan'}>
                     {a.meal_plan?.name ?? 'Meal Plan'}
                   </p>
                   <p className="text-xs text-muted mt-0.5">
@@ -405,7 +405,7 @@ export default function ClientDetailView({ client, coachId, onBack }: ClientDeta
                   <Dumbbell size={16} className="text-indigo-fg" />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-foreground text-sm truncate">
+                  <p className="font-medium text-foreground text-sm truncate" title={a.workout?.name ?? 'Workout'}>
                     {a.workout?.name ?? 'Workout'}
                   </p>
                   <p className="text-xs text-muted mt-0.5">

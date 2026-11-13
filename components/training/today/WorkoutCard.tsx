@@ -143,7 +143,7 @@ export function WorkoutCard({
       ) : (
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-semibold text-foreground truncate min-w-0">
+            <p className="font-semibold text-foreground truncate min-w-0" title={assignments.map(a => a.workout.name).join(' · ')}>
               {assignments.map(a => a.workout.name).join(' · ')}
             </p>
             <p className="text-xs text-muted shrink-0 tabular-nums">
@@ -191,7 +191,7 @@ export function WorkoutCard({
             // The next thing to do is a cardio exercise or superset
             // round, which the inline mini-logger doesn't handle. Point
             // the user at the full view via the Open button.
-            <p className="text-xs text-muted truncate">
+            <p className="text-xs text-muted truncate" title={`Next: ${summary.nextExercise}`}>
               Next:{' '}
               <span className="font-medium text-foreground">{summary.nextExercise}</span>
               <span className="ml-1 text-subtle">— open to log</span>

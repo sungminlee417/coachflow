@@ -206,7 +206,7 @@ function IngredientNameField({
  i === highlight ? 'bg-emerald-soft ' : 'hover:bg-elevated '
  }`}
               >
-                <p className="font-medium text-foreground truncate">
+                <p className="font-medium text-foreground truncate" title={entry.name}>
                   {entry.name}
                 </p>
                 <p className="text-[10px] text-muted mt-0.5 tabular-nums">

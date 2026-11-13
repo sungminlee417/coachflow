@@ -46,8 +46,7 @@ interface WorkoutAssignmentRow {
   notes: string | null
   coach_id: string
   cycle_anchor_date: string | null
-  // Supabase serializes single-row joins as either an object or an array
-  // depending on relationship cardinality.
+  days_of_week: DayOfWeek[] | null
   workout: WorkoutJoinedRow | WorkoutJoinedRow[] | null
 }
 
@@ -161,6 +160,7 @@ export async function fetchActiveWorkoutAssignments(
         notes: item.notes,
         coach_id: item.coach_id,
         cycle_anchor_date: item.cycle_anchor_date,
+        days_of_week: item.days_of_week ?? null,
         workout: {
           id: workout?.id ?? '',
           name: workout?.name ?? '',
@@ -192,7 +192,8 @@ export async function fetchActiveWorkoutAssignments(
         item.workout?.cycle_length,
         item.workout?.cycle_position,
         item.cycle_anchor_date,
-        item.workout?.days_of_week,
+        // Assignment-level days take precedence over the workout template's.
+        item.days_of_week ?? item.workout?.days_of_week,
         weekday,
         dateISO
       )

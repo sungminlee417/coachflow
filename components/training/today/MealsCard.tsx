@@ -176,6 +176,7 @@ export function MealsCard({
                       className={`truncate ${
  status === 'eaten' ? 'text-subtle line-through' : 'text-foreground '
  }`}
+                      title={mealDisplayName(m.name, numberByMeal.get(m.id))}
                     >
                       {mealDisplayName(m.name, numberByMeal.get(m.id))}
                     </span>
